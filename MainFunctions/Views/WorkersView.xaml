@@ -1,0 +1,117 @@
+﻿<UserControl x:Class="MainFunctions.Views.WorkersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:MainFunctions.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Background="#F5F5F5" Margin="10">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Filters -->
+            <RowDefinition Height="*"/>
+            <!-- Content -->
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <DockPanel Margin="0,0,0,15">
+            <TextBlock Text="Workers"
+                   FontSize="26"
+                   FontWeight="Bold"/>
+
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+            </StackPanel>
+        </DockPanel>
+
+        <!-- FILTERS -->
+        <Grid Grid.Row="1" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SearchWorkers"
+                 Height="32"
+                 Margin="0,0,10,0"
+                 ToolTip="Search workers..." />
+
+            <ComboBox x:Name="RoleFilter"
+                  Grid.Column="1"
+                  Margin="0,0,10,0"
+                  SelectedIndex="0" SelectionChanged="RoleFilter_SelectionChanged">
+                <ComboBoxItem Content="All Roles"/>
+                <ComboBoxItem Content="Mason"/>
+                <ComboBoxItem Content="Helper"/>
+                <ComboBoxItem Content="Electrician"/>
+                <ComboBoxItem Content="Supervisor"/>
+            </ComboBox>
+
+            <Button Grid.Column="2" Content="Refresh" Width="90"/>
+        </Grid>
+
+        <!-- MAIN CONTENT -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="2*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- WORKERS LIST -->
+            <Border Background="White" CornerRadius="10" Padding="10" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="Worker List" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+
+                    <DataGrid x:Name="WorkersGrid"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Role" Binding="{Binding Role}" Width="*"/>
+                            <DataGridTextColumn Header="Daily Rate" Binding="{Binding Rate}" Width="*"/>
+                            <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="*"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*"/>
+                        </DataGrid.Columns>
+
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- DETAILS PANEL -->
+            <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="15">
+                <StackPanel>
+                    <TextBlock Text="Worker Details" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Name:" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailWorkerName" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Role:" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailRole" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Rate (LKR / day):" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailRate" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Phone:" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailPhone" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Notes:" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailNotes" TextWrapping="Wrap" Margin="0,0,0,15"/>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Assign to Project" Width="130" Margin="0,0,10,0"/>
+                        <Button Content="Mark Attendance" Width="137"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <Button Content="Add Worker" Click="AddWorker_Click" Grid.Column="1" Margin="68,291,68,22" />
+
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,68 @@
+﻿<UserControl x:Class="MainFunctions.Views.MaterialsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#F5F5F5">
+
+    <Grid Margin="10">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Search + Actions -->
+            <RowDefinition Height="*" />
+            <!-- Table -->
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <TextBlock Text="Materials"
+                   FontSize="26"
+                   FontWeight="Bold"
+                   Margin="0,0,0,15"/>
+
+        <!-- SEARCH + ACTIONS -->
+        <Grid Grid.Row="1" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SearchBox"
+                     Margin="0,0,15,0"
+                     Height="32"
+                     ToolTip="Search material..."/>
+
+            <Button Grid.Column="1"
+                    Content="Add Material"
+                    Width="120" Margin="0,0,10,0"
+                    Click="AddMaterial_Click"/>
+
+            <Button Grid.Column="2"
+                    Content="Refresh"
+                    Width="90"
+                    Click="Refresh_Click"/>
+        </Grid>
+
+        <!-- TABLE -->
+        <DataGrid Grid.Row="2"
+                  x:Name="MaterialsGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="150"/>
+                <DataGridTextColumn Header="Stock" Binding="{Binding Quantity}" Width="100"/>
+                <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="100"/>
+                <DataGridTextColumn Header="Cost" Binding="{Binding Cost}" Width="120"/>
+            </DataGrid.Columns>
+
+        </DataGrid>
+
+    </Grid>
+
+</UserControl>
