@@ -1,0 +1,382 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+
+namespace MainFunctions.Services
+{
+    public static class DbPatcher
+    {
+        // Ensures new columns exist in SQLite when no EF migrations are present
+        public static async Task EnsureAttendanceSchema(DbContext db)
+        {
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                if (conn.State != ConnectionState.Open)
+                    await conn.OpenAsync();
+
+                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "PRAGMA table_info(Attendances);";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var name = reader.GetString(1);
+                        columns.Add(name);
+                    }
+                }
+
+                if (!columns.Contains("HoursWorked"))
+                {
+                    using var alter = conn.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Attendances ADD COLUMN HoursWorked NUMERIC NOT NULL DEFAULT 0;";
+                    await alter.ExecuteNonQueryAsync();
+                }
+
+                if (!columns.Contains("IsHalfDay"))
+                {
+                    using var alter2 = conn.CreateCommand();
+                    alter2.CommandText = "ALTER TABLE Attendances ADD COLUMN IsHalfDay INTEGER NOT NULL DEFAULT 0;";
+                    await alter2.ExecuteNonQueryAsync();
+                }
+            }
+            catch { }
+        }
+
+        public static async Task EnsurePaymentSchema(DbContext db)
+        {
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                if (conn.State != ConnectionState.Open)
+                    await conn.OpenAsync();
+
+                async Task<bool> TableExists(string table)
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = $"PRAGMA table_info({table});";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    return reader.HasRows;
+                }
+
+                if (!await TableExists("PaymentHeaders"))
+                {
+                    using var create = conn.CreateCommand();
+                    create.CommandText = @"CREATE TABLE IF NOT EXISTS PaymentHeaders (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Type TEXT NOT NULL,
+                        EntityId INTEGER NOT NULL,
+                        ProjectId INTEGER,
+                        PeriodStart TEXT NOT NULL,
+                        PeriodEnd TEXT NOT NULL,
+                        Source TEXT NOT NULL,
+                        Status TEXT NOT NULL,
+                        Notes TEXT NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        DueDate TEXT
+                    );";
+                    await create.ExecuteNonQueryAsync();
+                }
+
+                if (!await TableExists("PaymentLines"))
+                {
+                    using var create = conn.CreateCommand();
+                    create.CommandText = @"CREATE TABLE IF NOT EXISTS PaymentLines (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        PaymentHeaderId INTEGER NOT NULL,
+                        Date TEXT NOT NULL,
+                        Description TEXT NOT NULL,
+                        Amount NUMERIC NOT NULL,
+                        FOREIGN KEY (PaymentHeaderId) REFERENCES PaymentHeaders(Id) ON DELETE CASCADE
+                    );";
+                    await create.ExecuteNonQueryAsync();
+                }
+
+                if (!await TableExists("Settlements"))
+                {
+                    using var create = conn.CreateCommand();
+                    create.CommandText = @"CREATE TABLE IF NOT EXISTS Settlements (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        PaymentHeaderId INTEGER NOT NULL,
+                        Date TEXT NOT NULL,
+                        Amount NUMERIC NOT NULL,
+                        Method TEXT NOT NULL,
+                        FOREIGN KEY (PaymentHeaderId) REFERENCES PaymentHeaders(Id) ON DELETE CASCADE
+                    );";
+                    await create.ExecuteNonQueryAsync();
+                }
+
+                using (var idx = conn.CreateCommand())
+                {
+                    idx.CommandText = @"CREATE UNIQUE INDEX IF NOT EXISTS IX_PaymentHeaders_UniquePayroll ON PaymentHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd);";
+                    await idx.ExecuteNonQueryAsync();
+                }
+            }
+            catch { }
+        }
+
+        // Ensure Workers table has Phone2 column to avoid materialization errors
+        public static async Task EnsureWorkerSchema(DbContext db)
+        {
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                if (conn.State != ConnectionState.Open)
+                    await conn.OpenAsync();
+
+                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "PRAGMA table_info(Workers);";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var name = reader.GetString(1);
+                        columns.Add(name);
+                    }
+                }
+
+                if (!columns.Contains("Phone2"))
+                {
+                    using var alter = conn.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Workers ADD COLUMN Phone2 TEXT NOT NULL DEFAULT '';";
+                    await alter.ExecuteNonQueryAsync();
+                }
+            }
+            catch { }
+        }
+
+        // New obligation & cash ledger schema
+        public static async Task EnsureObligationSchema(DbContext db)
+        {
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                if (conn.State != ConnectionState.Open)
+                    await conn.OpenAsync();
+
+                async Task<bool> TableExists(string table)
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = $"PRAGMA table_info({table});";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    return reader.HasRows;
+                }
+
+                async Task Exec(string sql)
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = sql;
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                if (!await TableExists("Suppliers"))
+                {
+                    await Exec(@"CREATE TABLE IF NOT EXISTS Suppliers (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL,
+                        Contact TEXT NOT NULL,
+                        Notes TEXT NOT NULL,
+                        IsActive INTEGER NOT NULL,
+                        CreatedAt TEXT NOT NULL
+                    );");
+                }
+
+                if (!await TableExists("ObligationHeaders"))
+                {
+                    await Exec(@"CREATE TABLE IF NOT EXISTS ObligationHeaders (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Type TEXT NOT NULL,
+                        Direction TEXT NOT NULL,
+                        ProjectId INTEGER,
+                        EntityType TEXT NOT NULL,
+                        EntityId INTEGER,
+                        PeriodStart TEXT NOT NULL,
+                        PeriodEnd TEXT NOT NULL,
+                        DueDate TEXT,
+                        TotalAmountSnapshot NUMERIC NOT NULL DEFAULT 0,
+                        Status TEXT NOT NULL,
+                        IsLocked INTEGER NOT NULL DEFAULT 0,
+                        Notes TEXT NOT NULL,
+                        CreatedAt TEXT NOT NULL
+                    );");
+
+                    // Legacy generic uniqueness (kept for backward compatibility, doesn't enforce ClientInvoice uniqueness for NULL EntityId)
+                    await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_Unique ON ObligationHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd);");
+                }
+
+                if (!await TableExists("ObligationLines"))
+                {
+                    await Exec(@"CREATE TABLE IF NOT EXISTS ObligationLines (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ObligationHeaderId INTEGER NOT NULL,
+                        Description TEXT NOT NULL,
+                        Quantity NUMERIC NOT NULL,
+                        UnitRate NUMERIC NOT NULL,
+                        Amount NUMERIC NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
+                    );");
+                }
+
+                if (!await TableExists("CashSettlements"))
+                {
+                    await Exec(@"CREATE TABLE IF NOT EXISTS CashSettlements (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ObligationHeaderId INTEGER,
+                        Date TEXT NOT NULL,
+                        Amount NUMERIC NOT NULL,
+                        Direction TEXT NOT NULL,
+                        Method TEXT NOT NULL,
+                        FromEntityType TEXT NOT NULL,
+                        FromEntityId INTEGER,
+                        ToEntityType TEXT NOT NULL,
+                        ToEntityId INTEGER,
+                        ReferenceNo TEXT NOT NULL,
+                        Notes TEXT NOT NULL,
+                        EnteredByUserId INTEGER,
+                        CreatedAt TEXT NOT NULL,
+                        IsReversal INTEGER NOT NULL DEFAULT 0,
+                        ReversesSettlementId INTEGER,
+                        RemainingAmount NUMERIC NOT NULL DEFAULT 0,
+                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
+                    );");
+
+                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_CashSettlements_Header ON CashSettlements(ObligationHeaderId);");
+                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_CashSettlements_Reverses ON CashSettlements(ReversesSettlementId);");
+                }
+
+                if (!await TableExists("AdvanceApplications"))
+                {
+                    await Exec(@"CREATE TABLE IF NOT EXISTS AdvanceApplications (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        AdvanceSettlementId INTEGER NOT NULL,
+                        ObligationHeaderId INTEGER NOT NULL,
+                        AppliedAmount NUMERIC NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        FOREIGN KEY(AdvanceSettlementId) REFERENCES CashSettlements(Id),
+                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
+                    );");
+
+                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_AdvanceApplications_Advance ON AdvanceApplications(AdvanceSettlementId);");
+                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_AdvanceApplications_Header ON AdvanceApplications(ObligationHeaderId);");
+                }
+
+                // Drop any existing triggers on these tables and recreate the allowed set
+                foreach (var tbl in new[] { "ObligationHeaders", "ObligationLines", "CashSettlements", "AdvanceApplications" })
+                {
+                    using var q = conn.CreateCommand();
+                    q.CommandText = "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=@t";
+                    var p = q.CreateParameter();
+                    p.ParameterName = "@t";
+                    p.Value = tbl;
+                    q.Parameters.Add(p);
+                    using var r = await q.ExecuteReaderAsync();
+                    var toDrop = new List<string>();
+                    while (await r.ReadAsync()) toDrop.Add(r.GetString(0));
+                    foreach (var trig in toDrop)
+                    {
+                        await Exec($"DROP TRIGGER IF EXISTS {trig};");
+                    }
+                }
+
+                // Append-only triggers: block DELETE for all tables
+                async Task EnsureNoDelete(string table)
+                {
+                    await Exec($@"CREATE TRIGGER IF NOT EXISTS TR_{table}_NoDelete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;");
+                }
+
+                // Headers: allow only Status, IsLocked, TotalAmountSnapshot to change
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_ObligationHeaders_BlockImmutableUpdate
+                      BEFORE UPDATE ON ObligationHeaders
+                      FOR EACH ROW
+                      WHEN COALESCE(NEW.Type,'') <> COALESCE(OLD.Type,'')
+                        OR COALESCE(NEW.Direction,'') <> COALESCE(OLD.Direction,'')
+                        OR COALESCE(NEW.ProjectId,-1) <> COALESCE(OLD.ProjectId,-1)
+                        OR COALESCE(NEW.EntityType,'') <> COALESCE(OLD.EntityType,'')
+                        OR COALESCE(NEW.EntityId,-1) <> COALESCE(OLD.EntityId,-1)
+                        OR COALESCE(NEW.PeriodStart,'') <> COALESCE(OLD.PeriodStart,'')
+                        OR COALESCE(NEW.PeriodEnd,'') <> COALESCE(OLD.PeriodEnd,'')
+                        OR COALESCE(NEW.DueDate,'') <> COALESCE(OLD.DueDate,'')
+                        OR COALESCE(NEW.Notes,'') <> COALESCE(OLD.Notes,'')
+                        OR COALESCE(NEW.CreatedAt,'') <> COALESCE(OLD.CreatedAt,'')
+                      BEGIN
+                        SELECT RAISE(ABORT, 'Obligation header is append-only');
+                      END;");
+
+                await EnsureNoDelete("ObligationHeaders");
+
+                // Lines, settlements, applications: block any UPDATE/DELETE
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_ObligationLines_NoUpdate BEFORE UPDATE ON ObligationLines BEGIN SELECT RAISE(ABORT, 'Obligation lines are append-only'); END;");
+                await EnsureNoDelete("ObligationLines");
+
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_NoUpdate BEFORE UPDATE ON CashSettlements BEGIN SELECT RAISE(ABORT, 'Cash settlements are append-only'); END;");
+                await EnsureNoDelete("CashSettlements");
+
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_NoUpdate BEFORE UPDATE ON AdvanceApplications BEGIN SELECT RAISE(ABORT, 'Advance applications are append-only'); END;");
+                await EnsureNoDelete("AdvanceApplications");
+
+                // Enforce correct uniqueness using partial indices in SQLite
+                // 1) ClientInvoice: one per project and period (EntityId may be NULL)
+                await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_ClientInvoice_PerProjectPeriod
+                      ON ObligationHeaders(Type, ProjectId, PeriodStart, PeriodEnd)
+                      WHERE Type = 'ClientInvoice';");
+
+                // 2) Entity-scoped: for types with EntityId present
+                await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_EntityScoped
+                      ON ObligationHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd)
+                      WHERE EntityId IS NOT NULL;");
+
+                // NEW: Trigger to maintain RemainingAmount on CashSettlements for advances
+                // This computes RemainingAmount = Amount - (sum of AdvanceApplications.AppliedAmount)
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_UpdateRemaining AFTER INSERT ON AdvanceApplications
+                      BEGIN
+                        UPDATE CashSettlements
+                        SET RemainingAmount = Amount - IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = NEW.AdvanceSettlementId), 0)
+                        WHERE Id = NEW.AdvanceSettlementId;
+                      END;");
+
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_UpdateRemaining_OnDelete AFTER DELETE ON AdvanceApplications
+                      BEGIN
+                        UPDATE CashSettlements
+                        SET RemainingAmount = Amount - IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = OLD.AdvanceSettlementId), 0)
+                        WHERE Id = OLD.AdvanceSettlementId;
+                      END;");
+
+                // Also update remaining when an advance row is inserted
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_InitRemaining AFTER INSERT ON CashSettlements
+                      BEGIN
+                        UPDATE CashSettlements SET RemainingAmount = Amount WHERE Id = NEW.Id;
+                      END;");
+
+                // Prevent applying advances such that sum(AppliedAmount) > CashSettlements.Amount
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOverApply
+                      BEFORE INSERT ON AdvanceApplications
+                      BEGIN
+                        SELECT CASE WHEN (NEW.AppliedAmount + IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = NEW.AdvanceSettlementId), 0)) > (SELECT Amount FROM CashSettlements WHERE Id = NEW.AdvanceSettlementId)
+                          THEN RAISE(ABORT, 'Advance over-applied') END;
+                      END;");
+
+                // Prevent applying against reversed advances
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOnReversedAdvance
+                      BEFORE INSERT ON AdvanceApplications
+                      BEGIN
+                        SELECT CASE WHEN (SELECT IsReversal FROM CashSettlements WHERE Id = NEW.AdvanceSettlementId) = 1
+                          THEN RAISE(ABORT, 'Cannot apply a reversed advance') END;
+                      END;");
+
+                // Prevent applying to reversed obligations
+                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOnReversedObligation
+                      BEFORE INSERT ON AdvanceApplications
+                      BEGIN
+                        SELECT CASE WHEN (SELECT IsReversal FROM CashSettlements WHERE ObligationHeaderId = NEW.ObligationHeaderId LIMIT 1) = 1
+                          THEN RAISE(ABORT, 'Cannot apply to a reversed obligation') END;
+                      END;");
+            }
+            catch { }
+        }
+    }
+}

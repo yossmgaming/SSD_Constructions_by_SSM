@@ -31,7 +31,6 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBox x:Name="SearchProjects"
@@ -42,14 +41,14 @@
             <ComboBox x:Name="StatusFilter"
                   Grid.Column="1"
                   Margin="0,0,10,0"
-                  SelectedIndex="0">
+                  SelectedIndex="0"
+                  SelectionChanged="StatusFilter_SelectionChanged">
                 <ComboBoxItem Content="All"/>
                 <ComboBoxItem Content="Ongoing"/>
                 <ComboBoxItem Content="Completed"/>
                 <ComboBoxItem Content="On Hold"/>
             </ComboBox>
 
-            <Button Grid.Column="2" Content="Refresh" Width="90"/>
         </Grid>
 
         <!-- MAIN CONTENT -->
@@ -73,6 +72,7 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                             <DataGridTextColumn Header="Client" Binding="{Binding Client}" Width="*"/>
+                            <DataGridTextColumn Header="Budget" Binding="{Binding Budget, StringFormat=LKR {0:N2}}" Width="120"/>
                             <DataGridTextColumn Header="Start" Binding="{Binding StartDate}" Width="*"/>
                             <DataGridTextColumn Header="End" Binding="{Binding EndDate}" Width="*"/>
                             <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*"/>
@@ -84,28 +84,88 @@
 
             <!-- DETAILS PANEL -->
             <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="15">
-                <StackPanel>
-                    <TextBlock Text="Project Details" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
 
-                    <TextBlock Text="Name:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailName" Margin="0,0,0,10"/>
+                        <TextBlock Text="Project Details"
+                       FontWeight="Bold"
+                       FontSize="16"
+                       Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Client:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailClient" Margin="0,0,0,10"/>
+                        <!-- NAME -->
+                        <TextBlock Text="Name"/>
+                        <TextBox x:Name="ProjName" Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Budget (LKR):" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailBudget" Margin="0,0,0,10"/>
+                        <!-- CLIENT -->
+                        <TextBlock Text="Client"/>
+                        <TextBox x:Name="ProjClient" Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Description:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailDescription" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                        <!-- BUDGET -->
+                        <TextBlock Text="Budget (LKR)"/>
+                        <TextBox x:Name="ProjBudget" Margin="0,0,0,10"/>
 
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Edit" Width="80" Margin="0,0,10,0"/>
-                        <Button Content="Close" Width="80"/>
-                        <Button Content=" Add Project" Width="100" Click="AddProject_Click" Margin="10,0,0,0"/>
+                        <!-- START / END DATES -->
+                        <TextBlock Text="Start Date"/>
+                        <DatePicker x:Name="ProjStart" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="End Date"/>
+                        <DatePicker x:Name="ProjEnd" Margin="0,0,0,10"/>
+
+                        <!-- STATUS -->
+                        <TextBlock Text="Status"/>
+                        <ComboBox x:Name="ProjStatus" Margin="0,0,0,10">
+                            <ComboBoxItem Content="Ongoing"/>
+                            <ComboBoxItem Content="Completed"/>
+                            <ComboBoxItem Content="On Hold"/>
+                            <ComboBoxItem Content="Cancelled"/>
+                        </ComboBox>
+
+                        <!-- DESCRIPTION -->
+                        <TextBlock Text="Description"/>
+                        <TextBox x:Name="ProjDescription"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     Height="80"
+                     Margin="0,0,0,15"/>
+
+                        <!-- ACTION BUTTONS -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <!-- ACTION BUTTONS -->
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0"
+            Content="Save"
+            Height="34"
+                                        Width="75"
+            Margin="0,0,8,0"
+            Click="SaveProject_Click"/>
+
+                                <Button Grid.Column="1"
+            Content="Delete"
+            Height="34"
+                                        Width="75"
+            Margin="8,0,8,0"
+            Click="DeleteProject_Click"/>
+
+                                <Button Grid.Column="2"
+            Content="Clear"
+            Height="34"
+                                        Width="75"
+            Margin="8,0,0,0"
+            Click="ClearProjectForm_Click"/>
+                            </Grid>
+
+                        </StackPanel>
+
                     </StackPanel>
-                </StackPanel>
+                </ScrollViewer>
             </Border>
+
         </Grid>
     </Grid>
 

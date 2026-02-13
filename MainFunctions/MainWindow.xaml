@@ -1,15 +1,17 @@
 ﻿<Window x:Class="MainFunctions.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SSM Systems"
+        Title="SSD Construction Manager V 1.0"
         Height="650"
         Width="1100"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        Icon="Assets/Logo.png">
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="230"/>   <!-- Sidebar -->
-            <ColumnDefinition Width="*"/>     <!-- Main -->
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- LEFT SIDEBAR -->
@@ -21,7 +23,7 @@
                     <RowDefinition Height="Auto"/>   <!-- Bottom stuff -->
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="SSD CONSTRUCTIONS"
+                <TextBlock Text="SSD Construction Manager"
                            Foreground="White"
                            FontSize="18"
                            FontWeight="Bold"
@@ -35,12 +37,22 @@
                     <Button Content="Materials" Style="{StaticResource NavButton}" Click="Materials_Click"/>
                     <Button Content="Payments" Style="{StaticResource NavButton}" Click="Payments_Click"/>
                     <Button Content="Reports" Style="{StaticResource NavButton}" Click="Reports_Click"/>
+                    <Separator Margin="0,10,0,10"/>
+                    <TextBlock Text="Finance" Foreground="White" FontSize="16" Margin="10,0,0,5"/>
+                    <Button Content="Project Overview" Style="{StaticResource NavButton}" Click="ProjectOverview_Click"/>
+                    <Button Content="Worker Payroll" Style="{StaticResource NavButton}" Click="WorkerPayroll_Click"/>
+                    <Button Content="Material Purchase" Style="{StaticResource NavButton}" Click="MaterialPurchase_Click"/>
+                    <Button Content="Client Invoice" Style="{StaticResource NavButton}" Click="ClientInvoice_Click"/>
+                    <Button Content="Project Expense" Style="{StaticResource NavButton}" Click="ProjectExpense_Click"/>
+                    <Separator Margin="0,10,0,10"/>
+                    <Button Content="BOQ Generator" Style="{StaticResource NavButton}" Click="BOQGenerator_Click"/>
+                    <Button Content="Advances" Style="{StaticResource NavButton}" Click="Advances_Click"/>
                 </StackPanel>
 
                 <!-- BOTTOM PANEL -->
                 <StackPanel Grid.Row="2" Margin="0,20,0,0">
                     <Separator/>
-                    <TextBlock Text="v0.1 — SSM Construction Manager"
+                    <TextBlock Text="SSD Construction Manager V 1.0"
                                Foreground="#BBBBBB"
                                FontSize="12"
                                />

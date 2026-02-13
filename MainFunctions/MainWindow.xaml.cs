@@ -28,7 +28,6 @@ namespace MainFunctions
 
         private void Projects_Click(object sender, RoutedEventArgs e)
         {
-            // Load Projects view into MainContent
             MainContent.Content = new Views.ProjectsView();
         }
 
@@ -44,12 +43,47 @@ namespace MainFunctions
 
         private void Payments_Click(object sender, RoutedEventArgs e)
         {
-            MainContent.Content = new Views.PaymentsView(); 
+            MainContent.Content = new Views.PaymentsView();
         }
 
         private void Reports_Click(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new Views.ReportsView();
+        }
+
+        private void BOQGenerator_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.BOQGenerator();
+        }
+
+        private void ProjectOverview_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.ProjectFinancialOverviewView();
+        }
+
+        private void WorkerPayroll_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.WorkerPayrollView();
+        }
+
+        private void MaterialPurchase_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.MaterialPurchaseView();
+        }
+
+        private void ClientInvoice_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.ClientInvoiceView();
+        }
+
+        private void ProjectExpense_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.ProjectExpenseView();
+        }
+
+        private void Advances_Click(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new Views.AdvancesView();
         }
     }
 }

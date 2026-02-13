@@ -3,66 +3,88 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#F5F5F5">
 
-    <Grid Margin="10">
+    <Grid Grid.Row="2">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- Header -->
-            <RowDefinition Height="Auto"/>
-            <!-- Search + Actions -->
-            <RowDefinition Height="*" />
-            <!-- Table -->
-        </Grid.RowDefinitions>
-
-        <!-- HEADER -->
-        <TextBlock Text="Materials"
-                   FontSize="26"
-                   FontWeight="Bold"
-                   Margin="0,0,0,15"/>
-
-        <!-- SEARCH + ACTIONS -->
-        <Grid Grid.Row="1" Margin="0,0,0,15">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <TextBox x:Name="SearchBox"
-                     Margin="0,0,15,0"
-                     Height="32"
-                     ToolTip="Search material..."/>
-
-            <Button Grid.Column="1"
-                    Content="Add Material"
-                    Width="120" Margin="0,0,10,0"
-                    Click="AddMaterial_Click"/>
-
-            <Button Grid.Column="2"
-                    Content="Refresh"
-                    Width="90"
-                    Click="Refresh_Click"/>
-        </Grid>
-
-        <!-- TABLE -->
-        <DataGrid Grid.Row="2"
-                  x:Name="MaterialsGrid"
+        <!-- MATERIAL LIST -->
+        <Border Background="White" CornerRadius="8" Padding="10" Margin="0,0,10,0">
+            <DataGrid x:Name="MaterialsGrid"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  SelectionMode="Single">
+                  SelectionMode="Single"
+                  MouseDoubleClick="MaterialsGrid_DoubleClick">
 
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="150"/>
-                <DataGridTextColumn Header="Stock" Binding="{Binding Quantity}" Width="100"/>
-                <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="100"/>
-                <DataGridTextColumn Header="Cost" Binding="{Binding Cost}" Width="120"/>
-            </DataGrid.Columns>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="150"/>
+                    <DataGridTextColumn Header="Stock" Binding="{Binding Quantity}" Width="100"/>
+                    <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="100"/>
+                    <!-- New: Cost column with comma formatting and two decimals -->
+                    <DataGridTextColumn Header="Cost (LKR)" Binding="{Binding Cost, StringFormat=LKR {0:N2}}" Width="130"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
 
-        </DataGrid>
+        <!-- EDIT/ADD PANEL -->
+        <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="14">
+            <StackPanel>
+                <!-- SEARCH EXISTING MATERIAL -->
+                <TextBlock Text="Find Material"
+           FontWeight="SemiBold"
+           Margin="0,0,0,5"/>
 
+                <TextBox x:Name="SearchExistingBox"
+         Height="28"
+         Margin="0,0,0,12"
+         ToolTip="Search by name..."
+         TextChanged="SearchExistingBox_TextChanged"/>
+
+
+                <TextBlock Text="Material Details"
+                       FontWeight="Bold"
+                       FontSize="16"
+                       Margin="0,0,0,10"/>
+
+                <TextBlock Text="Name"/>
+                <TextBox x:Name="MatName" Margin="0,0,0,8"/>
+
+                <TextBlock Text="Category"/>
+                <TextBox x:Name="MatCategory" Margin="0,0,0,8"/>
+
+                <TextBlock Text="Quantity"/>
+                <TextBox x:Name="MatQuantity" Margin="0,0,0,8"/>
+
+                <TextBlock Text="Unit"/>
+                <TextBox x:Name="MatUnit" Margin="0,0,0,8"/>
+
+                <TextBlock Text="Cost (LKR)"/>
+                <TextBox x:Name="MatCost" Margin="0,0,0,14"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="Save"
+                        Width="90"
+                            Height="34"
+                        Margin="0,0,10,0"
+                        Click="SaveMaterial_Click"/>
+
+                    <Button Content="Delete"
+                        Width="90"
+                            Height="34"
+                        Margin="0,0,10,0"
+                        Click="DeleteMaterial_Click"/>
+
+                    <Button Content="Clear"
+                        Width="90"
+                            Height="34"
+                        Click="ClearForm_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
+
 
 </UserControl>

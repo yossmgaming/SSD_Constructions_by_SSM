@@ -7,111 +7,139 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid Background="#F5F5F5" Margin="10">
-
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- Header -->
             <RowDefinition Height="Auto"/>
-            <!-- Filters -->
             <RowDefinition Height="*"/>
-            <!-- Content -->
         </Grid.RowDefinitions>
-
-        <!-- HEADER -->
         <DockPanel Margin="0,0,0,15">
-            <TextBlock Text="Workers"
-                   FontSize="26"
-                   FontWeight="Bold"/>
-
+            <TextBlock Text="Workers" FontSize="26" FontWeight="Bold"/>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button x:Name="ReconcileButton" Content="Reconcile Month" Margin="8,0,0,0" Click="ReconcileButton_Click"/>
             </StackPanel>
         </DockPanel>
-
-        <!-- FILTERS -->
+        <!-- FILTERS: aligned inputs, no refresh button -->
         <Grid Grid.Row="1" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-
-            <TextBox x:Name="SearchWorkers"
-                 Height="32"
-                 Margin="0,0,10,0"
-                 ToolTip="Search workers..." />
-
-            <ComboBox x:Name="RoleFilter"
-                  Grid.Column="1"
-                  Margin="0,0,10,0"
-                  SelectedIndex="0" SelectionChanged="RoleFilter_SelectionChanged">
-                <ComboBoxItem Content="All Roles"/>
-                <ComboBoxItem Content="Mason"/>
-                <ComboBoxItem Content="Helper"/>
-                <ComboBoxItem Content="Electrician"/>
-                <ComboBoxItem Content="Supervisor"/>
-            </ComboBox>
-
-            <Button Grid.Column="2" Content="Refresh" Width="90"/>
+            <StackPanel>
+                <TextBlock Text="Name" Margin="0,0,0,4"/>
+                <TextBox x:Name="SearchWorkers" Height="32" Margin="0,0,10,0" ToolTip="Search by name..."/>
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="NIC" Margin="0,0,0,4"/>
+                <TextBox x:Name="SearchNIC" Height="32" Margin="0,0,10,0" ToolTip="Search by NIC"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Role" Margin="0,0,0,4"/>
+                <ComboBox x:Name="RoleFilter" Width="180" Height="32" SelectionChanged="RoleFilter_SelectionChanged">
+                    <ComboBoxItem Content="All Roles"/>
+                    <ComboBoxItem Content="Mason"/>
+                    <ComboBoxItem Content="Helper"/>
+                    <ComboBoxItem Content="Electrician"/>
+                    <ComboBoxItem Content="Supervisor"/>
+                    <ComboBoxItem Content="Plumber"/>
+                    <ComboBoxItem Content="Carpenter"/>
+                    <ComboBoxItem Content="Painter"/>
+                    <ComboBoxItem Content="Welder"/>
+                    <ComboBoxItem Content="Driver"/>
+                    <ComboBoxItem Content="Operator"/>
+                    <ComboBoxItem Content="Site Engineer"/>
+                    <ComboBoxItem Content="Foreman"/>
+                    <ComboBoxItem Content="Architect"/>
+                </ComboBox>
+            </StackPanel>
         </Grid>
-
-        <!-- MAIN CONTENT -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
-
-            <!-- WORKERS LIST -->
             <Border Background="White" CornerRadius="10" Padding="10" Margin="0,0,10,0">
                 <StackPanel>
                     <TextBlock Text="Worker List" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
-
-                    <DataGrid x:Name="WorkersGrid"
-                          AutoGenerateColumns="False"
-                          CanUserAddRows="False"
-                          IsReadOnly="True"
-                          SelectionMode="Single">
-
+                    <DataGrid x:Name="WorkersGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" SelectionMode="Single">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding FullName}" Width="*"/>
+                            <DataGridTextColumn Header="NIC" Binding="{Binding NIC}" Width="*"/>
                             <DataGridTextColumn Header="Role" Binding="{Binding Role}" Width="*"/>
-                            <DataGridTextColumn Header="Daily Rate" Binding="{Binding Rate}" Width="*"/>
-                            <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="*"/>
+                            <DataGridTextColumn Header="Daily Rate" Binding="{Binding DailyRate, StringFormat=LKR {0:N2}}" Width="*"/>
+                            <DataGridTextColumn Header="Phone 1" Binding="{Binding Phone}" Width="*"/>
+                            <DataGridTextColumn Header="Phone 2" Binding="{Binding Phone2}" Width="*"/>
                             <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*"/>
                         </DataGrid.Columns>
-
                     </DataGrid>
                 </StackPanel>
             </Border>
-
-            <!-- DETAILS PANEL -->
             <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="15">
-                <StackPanel>
-                    <TextBlock Text="Worker Details" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Worker Details" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+                        <TextBlock Text="Full Name"/>
+                        <TextBox x:Name="WorkerName" Margin="0,0,0,8"/>
+                        <TextBlock Text="NIC"/>
+                        <TextBox x:Name="WorkerNIC" Margin="0,0,0,8"/>
+                        <TextBlock Text="Role"/>
+                        <ComboBox x:Name="WorkerRole" Margin="0,0,0,8">
+                            <ComboBoxItem Content="Mason"/>
+                            <ComboBoxItem Content="Helper"/>
+                            <ComboBoxItem Content="Electrician"/>
+                            <ComboBoxItem Content="Supervisor"/>
+                            <ComboBoxItem Content="Plumber"/>
+                            <ComboBoxItem Content="Carpenter"/>
+                            <ComboBoxItem Content="Painter"/>
+                            <ComboBoxItem Content="Welder"/>
+                            <ComboBoxItem Content="Driver"/>
+                            <ComboBoxItem Content="Operator"/>
+                            <ComboBoxItem Content="Site Engineer"/>
+                            <ComboBoxItem Content="Foreman"/>
+                            <ComboBoxItem Content="Architect"/>
+                        </ComboBox>
+                        <TextBlock Text="Daily Rate (LKR)"/>
+                        <TextBox x:Name="WorkerRate" Margin="0,0,0,8"/>
+                        <TextBlock Text="Phone 1"/>
+                        <TextBox x:Name="WorkerPhone" Margin="0,0,0,8"/>
+                        <TextBlock Text="Phone 2"/>
+                        <TextBox x:Name="WorkerPhone2" Margin="0,0,0,8"/>
+                        <TextBlock Text="Status"/>
+                        <ComboBox x:Name="WorkerStatus" Margin="0,0,0,8">
+                            <ComboBoxItem Content="Active"/>
+                            <ComboBoxItem Content="Inactive"/>
+                            <ComboBoxItem Content="Assigned"/>
+                        </ComboBox>
+                        <TextBlock Text="Project Assignment" Margin="0,10,0,4" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Vertical" Margin="0,0,0,8">
+                            <TextBlock x:Name="CurrentAssignmentText" Text="Current: None" Margin="0,0,0,6"/>
+                            <StackPanel Orientation="Horizontal">
+                                <ComboBox x:Name="AssignProjectBox" Width="200" IsEditable="True" IsTextSearchEnabled="True" />
+                                <TextBlock Text="From" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                                <DatePicker x:Name="AssignFromDate" Width="75"/>
+                                <TextBlock Text="To" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                                <DatePicker x:Name="AssignToDate" Width="75"/>
+                                <Button x:Name="SetAssignmentButton" Content="Set" Width="80" Margin="10,0,0,0" Click="SetAssignmentButton_Click"/>
+                            </StackPanel>
+                        </StackPanel>
 
-                    <TextBlock Text="Name:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailWorkerName" Margin="0,0,0,10"/>
+                        <!-- Assignment history list -->
+                        <TextBlock Text="Assignment History" Margin="0,6,0,4" FontWeight="SemiBold"/>
+                        <ListBox x:Name="AssignmentHistoryList" Height="140"/>
 
-                    <TextBlock Text="Role:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailRole" Margin="0,0,0,10"/>
-
-                    <TextBlock Text="Rate (LKR / day):" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailRate" Margin="0,0,0,10"/>
-
-                    <TextBlock Text="Phone:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailPhone" Margin="0,0,0,10"/>
-
-                    <TextBlock Text="Notes:" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailNotes" TextWrapping="Wrap" Margin="0,0,0,15"/>
-
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Assign to Project" Width="130" Margin="0,0,10,0"/>
-                        <Button Content="Mark Attendance" Width="137"/>
+                        <TextBlock Text="Notes"/>
+                        <TextBox x:Name="WorkerNotes" AcceptsReturn="True" TextWrapping="Wrap" Height="70" Margin="0,0,0,15"/>
+                        <StackPanel Margin="0,10,0,0">
+                            <Button Content="Mark Attendance" Height="36" Margin="0,0,0,10" Click="MarkAttendance_Click" HorizontalAlignment="Stretch"/>
+                            <UniformGrid Columns="3" Rows="1" Margin="0,0,0,0">
+                                <Button Content="Save / Add Worker" Height="36" Margin="0,0,8,0" Click="AddWorker_Click" />
+                                <Button Content="Clear" Height="36" Margin="8,0,8,0" Click="Clear_Click" />
+                                <Button Content="Delete" Height="36" Margin="8,0,0,0" Click="Delete_Click" />
+                            </UniformGrid>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
+                </ScrollViewer>
             </Border>
-            <Button Content="Add Worker" Click="AddWorker_Click" Grid.Column="1" Margin="68,291,68,22" />
-
         </Grid>
     </Grid>
 </UserControl>
