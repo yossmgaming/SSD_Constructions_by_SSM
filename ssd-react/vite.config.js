@@ -11,8 +11,8 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
         name: 'SSD Constructions',
-        short_name: 'SSD',
-        description: 'SSD Constructions Management App by SSM',
+        short_name: 'SSD Constructions',
+        description: 'SSD Constructions Management App',
         theme_color: '#e6631b',
         background_color: '#0f1117',
         display: 'standalone',
@@ -21,15 +21,15 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icons/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'icons/logo.png',
+            sizes: '256x256',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'icons/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'icons/logo.png',
+            sizes: '256x256',
+            type: 'image/png',
             purpose: 'maskable'
           }
         ]
