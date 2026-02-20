@@ -1,0 +1,336 @@
+.reports-page {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.reports-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.reports-filters .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+}
+
+.reports-filters .filter-group label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+}
+
+/* KPI summary cards */
+.report-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.report-summary-card {
+    text-align: center;
+}
+
+.report-summary-card .card-label {
+    margin-bottom: 6px;
+}
+
+.report-summary-card .card-value {
+    font-size: 1.375rem;
+}
+
+.kpi-in {
+    border-left: 3px solid #10b981;
+}
+
+.kpi-out {
+    border-left: 3px solid #ef4444;
+}
+
+.kpi-net {
+    border-left: 3px solid #6366f1;
+}
+
+/* Stat pills row */
+.stat-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 100px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.pill strong {
+    color: var(--text-primary);
+    margin-right: 2px;
+}
+
+/* Chart cards */
+.chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.chart-card,
+.chart-card-full {
+    margin-bottom: 20px;
+}
+
+.chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* Custom tooltip */
+.chart-tooltip {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    font-size: 0.8125rem;
+}
+
+.chart-tooltip-label {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.chart-tooltip p {
+    margin: 2px 0;
+    font-size: 0.8125rem;
+}
+
+/* Amount colors (shared) */
+.amount-in {
+    color: #059669;
+    font-weight: 600;
+}
+
+.amount-out {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* Recharts legend customization */
+.recharts-legend-item-text {
+    font-size: 0.75rem !important;
+    color: var(--text-muted) !important;
+}
+
+/* ========================================= */
+/* PERFORMANCE TAB STYLES                    */
+/* ========================================= */
+
+.perf-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.perf-card {
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.perf-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 16px 0;
+}
+
+.perf-name {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+}
+
+.perf-role {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Grade badge */
+.perf-grade {
+    font-size: 0.875rem;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 6px;
+    line-height: 1;
+}
+
+.grade-Aplus {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.grade-A {
+    background: #ccfbf1;
+    color: #0f766e;
+}
+
+.grade-B {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.grade-C {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.grade-D {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.grade-F {
+    background: #fecaca;
+    color: #7f1d1d;
+}
+
+/* Score ring */
+.perf-score-ring {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    margin: 12px auto 8px;
+}
+
+.ring-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(0deg);
+}
+
+.ring-svg circle:last-child {
+    transition: stroke-dasharray 0.8s ease-out;
+}
+
+.ring-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+/* Metric bars */
+.perf-metrics {
+    padding: 0 16px 12px;
+}
+
+.perf-metric {
+    display: grid;
+    grid-template-columns: 90px 1fr 36px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.perf-bar-track {
+    height: 6px;
+    background: #f1f5f9;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.perf-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease-out;
+}
+
+.perf-val {
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.6875rem;
+}
+
+/* Stats footer */
+.perf-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 16px;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+
+/* Table grade badge */
+.perf-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.perf-badge.grade-Aplus {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.perf-badge.grade-A {
+    background: #ccfbf1;
+    color: #0f766e;
+}
+
+.perf-badge.grade-B {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.perf-badge.grade-C {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.perf-badge.grade-D {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.perf-badge.grade-F {
+    background: #fecaca;
+    color: #7f1d1d;
+}

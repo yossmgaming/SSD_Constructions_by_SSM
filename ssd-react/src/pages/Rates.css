@@ -1,0 +1,231 @@
+.rates-page {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Tabs */
+.rates-tabs {
+    display: flex;
+    gap: 4px;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    width: fit-content;
+}
+
+.rates-tab {
+    padding: 10px 24px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.rates-tab:hover {
+    color: var(--text-primary);
+}
+
+.rates-tab.active {
+    background: var(--bg-card);
+    color: var(--sidebar-accent);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Content */
+.rates-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Add form */
+.rates-add-form {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.rates-add-form .form-group {
+    margin-bottom: 0;
+    min-width: 140px;
+    flex: 1;
+}
+
+.rates-add-form .btn {
+    height: 40px;
+    white-space: nowrap;
+}
+
+/* Table */
+.rates-table {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.rates-table-header {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 80px;
+    padding: 10px 16px;
+    background: #f8fafc;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.rates-table-header.work-header {
+    grid-template-columns: 1.5fr 1fr 0.8fr 1.5fr 80px;
+}
+
+.rates-table-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 80px;
+    padding: 12px 16px;
+    align-items: center;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.12s ease;
+}
+
+.rates-table-row:hover {
+    background: rgba(99, 102, 241, 0.02);
+}
+
+.rates-table-row:last-child {
+    border-bottom: none;
+}
+
+/* Work rates use different columns */
+.work-header+.rates-table-row,
+.work-header~.rates-table-row {
+    grid-template-columns: 1.5fr 1fr 0.8fr 1.5fr 80px;
+}
+
+.rate-role-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.rate-work-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.rate-value {
+    font-weight: 600;
+    color: #059669;
+}
+
+.rate-unit {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.rate-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+/* Action buttons */
+.rate-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.btn-icon {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    color: var(--text-muted);
+}
+
+.btn-icon:hover {
+    background: #f1f5f9;
+}
+
+.btn-icon.edit:hover {
+    color: #6366f1;
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+.btn-icon.delete:hover {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-icon.save {
+    color: #059669;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-icon.save:hover {
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.btn-icon.cancel {
+    color: #64748b;
+}
+
+.btn-icon.cancel:hover {
+    background: rgba(100, 116, 139, 0.08);
+}
+
+/* Inline edit inputs */
+.inline-edit {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--sidebar-accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* Work category groups */
+.work-category-group {
+    margin-bottom: 20px;
+}
+
+.work-category-group:last-child {
+    margin-bottom: 0;
+}
+
+.work-category-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--sidebar-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 0;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.15);
+    margin-bottom: 0;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 20px;
+    font-size: 0.875rem;
+}

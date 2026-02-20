@@ -1,0 +1,164 @@
+﻿[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 2937 modules transformed.
+node.exe : 
+[31mΓ£ù[39m Build 
+failed in 15.47s
+At line:1 char:1
++ & "E:\Node 
+JS/node.exe" "E:\Node J
+S/node_modules/npm/bin/
+npx-cli.js"  ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ([31mΓ£ù[39m   
+  Build failed in 1    
+5.47s:String) [],     
+RemoteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+[31merror during 
+build:
+[31msrc/pages/Attendan
+ce.jsx (4:24): 
+"upsert" is not 
+exported by 
+"src/data/db.js", 
+imported by "src/pages/
+Attendance.jsx".[31m
+file: [36mE:/My 
+software Projects/SSD 
+Constructions - react 
+app/Custom software 
+Main Functions/MainFunc
+tions/ssd-react/src/pag
+es/Attendance.jsx:4:24
+[31m
+[33m
+2: import { 
+ChevronLeft, 
+ChevronRight, 
+Briefcase, 
+CalendarDays, Clock } 
+from 'lucide-react';
+3: import Card from 
+'../components/Card';
+4: import { getAll, 
+query, upsert, KEYS } 
+from '../data/db';
+                       
+    ^
+5: import 
+'./Attendance.css';
+6: import BounceButton 
+from '../components/Bou
+nceButton';
+[31m
+    at getRollupError (
+file:///E:/My%20softwar
+e%20Projects/SSD%20Cons
+tructions%20-%20react%2
+0app/Custom%20software%
+20Main%20Functions/Main
+Functions/ssd-react/nod
+e_modules/rollup/dist/e
+s/shared/parseAst.js:40
+2:41)
+    at error (file:///E
+:/My%20software%20Proje
+cts/SSD%20Constructions
+%20-%20react%20app/Cust
+om%20software%20Main%20
+Functions/MainFunctions
+/ssd-react/node_modules
+/rollup/dist/es/shared/
+parseAst.js:398:42)
+    at Module.error (fi
+le:///E:/My%20software%
+20Projects/SSD%20Constr
+uctions%20-%20react%20a
+pp/Custom%20software%20
+Main%20Functions/MainFu
+nctions/ssd-react/node_
+modules/rollup/dist/es/
+shared/node-entry.js:17
+040:16)
+    at 
+Module.traceVariable (f
+ile:///E:/My%20software
+%20Projects/SSD%20Const
+ructions%20-%20react%20
+app/Custom%20software%2
+0Main%20Functions/MainF
+unctions/ssd-react/node
+_modules/rollup/dist/es
+/shared/node-entry.js:1
+7452:29)
+    at ModuleScope.find
+Variable (file:///E:/My
+%20software%20Projects/
+SSD%20Constructions%20-
+%20react%20app/Custom%2
+0software%20Main%20Func
+tions/MainFunctions/ssd
+-react/node_modules/rol
+lup/dist/es/shared/node
+-entry.js:15070:39)
+    at FunctionScope.fi
+ndVariable (file:///E:/
+My%20software%20Project
+s/SSD%20Constructions%2
+0-%20react%20app/Custom
+%20software%20Main%20Fu
+nctions/MainFunctions/s
+sd-react/node_modules/r
+ollup/dist/es/shared/no
+de-entry.js:5673:38)
+    at FunctionBodyScop
+e.findVariable (file://
+/E:/My%20software%20Pro
+jects/SSD%20Constructio
+ns%20-%20react%20app/Cu
+stom%20software%20Main%
+20Functions/MainFunctio
+ns/ssd-react/node_modul
+es/rollup/dist/es/share
+d/node-entry.js:5673:38
+)
+    at FunctionScope.fi
+ndVariable (file:///E:/
+My%20software%20Project
+s/SSD%20Constructions%2
+0-%20react%20app/Custom
+%20software%20Main%20Fu
+nctions/MainFunctions/s
+sd-react/node_modules/r
+ollup/dist/es/shared/no
+de-entry.js:5673:38)
+    at FunctionBodyScop
+e.findVariable (file://
+/E:/My%20software%20Pro
+jects/SSD%20Constructio
+ns%20-%20react%20app/Cu
+stom%20software%20Main%
+20Functions/MainFunctio
+ns/ssd-react/node_modul
+es/rollup/dist/es/share
+d/node-entry.js:5673:38
+)
+    at BlockScope.findV
+ariable (file:///E:/My%
+20software%20Projects/S
+SD%20Constructions%20-%
+20react%20app/Custom%20
+software%20Main%20Funct
+ions/MainFunctions/ssd-
+react/node_modules/roll
+up/dist/es/shared/node-
+entry.js:5673:38)[39m

@@ -1,0 +1,130 @@
+.finance-page {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.finance-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.finance-detail {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.obligation-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.obligation-form .full-width {
+    grid-column: 1 / -1;
+}
+
+.settlement-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.settlement-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.875rem;
+}
+
+.settlement-item:last-child {
+    border-bottom: none;
+}
+
+.summary-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 16px 20px;
+    background: #f8fafc;
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+}
+
+.summary-bar strong {
+    color: var(--text-primary);
+}
+
+/* Chart tooltip (shared) */
+.chart-tooltip {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    font-size: 0.8125rem;
+}
+
+.chart-tooltip-label {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.chart-tooltip p {
+    margin: 2px 0;
+    font-size: 0.8125rem;
+}
+
+.recharts-legend-item-text {
+    font-size: 0.75rem !important;
+    color: var(--text-muted) !important;
+}
+
+/* Shared Filter Styles */
+.filter-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filter-group input,
+.filter-group select {
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    min-width: 140px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}

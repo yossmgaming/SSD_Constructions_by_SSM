@@ -1,0 +1,31 @@
+.card {
+    /* Background handled by inner-content, but kept here for container if needed */
+    /* Padding handled by StarBorder (outer) and inner-content (inner) */
+    /* border-radius handled by StarBorder */
+    box-shadow: var(--shadow-sm);
+    /* border: 1px solid rgba(0, 0, 0, 0.04); Removed static border */
+    transition: var(--transition);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.card-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.card-label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
