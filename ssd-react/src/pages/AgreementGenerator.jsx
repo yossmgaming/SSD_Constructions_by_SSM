@@ -119,6 +119,7 @@ export default function AgreementGenerator() {
             if (clientSubType === 'LetterOfAcceptance') {
                 const levyPercent = amt > 50000000 ? 1 : 0.25;
                 const perfSec = amt * 0.05;
+                const ldPerDay = amt * 0.0005;
 
                 let durationStr = "180";
                 if (project.startDate && project.endDate) {
@@ -143,7 +144,7 @@ export default function AgreementGenerator() {
                     <p>The <strong>Effective Date of Commencement</strong> shall be 14 days from the date of this letter. You are hereby instructed to commence mobilization of equipment and personnel to the site immediately.</p>
                     <h2>3. Time for Completion & Liquidated Damages</h2>
                     <p>The Contractor shall complete the Works within <strong>${durationStr} calendar days</strong> from the Commencement Date, as per the Contract Data.</p>
-                    <p>In the event of delay attributable to the Contractor, <strong>Liquidated Damages</strong> shall be applied at <strong>0.05% of the Initial Contract Price per calendar day</strong>, capped at 10% of the Contract Price.</p>
+                    <p>In the event of delay attributable to the Contractor, <strong>Liquidated Damages</strong> shall be applied at <strong>0.05% of the Initial Contract Price per calendar day (LKR ${ldPerDay.toLocaleString(undefined, { minimumFractionDigits: 2 })})</strong>, capped at 10% of the Contract Price.</p>
                     <h2>4. Performance Security</h2>
                     <p>You are hereby requested to furnish the Performance Security in the amount of 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) within 14 days of receipt of this letter.</p>
                     ${isCIGFL ? `
