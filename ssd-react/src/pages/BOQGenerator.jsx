@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, FileDown } from 'lucide-react';
+import { Plus, Trash2, FileDown, FileSpreadsheet } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { exportBOQData } from '../utils/exportUtils';
 import Card from '../components/Card';
+import ExportDropdown from '../components/ExportDropdown';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
 import './BOQGenerator.css';
 import BounceButton from '../components/BounceButton';
 
-const emptyHeader = { projectId: '', title: '', toAddress: '', notes: '', documentDate: '' };
+const emptyHeader = { projectId: '', title: '', clientName: '', toAddress: '', notes: '', documentDate: '' };
 const emptyItem = { itemNo: '', description: '', quantity: '', unit: '', rate: '' };
 
 export default function BOQGenerator() {
@@ -15,6 +18,8 @@ export default function BOQGenerator() {
     const [items, setItems] = useState([{ ...emptyItem }]);
     const [selectedId, setSelectedId] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => { loadData(); }, []);
 
@@ -36,7 +41,7 @@ export default function BOQGenerator() {
 
     async function selectBoq(boq) {
         setSelectedId(boq.id);
-        setHeader({ projectId: boq.projectId || '', title: boq.title, toAddress: boq.toAddress || '', notes: boq.notes || '', documentDate: boq.documentDate || '' });
+        setHeader({ projectId: boq.projectId || '', title: boq.title, clientName: boq.clientName || '', toAddress: boq.toAddress || '', notes: boq.notes || '', documentDate: boq.documentDate || '' });
 
         setIsLoading(true);
         try {
@@ -59,7 +64,9 @@ export default function BOQGenerator() {
 
     async function handleSave() {
         if (!header.title.trim()) return alert('BOQ title is required');
-        const boqData = { ...header, projectId: header.projectId ? parseInt(header.projectId) : null };
+        // Only send columns that exist in the boqs table — exclude clientName until the DB column is added
+        const { clientName, ...headerForDb } = header;
+        const boqData = { ...headerForDb, projectId: header.projectId ? parseInt(header.projectId) : null };
         let boqId;
 
         setIsLoading(true);
@@ -88,7 +95,8 @@ export default function BOQGenerator() {
             handleClear();
             await loadData();
         } catch (error) {
-            console.error(error);
+            console.error('BOQ save error:', error);
+            alert('Failed to save BOQ. Please try again.');
             setIsLoading(false);
         }
     }
@@ -113,6 +121,34 @@ export default function BOQGenerator() {
 
     function handleClear() { setHeader(emptyHeader); setItems([{ ...emptyItem }]); setSelectedId(null); }
 
+    async function handleExport(format) {
+        if (!selectedId && items.length <= 1 && !items[0].description) {
+            return alert('Please save the BOQ or enter items to export.');
+        }
+
+        const project = projects.find(p => p.id === parseInt(header.projectId)) || { name: 'General' };
+        const name = header.title || 'Untitled_BOQ';
+        const fileName = `BOQ_${name.replace(/\s+/g, '_')}`;
+
+        setIsLoadingExport(true);
+        try {
+            await exportBOQData({
+                format,
+                project: { ...project, client: header.clientName || project.client || '' },
+                items: items.filter(i => i.description.trim()).map(i => ({
+                    ...i,
+                    qty: parseFloat(i.quantity) || 0,
+                    amount: (parseFloat(i.quantity) || 0) * (parseFloat(i.rate) || 0)
+                })),
+                fileName
+            });
+        } catch (e) {
+            console.error("Export error:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    }
+
     const grandTotal = items.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.rate) || 0), 0);
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
@@ -120,7 +156,8 @@ export default function BOQGenerator() {
         <div className="crud-page boq-page">
             <div className="page-header">
                 <h1>BOQ Generator</h1>
-                <div className="page-header-actions">
+                <div className="page-header-actions" style={{ display: 'flex', gap: 10 }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
                     <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New BOQ</BounceButton>
                 </div>
             </div>
@@ -130,11 +167,16 @@ export default function BOQGenerator() {
                     <div className="boq-header-form">
                         <div className="form-group"><label>Title</label><input value={header.title} onChange={(e) => setHeader({ ...header, title: e.target.value })} /></div>
                         <div className="form-group"><label>Project</label>
-                            <select value={header.projectId} onChange={(e) => setHeader({ ...header, projectId: e.target.value })}>
+                            <select value={header.projectId} onChange={(e) => {
+                                const pid = e.target.value;
+                                const proj = projects.find(p => p.id === parseInt(pid));
+                                setHeader({ ...header, projectId: pid, clientName: proj ? proj.client : header.clientName });
+                            }}>
                                 <option value="">Select project...</option>
                                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
+                        <div className="form-group"><label>Client Name</label><input value={header.clientName || ''} onChange={(e) => setHeader({ ...header, clientName: e.target.value })} placeholder="Custom client name..." /></div>
                         <div className="form-group"><label>Document Date</label><input type="date" value={header.documentDate} onChange={(e) => setHeader({ ...header, documentDate: e.target.value })} /></div>
                         <div className="form-group"><label>To / Address</label><input value={header.toAddress} onChange={(e) => setHeader({ ...header, toAddress: e.target.value })} /></div>
                         <div className="form-group full-width"><label>Notes</label><textarea value={header.notes} onChange={(e) => setHeader({ ...header, notes: e.target.value })} rows={2} /></div>

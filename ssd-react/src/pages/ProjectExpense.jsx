@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
+import ExportDropdown from '../components/ExportDropdown';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
@@ -14,10 +16,48 @@ export default function ProjectExpense() {
     const [settlements, setSettlements] = useState([]);
     const [settlementAmt, setSettlementAmt] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => {
         loadData();
     }, []);
+
+    const handleExport = async (format) => {
+        const exportData = headers.map(h => {
+            const project = projects.find(p => p.id === h.projectId);
+            return {
+                Project: project?.name || '—',
+                Description: h.description,
+                Amount: h.totalAmountSnapshot,
+                Status: h.status,
+                Notes: h.notes || ''
+            };
+        });
+
+        const columns = [
+            { header: 'Project', key: 'Project' },
+            { header: 'Description', key: 'Description' },
+            { header: 'Total Amount (LKR)', key: 'Amount' },
+            { header: 'Status', key: 'Status' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Project Expenses Report';
+        const fileName = 'Project_Expenses_List';
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    };
 
     async function loadData() {
         setIsLoading(true);
@@ -115,7 +155,10 @@ export default function ProjectExpense() {
         <div className="crud-page finance-page">
             <div className="page-header">
                 <h1>Project Expenses</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Expense</BounceButton>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Expense</BounceButton>
+                </div>
             </div>
 
             <div className="finance-detail">

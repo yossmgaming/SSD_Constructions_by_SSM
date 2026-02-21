@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, ArrowDownCircle, ArrowUpCircle, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Plus, ArrowDownCircle, ArrowUpCircle, Zap, FileSpreadsheet, Download, ChevronDown, FileText } from 'lucide-react';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
@@ -7,6 +9,7 @@ import Modal from '../components/Modal';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
 import './Payments.css';
 import BounceButton from '../components/BounceButton';
+import ExportDropdown from '../components/ExportDropdown';
 
 const CATEGORIES = ['Client Payment', 'Worker Pay', 'Material Purchase', 'Project Expense', 'Advance', 'Other'];
 
@@ -16,6 +19,16 @@ const emptyForm = {
 };
 
 export default function Payments() {
+    const { t } = useTranslation();
+
+    const CATEGORY_MAP = {
+        'Client Payment': t('payments.categories.client_payment'),
+        'Worker Pay': t('payments.categories.worker_pay'),
+        'Material Purchase': t('payments.categories.material_purchase'),
+        'Project Expense': t('payments.categories.project_expense'),
+        'Advance': t('payments.categories.advance'),
+        'Other': t('payments.categories.other')
+    };
     const [payments, setPayments] = useState([]);
     const [form, setForm] = useState(emptyForm);
     const [selectedId, setSelectedId] = useState(null);
@@ -46,6 +59,8 @@ export default function Payments() {
     // Additional data needed for calculation
     const [attendances, setAttendances] = useState([]);
     const [advances, setAdvances] = useState([]);
+
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
 
     useEffect(() => { loadData(); }, []);
 
@@ -319,6 +334,54 @@ export default function Payments() {
         setIsModalOpen(true);
     }
 
+    const handleExport = async (format) => {
+        const exportData = filtered.map(p => {
+            const proj = projects.find(pr => pr.id === p.projectId);
+            const worker = workers.find(w => w.id === p.workerId);
+            const supplier = suppliers.find(s => s.id === p.supplierId);
+            const material = materials.find(m => m.id === p.materialId);
+
+            return {
+                Date: p.date ? new Date(p.date).toLocaleDateString() : '',
+                Type: p.direction === 'In' ? 'Money In' : 'Money Out',
+                Category: p.category,
+                Amount: p.amount,
+                Project: proj?.name || 'General/Office',
+                Entity: worker?.fullName || supplier?.name || material?.name || 'N/A',
+                Method: p.method,
+                Reference: p.reference || '—',
+                Notes: p.notes || ''
+            };
+        });
+
+        const columns = [
+            { header: 'Date', key: 'Date' },
+            { header: 'Type', key: 'Type' },
+            { header: 'Category', key: 'Category' },
+            { header: 'Amount (LKR)', key: 'Amount' },
+            { header: 'Project', key: 'Project' },
+            { header: 'Related Entity', key: 'Entity' },
+            { header: 'Payment Method', key: 'Method' },
+            { header: 'Reference', key: 'Reference' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Company Payment Transactions Report';
+        const fileName = `Payments_Report_${fromDate || 'All'}_to_${toDate || 'All'}`;
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    };
+
     async function handleSave() {
         if (!form.amount || parseFloat(form.amount) <= 0) return alert('Enter a valid amount');
         if (!form.projectId) return alert('Select a project');
@@ -408,15 +471,15 @@ export default function Payments() {
     }
 
     const columns = [
-        { key: 'date', label: 'Date', render: (v) => new Date(v).toLocaleDateString() },
+        { key: 'date', label: t('common.date'), render: (v) => new Date(v).toLocaleDateString() },
         {
-            key: 'direction', label: 'Type', render: (v) => (
-                v === 'In' ? <span className="badge badge-success"><ArrowDownCircle size={14} /> In</span> : <span className="badge badge-warning"><ArrowUpCircle size={14} /> Out</span>
+            key: 'direction', label: t('common.type'), render: (v) => (
+                v === 'In' ? <span className="badge badge-success"><ArrowDownCircle size={14} /> {t('payments.money_in')}</span> : <span className="badge badge-warning"><ArrowUpCircle size={14} /> {t('payments.money_out')}</span>
             )
         },
-        { key: 'category', label: 'Category' },
+        { key: 'category', label: t('common.category'), render: (v) => CATEGORY_MAP[v] || v },
         {
-            key: 'description', label: 'Description', render: (_, r) => {
+            key: 'description', label: t('common.description'), render: (_, r) => {
                 const proj = projects.find((p) => p.id === r.projectId);
                 const worker = workers.find((w) => w.id === r.workerId);
                 const sup = suppliers.find((s) => s.id === r.supplierId);
@@ -429,7 +492,7 @@ export default function Payments() {
                 return <div className="desc-cell">{desc}</div>;
             }
         },
-        { key: 'amount', label: 'Amount', render: (v) => fmt(v) },
+        { key: 'amount', label: t('common.amount'), render: (v) => fmt(v) },
     ];
 
     // ─── Render suggestion card ──────────────────────────────────
@@ -439,11 +502,11 @@ export default function Payments() {
         if (suggestion.type === 'worker') {
             return (
                 <div className="smart-suggestion">
-                    <div className="smart-header"><Zap size={14} /> Smart Fill — {suggestion.label}</div>
+                    <div className="smart-header"><Zap size={14} /> {t('payments.smart_fill')} — {suggestion.label}</div>
                     <div className="smart-grid">
                         {form.salaryFrom && form.salaryTo && (
                             <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: '#6366f1', marginBottom: '4px' }}>
-                                Period: {new Date(form.salaryFrom).toLocaleDateString()} — {new Date(form.salaryTo).toLocaleDateString()}
+                                {t('common.date')}: {new Date(form.salaryFrom).toLocaleDateString()} — {new Date(form.salaryTo).toLocaleDateString()}
                             </div>
                         )}
                         {suggestion.hourlyRate > 0 ? (
@@ -457,13 +520,13 @@ export default function Payments() {
                                 <span>Total Hours:</span><strong><CountUp to={suggestion.totalHours} /></strong>
                             </>
                         )}
-                        <span>Total Earned:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.totalEarned} separator="," /></strong>
-                        <span>Already Paid:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.alreadyPaid} separator="," /></strong>
+                        <span>{t('payments.total_earned')}:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.totalEarned} separator="," /></strong>
+                        <span>{t('payments.already_paid')}:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.alreadyPaid} separator="," /></strong>
                         {suggestion.activeAdvances > 0 && (
-                            <><span>Active Adv:</span><strong className="text-warning">-<span className="currency-prefix">LKR</span> <CountUp to={suggestion.activeAdvances} separator="," /></strong></>
+                            <><span>{t('payments.active_advance')}:</span><strong className="text-warning">-<span className="currency-prefix">LKR</span> <CountUp to={suggestion.activeAdvances} separator="," /></strong></>
                         )}
 
-                        <span>{suggestion.outstanding >= 0 ? 'Outstanding:' : 'Wait Payment:'}</span>
+                        <span>{suggestion.outstanding >= 0 ? t('payments.outstanding') + ":" : t('payments.pay_outstanding') + ":"}</span>
                         <strong className={suggestion.outstanding >= 0 ? "text-accent" : "text-danger"}>
                             <span className="currency-prefix">LKR</span> <CountUp to={Math.abs(suggestion.outstanding)} separator="," />
                         </strong>
@@ -471,12 +534,12 @@ export default function Payments() {
 
                     {suggestion.outstanding > 0 && (
                         <BounceButton className="btn btn-smart" onClick={() => applySuggested(suggestion.outstanding)}>
-                            <Zap size={12} /> Pay Outstanding: {fmt(suggestion.outstanding)}
+                            <Zap size={12} /> {t('payments.pay_outstanding')}: {fmt(suggestion.outstanding)}
                         </BounceButton>
                     )}
                     {suggestion.totalEarned > 0 && !(suggestion.outstanding < 0) && (
                         <BounceButton className="btn btn-smart-alt" onClick={() => applySuggested(suggestion.totalEarned)}>
-                            Pay Full Earned: {fmt(suggestion.totalEarned)}
+                            {t('payments.pay_full')}: {fmt(suggestion.totalEarned)}
                         </BounceButton>
                     )}
 
@@ -493,13 +556,13 @@ export default function Payments() {
         if (suggestion.type === 'material') {
             return (
                 <div className="smart-suggestion">
-                    <div className="smart-header"><Zap size={14} /> Smart Fill — {suggestion.label}</div>
+                    <div className="smart-header"><Zap size={14} /> {t('payments.smart_fill')} — {suggestion.label}</div>
                     <div className="smart-grid">
                         <span>Unit Cost:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.unitCost} separator="," /></strong>
                         <span>Stock Qty:</span><strong><CountUp to={suggestion.quantity} /> {suggestion.unit}</strong>
-                        <span>Total Value:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.totalValue} separator="," /></strong>
-                        <span>Already Paid:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.alreadyPaid} separator="," /></strong>
-                        <span>Outstanding:</span><strong className="text-accent"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.outstanding} separator="," /></strong>
+                        <span>{t('payments.total_earned')}:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.totalValue} separator="," /></strong>
+                        <span>{t('payments.already_paid')}:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.alreadyPaid} separator="," /></strong>
+                        <span>{t('payments.outstanding')}:</span><strong className="text-accent"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.outstanding} separator="," /></strong>
                     </div>
                     {suggestion.outstanding > 0 && (
                         <BounceButton className="btn btn-smart" onClick={() => applySuggested(suggestion.outstanding)}>
@@ -518,11 +581,11 @@ export default function Payments() {
         if (suggestion.type === 'project-in') {
             return (
                 <div className="smart-suggestion">
-                    <div className="smart-header"><Zap size={14} /> Smart Fill — {suggestion.label}</div>
+                    <div className="smart-header"><Zap size={14} /> {t('payments.smart_fill')} — {suggestion.label}</div>
                     <div className="smart-grid">
-                        <span>Contract Value:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.contractValue} separator="," /></strong>
-                        <span>Already Received:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.received} separator="," /></strong>
-                        <span>Remaining:</span><strong className="text-accent"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.remaining} separator="," /></strong>
+                        <span>{t('projects.contract_value')}:</span><strong><span className="currency-prefix">LKR</span> <CountUp to={suggestion.contractValue} separator="," /></strong>
+                        <span>{t('projects.total_received')}:</span><strong className="text-muted"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.received} separator="," /></strong>
+                        <span>{t('projects.remaining_balance')}:</span><strong className="text-accent"><span className="currency-prefix">LKR</span> <CountUp to={suggestion.remaining} separator="," /></strong>
                     </div>
                     {suggestion.remaining > 0 && (
                         <BounceButton className="btn btn-smart" onClick={() => applySuggested(suggestion.remaining)}>
@@ -539,26 +602,31 @@ export default function Payments() {
     return (
         <div className="crud-page payments-page">
             <div className="page-header">
-                <h1>Payments</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> New Payment</BounceButton>
+                <h1>{t('payments.title')}</h1>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}>
+                        <Plus size={18} /> {t('payments.new_payment')}
+                    </BounceButton>
+                </div>
             </div>
 
             {/* Summary cards */}
             <div className="payment-summary">
                 <div className="pay-card pay-in">
-                    <div className="pay-card-label"><ArrowDownCircle size={14} /> Money In</div>
+                    <div className="pay-card-label"><ArrowDownCircle size={14} /> {t('payments.money_in')}</div>
                     <div className="pay-card-value"><span className="currency-prefix">LKR</span> <CountUp to={summary.totalIn} separator="," /></div>
                 </div>
                 <div className="pay-card pay-out">
-                    <div className="pay-card-label"><ArrowUpCircle size={14} /> Money Out</div>
+                    <div className="pay-card-label"><ArrowUpCircle size={14} /> {t('payments.money_out')}</div>
                     <div className="pay-card-value"><span className="currency-prefix">LKR</span> <CountUp to={summary.totalOut} separator="," /></div>
                 </div>
                 <div className={`pay-card ${summary.net >= 0 ? 'pay-profit' : 'pay-loss'}`}>
-                    <div className="pay-card-label"><Zap size={14} /> Net Cash Flow</div>
+                    <div className="pay-card-label"><Zap size={14} /> {t('payments.net_cash_flow')}</div>
                     <div className="pay-card-value"><span className="currency-prefix">LKR</span> <CountUp to={summary.net} separator="," /></div>
                 </div>
                 <div className="pay-card pay-count">
-                    <div className="pay-card-label">Total Transactions</div>
+                    <div className="pay-card-label">{t('payments.total_transactions')}</div>
                     <div className="pay-card-value"><CountUp to={summary.count} /></div>
                 </div>
             </div>
@@ -566,35 +634,39 @@ export default function Payments() {
             {/* Filters */}
             <div className="filter-bar">
                 <div className="filter-group" style={{ flex: 2 }}>
-                    <label>Search</label>
-                    <input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <label>{t('common.search')}</label>
+                    <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
 
                 {/* Date Range Filters */}
                 <div className="filter-group">
-                    <label>From</label>
+                    <label>{t('common.date')} (From)</label>
                     <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
                 </div>
                 <div className="filter-group">
-                    <label>To</label>
+                    <label>{t('common.date')} (To)</label>
                     <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
                 </div>
                 <div className="filter-group">
-                    <label>Direction</label>
+                    <label>{t('common.type')}</label>
                     <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)}>
-                        <option>All</option><option value="In">Money In</option><option value="Out">Money Out</option>
+                        <option value="All">{t('common.all')}</option>
+                        <option value="In">{t('payments.money_in')}</option>
+                        <option value="Out">{t('payments.money_out')}</option>
                     </select>
                 </div>
                 <div className="filter-group">
-                    <label>Category</label>
+                    <label>{t('common.category')}</label>
                     <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-                        <option>All</option>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                        <option value="All">{t('common.all')}</option>
+                        {Object.entries(CATEGORY_MAP).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                     </select>
                 </div>
                 <div className="filter-group">
-                    <label>Project</label>
+                    <label>{t('common.project')}</label>
                     <select value={projFilter} onChange={(e) => setProjFilter(e.target.value)}>
-                        <option>All</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        <option value="All">{t('common.all')}</option>
+                        {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                 </div>
             </div>
@@ -605,14 +677,14 @@ export default function Payments() {
             </div>
 
             <div className="payments-table-container">
-                <Card title="All Transactions">
-                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectPayment} emptyMessage="No payments found" />
+                <Card title={t('payments.all_transactions')}>
+                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectPayment} emptyMessage={t('dashboard.no_transactions')} />
                 </Card>
 
                 <Modal
                     isOpen={isModalOpen}
                     onClose={() => { setIsModalOpen(false); handleClear(); }}
-                    title={selectedId ? 'Edit Payment' : 'New Payment'}
+                    title={selectedId ? t('payments.edit_payment') : t('payments.new_payment')}
                     onSave={handleSave}
                     onDelete={selectedId ? handleDelete : undefined}
                 >
@@ -620,25 +692,25 @@ export default function Payments() {
                     <div className="direction-toggle">
                         <BounceButton className={`dir-btn ${form.direction === 'In' ? 'active-in' : ''}`}
                             onClick={() => setForm({ ...form, direction: 'In' })}>
-                            <ArrowDownCircle size={16} /> Money In
+                            <ArrowDownCircle size={16} /> {t('payments.money_in')}
                         </BounceButton>
                         <BounceButton className={`dir-btn ${form.direction === 'Out' ? 'active-out' : ''}`}
                             onClick={() => setForm({ ...form, direction: 'Out' })}>
-                            <ArrowUpCircle size={16} /> Money Out
+                            <ArrowUpCircle size={16} /> {t('payments.money_out')}
                         </BounceButton>
                     </div>
 
                     <div className="form-group">
-                        <label>Category</label>
+                        <label>{t('common.category')}</label>
                         <select value={form.category} onChange={(e) => onCategoryChange(e.target.value)}>
-                            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                            {Object.entries(CATEGORY_MAP).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                         </select>
                     </div>
 
                     <div className="form-group">
-                        <label>Project *</label>
+                        <label>{t('common.project')} *</label>
                         <select value={form.projectId} onChange={(e) => onProjectChange(e.target.value)}>
-                            <option value="">— Select Project —</option>
+                            <option value="">— {t('common.project')} —</option>
                             {projects.map((p) => <option key={p.id} value={p.id}>{p.name} {p.status !== 'Ongoing' ? `[${p.status}]` : ''}</option>)}
                         </select>
                     </div>
@@ -647,9 +719,9 @@ export default function Payments() {
                     {(form.category === 'Worker Pay' || form.category === 'Advance') && (
                         <>
                             <div className="form-group">
-                                <label>Worker</label>
+                                <label>{t('nav.workers')}</label>
                                 <select value={form.workerId} onChange={(e) => onWorkerChange(e.target.value)}>
-                                    <option value="">— Select Worker —</option>
+                                    <option value="">— {t('nav.workers')} —</option>
                                     {workers.map((w) => <option key={w.id} value={w.id}>{w.fullName} ({w.role}) — {fmt(w.dailyRate)}/day</option>)}
                                 </select>
                             </div>
@@ -658,7 +730,7 @@ export default function Payments() {
                             {form.category === 'Worker Pay' && form.workerId && (
                                 <div className="form-group" style={{ display: 'flex', gap: '10px' }}>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Salary From</label>
+                                        <label style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('projects.start_date')}</label>
                                         <input
                                             type="date"
                                             value={form.salaryFrom || ''}
@@ -667,7 +739,7 @@ export default function Payments() {
                                         />
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Salary To</label>
+                                        <label style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('projects.end_date')}</label>
                                         <input
                                             type="date"
                                             value={form.salaryTo || ''}
@@ -684,16 +756,16 @@ export default function Payments() {
                     {form.category === 'Material Purchase' && (
                         <>
                             <div className="form-group">
-                                <label>Supplier</label>
+                                <label>{t('nav.suppliers')}</label>
                                 <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-                                    <option value="">— Select Supplier —</option>
+                                    <option value="">— {t('nav.suppliers')} —</option>
                                     {suppliers.filter((s) => s.isActive !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Material</label>
+                                <label>{t('nav.materials')}</label>
                                 <select value={form.materialId} onChange={(e) => onMaterialChange(e.target.value)}>
-                                    <option value="">— Select Material —</option>
+                                    <option value="">— {t('nav.materials')} —</option>
                                     {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.category}) — {fmt(m.cost)}/{m.unit}</option>)}
                                 </select>
                             </div>
@@ -705,31 +777,31 @@ export default function Payments() {
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Amount (LKR) {form.amount && <span className="rate-preview">{fmt(form.amount)}</span>}</label>
+                            <label>{t('common.amount')} (LKR) {form.amount && <span className="rate-preview">{fmt(form.amount)}</span>}</label>
                             <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>Date</label>
+                            <label>{t('common.date')}</label>
                             <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                         </div>
                     </div>
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Method</label>
+                            <label>{t('common.method')}</label>
                             <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
                                 <option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>Online</option><option>Other</option>
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Reference #</label>
-                            <input placeholder="Cheque no, receipt..." value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+                            <label>{t('common.reference')} #</label>
+                            <input placeholder="..." value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label>Notes</label>
-                        <textarea placeholder="Payment details..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                        <label>{t('common.notes')}</label>
+                        <textarea placeholder="..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                     </div>
                 </Modal>
             </div>

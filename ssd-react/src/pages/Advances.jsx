@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Download, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
@@ -7,6 +8,7 @@ import Modal from '../components/Modal';
 import { getAll, create, update, remove, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
+import ExportDropdown from '../components/ExportDropdown';
 
 export default function Advances() {
     const [advances, setAdvances] = useState([]);
@@ -17,9 +19,50 @@ export default function Advances() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
+
     useEffect(() => {
         loadData();
     }, []);
+
+    const handleExport = async (format) => {
+        const exportData = advances.map(a => {
+            const worker = workers.find(w => w.id === a.workerId);
+            const project = projects.find(p => p.id === a.projectId);
+            return {
+                Date: a.date ? new Date(a.date).toLocaleDateString() : '—',
+                Worker: worker?.fullName || '—',
+                Project: project?.name || '—',
+                Amount: a.amount,
+                Status: a.status,
+                Notes: a.notes || ''
+            };
+        });
+
+        const columns = [
+            { header: 'Date', key: 'Date' },
+            { header: 'Worker Name', key: 'Worker' },
+            { header: 'Project Name', key: 'Project' },
+            { header: 'Advance Amount (LKR)', key: 'Amount' },
+            { header: 'Status', key: 'Status' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Worker Advances Report';
+        const fileName = 'Advances_List';
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    };
 
     async function loadData() {
         setIsLoading(true);
@@ -96,7 +139,15 @@ export default function Advances() {
 
     return (
         <div className="crud-page finance-page">
-            <div className="page-header"><h1>Advances</h1><BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> New Advance</BounceButton></div>
+            <div className="page-header">
+                <h1>Advances</h1>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}>
+                        <Plus size={18} /> New Advance
+                    </BounceButton>
+                </div>
+            </div>
 
             <div className="finance-cards" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
                 <Card className="report-summary-card">

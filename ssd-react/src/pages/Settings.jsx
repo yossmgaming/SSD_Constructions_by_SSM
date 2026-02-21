@@ -1,31 +1,108 @@
 
-import { Database, Info } from 'lucide-react';
+import { Database, Info, Globe, Check } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import Card from '../components/Card';
+import './Settings.css';
 
 export default function Settings() {
-    return (
-        <div className="settings-page" style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-            <h1 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Database size={24} /> Settings & Data
-            </h1>
+    const { t, i18n } = useTranslation();
 
-            <Card title="Application Info">
-                <div style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-                        <div style={{ background: '#e0f2fe', padding: '10px', borderRadius: '50%', color: '#0284c7' }}>
-                            <Info size={24} />
-                        </div>
-                        <div>
-                            <h3 style={{ marginTop: 0, marginBottom: '5px' }}>SSD Construction Manager</h3>
-                            <p className="text-muted" style={{ margin: 0 }}>Version 2.0</p>
-                            <div style={{ marginTop: '15px', fontSize: '0.9rem', color: '#666', lineHeight: '1.5' }}>
-                                <p>This application automatically saves your data to your local device database.</p>
-                                <p>Your data is persistent and will be available every time you open the application.</p>
+    const languages = [
+        { code: 'en', name: 'English', native: 'English', flag: '🇬🇧' },
+        { code: 'sn', name: 'Sinhala', native: 'සිංහල', flag: '🇱🇰' }
+    ];
+
+    const handleLanguageChange = (code) => {
+        i18n.changeLanguage(code);
+    };
+
+    return (
+        <div className="settings-container">
+            <motion.header
+                className="settings-header"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+            >
+                <h1>
+                    <Database size={28} className="header-icon" />
+                    {t('settings.title')}
+                </h1>
+            </motion.header>
+
+            <div className="settings-grid">
+                {/* Language Selection Card */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                >
+                    <Card title={t('settings.language_selection')}>
+                        <div className="settings-card-content">
+                            <div className="section-intro">
+                                <Globe size={20} className="section-icon" />
+                                <p>{t('settings.select_preferred_language')}</p>
+                            </div>
+
+                            <div className="language-options">
+                                {languages.map((lang) => (
+                                    <button
+                                        key={lang.code}
+                                        className={`lang-option-card ${i18n.language === lang.code ? 'active' : ''}`}
+                                        onClick={() => handleLanguageChange(lang.code)}
+                                    >
+                                        <div className="lang-flag">{lang.flag}</div>
+                                        <div className="lang-info">
+                                            <span className="lang-native">{lang.native}</span>
+                                            <span className="lang-name">{lang.name}</span>
+                                        </div>
+                                        {i18n.language === lang.code && (
+                                            <motion.div
+                                                className="check-badge"
+                                                layoutId="activeCheck"
+                                                initial={{ scale: 0 }}
+                                                animate={{ scale: 1 }}
+                                            >
+                                                <Check size={16} />
+                                            </motion.div>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                </div>
-            </Card>
+                    </Card>
+                </motion.div>
+
+                {/* App Info Card */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    <Card title={t('settings.app_info')}>
+                        <div className="settings-card-content">
+                            <div className="app-branding">
+                                <div className="app-logo-circle">
+                                    <Info size={32} />
+                                </div>
+                                <div className="app-details">
+                                    <h3>SSD Construction Manager</h3>
+                                    <p className="version-pill">
+                                        {t('settings.version')} 3.0 (Enterprise)
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="app-description">
+                                <p>{t('settings.app_description')}</p>
+                                <div className="info-box">
+                                    <p>{t('settings.data_storage')}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </motion.div>
+            </div>
         </div>
     );
 }

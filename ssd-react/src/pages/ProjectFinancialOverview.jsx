@@ -3,9 +3,13 @@ import {
     PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Legend
 } from 'recharts';
+import { Download, ChevronDown, FileText } from 'lucide-react';
+import ExportDropdown from '../components/ExportDropdown';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
-import { getAll, query, KEYS } from '../data/db';
+import { getAll, queryEq, KEYS } from '../data/db';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV, exportBOQ, exportBOQData } from '../utils/exportUtils';
+import BounceButton from '../components/BounceButton';
 import './Finance.css';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
@@ -53,9 +57,9 @@ export default function ProjectFinancialOverview() {
         setIsLoading(true);
         try {
             const [allPayments, allAdvances, allAttendance, workers] = await Promise.all([
-                query(KEYS.payments, (p) => p.projectId === parseInt(selectedId)),
-                query(KEYS.advances, (a) => a.projectId === parseInt(selectedId)),
-                query(KEYS.attendances, (a) => a.projectId === parseInt(selectedId)),
+                queryEq(KEYS.payments, 'projectId', parseInt(selectedId)),
+                queryEq(KEYS.advances, 'projectId', parseInt(selectedId)),
+                queryEq(KEYS.attendances, 'projectId', parseInt(selectedId)),
                 getAll(KEYS.workers)
             ]);
 
@@ -145,6 +149,70 @@ export default function ProjectFinancialOverview() {
         }
     }
 
+    async function handleExport(format) {
+        if (!overview) return;
+        const project = overview.project;
+        const title = `Project Financial Summary: ${project.name}`;
+        const fileName = `Financial_Summary_${project.name.replace(/\s+/g, '_')}`;
+
+        const exportData = [
+            { Metric: 'Contract Value', Amount: overview.contractValue },
+            { Metric: 'Total Received', Amount: overview.totalIn },
+            { Metric: 'Total Spent', Amount: overview.totalOut },
+            { Metric: 'Worker Pay', Amount: overview.workerCost },
+            { Metric: 'Material Cost', Amount: overview.materialCost },
+            { Metric: 'Expenses', Amount: overview.expenseCost },
+            { Metric: 'Advances Paid', Amount: overview.advanceCost + overview.totalAdvances },
+            { Metric: 'Net Profit/Loss', Amount: overview.profit }
+        ];
+
+        const columns = [
+            { header: 'Metric', key: 'Metric' },
+            { header: 'Amount (LKR)', key: 'Amount' }
+        ];
+
+        setIsLoading(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function handleBOQExport(format) {
+        if (!overview || !selectedId) return;
+        setIsLoading(true);
+        try {
+            const boqItems = await queryEq(KEYS.boqItems, 'projectId', parseInt(selectedId));
+            if (boqItems.length === 0) {
+                alert("No BOQ items found for this project.");
+                return;
+            }
+
+            await exportBOQData({
+                format,
+                project: overview.project,
+                items: boqItems.map(i => ({
+                    description: i.description,
+                    qty: i.quantity || i.qty || 0,
+                    unit: i.unit,
+                    rate: i.unitPrice || i.rate || 0,
+                    amount: (i.quantity || i.qty || 0) * (i.unitPrice || i.rate || 0)
+                })),
+                fileName: `BOQ_${overview.project.name.replace(/\s+/g, '_')}`
+            });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     const fmtShort = (v) => {
         if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
@@ -175,11 +243,27 @@ export default function ProjectFinancialOverview() {
 
     return (
         <div className="finance-page">
-            <div className="page-header"><h1>Project Financial Overview</h1></div>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <h1>Project Financial Overview</h1>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <ExportDropdown
+                        onExport={handleBOQExport}
+                        isLoading={isLoading}
+                        disabled={!selectedId}
+                        label="Export BOQ"
+                    />
+                    <ExportDropdown
+                        onExport={handleExport}
+                        isLoading={isLoading}
+                        disabled={!selectedId}
+                        label="Export Summary"
+                    />
+                </div>
+            </div>
 
             <div className="form-group" style={{ maxWidth: 400, marginBottom: 20 }}>
                 <label>Select Project</label>
-                <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)}>
+                <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)} disabled={isLoading}>
                     <option value="">Choose a project...</option>
                     {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>

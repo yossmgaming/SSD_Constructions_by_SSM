@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Plus, CalendarDays, Pencil, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Plus, CalendarDays, Pencil, Trash2, Download, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import BounceButton from '../components/BounceButton';
 import Modal from '../components/Modal';
+import ExportDropdown from '../components/ExportDropdown';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
 import { WorkerRoles, ProjectStatus } from '../models/enums';
 import './Workers.css';
@@ -12,6 +15,7 @@ import './Workers.css';
 const emptyForm = { fullName: '', nic: '', role: 'Mason', hourlyRate: '', dailyRate: '', phone: '', phone2: '', status: 'Active', notes: '' };
 
 export default function Workers() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [workers, setWorkers] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -32,9 +36,48 @@ export default function Workers() {
     // Rates store for defaults
     const [workerRates, setWorkerRates] = useState([]);
 
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
+
     useEffect(() => {
         loadData();
     }, []);
+
+    const handleExport = async (format) => {
+        const exportData = workers.map(w => ({
+            Name: w.fullName,
+            NIC: w.nic,
+            Role: w.role,
+            DailyRate: w.dailyRate,
+            Phone: w.phone,
+            Status: w.status,
+            Notes: w.notes
+        }));
+
+        const columns = [
+            { header: 'Full Name', key: 'Name' },
+            { header: 'NIC', key: 'NIC' },
+            { header: 'Role', key: 'Role' },
+            { header: 'Daily Rate', key: 'DailyRate' },
+            { header: 'Phone', key: 'Phone' },
+            { header: 'Status', key: 'Status' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Company Workers Directory';
+        const fileName = 'Workers_List';
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    };
 
     async function loadData() {
         setIsLoading(true);
@@ -92,7 +135,7 @@ export default function Workers() {
     }
 
     async function handleSave() {
-        if (!form.fullName.trim()) return alert('Worker name is required');
+        if (!form.fullName.trim()) return alert(t('common.full_name') + ' is required');
 
         // ✅ NIC duplicate validation
         if (isNICDuplicate(form.nic)) {
@@ -150,9 +193,9 @@ export default function Workers() {
             if (assignCount > 0) deps.push(`${assignCount} project assignment${assignCount > 1 ? 's' : ''}`);
             if (oblCount > 0) deps.push(`${oblCount} obligation${oblCount > 1 ? 's' : ''}`);
 
-            let msg = 'Delete this worker?';
+            let msg = t('common.confirm') + '?';
             if (deps.length > 0) {
-                msg = `⚠️ This worker has ${deps.join(', ')}.\n\nDeleting will leave orphan records. Are you sure?`;
+                msg = `⚠️ This worker has ${deps.join(', ')}.\n\n${t('projects.delete_warning')}?`;
             }
 
             if (!confirm(msg)) {
@@ -217,14 +260,14 @@ export default function Workers() {
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} `;
 
     const columns = [
-        { key: 'fullName', label: 'Name' },
-        { key: 'nic', label: 'NIC' },
-        { key: 'role', label: 'Role' },
+        { key: 'fullName', label: t('common.full_name') },
+        { key: 'nic', label: t('workers.nic_number') },
+        { key: 'role', label: t('common.role') },
         // ✅ Daily rate formatting in table
-        { key: 'dailyRate', label: 'Daily Rate', render: (v) => fmt(v) },
-        { key: 'phone', label: 'Phone' },
+        { key: 'dailyRate', label: t('workers.daily_rate'), render: (v) => fmt(v) },
+        { key: 'phone', label: t('common.phone') },
         {
-            key: 'status', label: 'Status', render: (v) => (
+            key: 'status', label: t('common.status'), render: (v) => (
                 <span className={`badge ${v === 'Active' ? 'badge-success' : v === 'Assigned' ? 'badge-info' : 'badge-default'} `}>{v}</span>
             )
         },
@@ -240,26 +283,27 @@ export default function Workers() {
     return (
         <div className="crud-page workers-page">
             <div className="page-header">
-                <h1>Workers</h1>
-                <div className="page-header-actions">
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> New Worker</BounceButton>
+                <h1>{t('workers.title')}</h1>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('workers.new_worker')}</BounceButton>
                 </div>
             </div>
 
             <div className="filter-bar">
                 <div className="filter-group">
-                    <label>Name</label>
-                    <input placeholder="Search by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <label>{t('common.name')}</label>
+                    <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
                 <div className="filter-group">
-                    <label>NIC</label>
-                    <input placeholder="Search by NIC..." value={searchNIC} onChange={(e) => setSearchNIC(e.target.value)} />
+                    <label>{t('workers.nic_number')}</label>
+                    <input placeholder={t('common.search') + "..."} value={searchNIC} onChange={(e) => setSearchNIC(e.target.value)} />
                 </div>
                 <div className="filter-group" style={{ maxWidth: 200 }}>
-                    <label>Role</label>
+                    <label>{t('common.role')}</label>
                     <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-                        <option>All Roles</option>
-                        {allRoles.map((r) => <option key={r}>{r}</option>)}
+                        <option value="All Roles">{t('common.all')}</option>
+                        {allRoles.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                 </div>
             </div>
@@ -271,22 +315,22 @@ export default function Workers() {
             </div>
 
             <div className="crud-layout" style={{ gridTemplateColumns: '1fr' }}>
-                <Card title="Worker List">
-                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectWorker} emptyMessage="No workers found" />
+                <Card title={t('workers.worker_list')}>
+                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectWorker} emptyMessage={t('workers.no_workers')} />
                 </Card>
 
                 <Modal
                     isOpen={isModalOpen}
                     onClose={() => { setIsModalOpen(false); handleClear(); }}
-                    title={selectedId ? 'Edit Worker' : 'New Worker'}
+                    title={selectedId ? t('workers.edit_worker') : t('workers.new_worker')}
                     onSave={handleSave}
                 >
                     <div className="form-group">
-                        <label>Full Name</label>
+                        <label>{t('common.full_name')}</label>
                         <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
                     </div>
                     <div className="form-group">
-                        <label>NIC</label>
+                        <label>{t('workers.nic_number')}</label>
                         <input
                             value={form.nic}
                             onChange={(e) => setForm({ ...form, nic: e.target.value })}
@@ -298,7 +342,7 @@ export default function Workers() {
                         )}
                     </div>
                     <div className="form-group">
-                        <label>Role</label>
+                        <label>{t('common.role')}</label>
                         <select
                             value={allRoles.includes(form.role) ? form.role : 'Other'}
                             onChange={(e) => {
@@ -317,13 +361,13 @@ export default function Workers() {
                                 }
                             }}
                         >
-                            {allRoles.map((r) => <option key={r}>{r}</option>)}
-                            <option>Other</option>
+                            {allRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+                            <option value="Other">{t('projects.custom_type')}</option>
                         </select>
                     </div>
                     {(!allRoles.includes(form.role) || form.role === 'Other' || form.role === '') && (
                         <div className="form-group">
-                            <label>Custom Role</label>
+                            <label>{t('workers.custom_role') || 'Custom Role'}</label>
                             <input
                                 placeholder="Enter custom role..."
                                 value={form.role === 'Other' ? '' : form.role}
@@ -333,7 +377,7 @@ export default function Workers() {
                     )}
                     <div className="form-grid">
                         <div className="form-group">
-                            <label>Hourly Rate <span className="text-muted">(Locked)</span></label>
+                            <label>{t('workers.base_salary')} <span className="text-muted">(Locked)</span></label>
                             <input
                                 type="number"
                                 placeholder="0.00"
@@ -344,7 +388,7 @@ export default function Workers() {
                         </div>
                         <div className="form-group">
                             {/* ✅ Daily rate with formatted preview */}
-                            <label>Daily Rate (x8) {form.dailyRate && <span className="text-muted text-xs">({fmt(form.dailyRate)})</span>}</label>
+                            <label>{t('workers.daily_rate')} (x8) {form.dailyRate && <span className="text-muted text-xs">({fmt(form.dailyRate)})</span>}</label>
                             <input
                                 type="number"
                                 value={form.dailyRate}
@@ -381,26 +425,22 @@ export default function Workers() {
 
                     <div className="assignment-section" style={{ borderTop: '1px solid var(--border-color)', marginTop: 16, paddingTop: 16 }}>
                         <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                            {selectedId ? 'Project Assignment' : 'Assign to Project (Optional)'}
+                            {selectedId ? t('workers.project_assignment') : t('workers.assign_to_project')}
                         </label>
                         <div className="form-grid">
                             <div className="form-group">
                                 {/* ✅ Project status badge in dropdown */}
-                                <label>Project</label>
+                                <label>{t('common.project')}</label>
                                 <select value={assignProject} onChange={(e) => setAssignProject(e.target.value)}>
-                                    <option value="">Select project...</option>
+                                    <option value="">{t('common.search')}...</option>
                                     {projects.map((p) => (
                                         <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>From</label>
+                                <label>{t('common.date')}</label>
                                 <input type="date" value={assignFrom} onChange={(e) => setAssignFrom(e.target.value)} />
-                            </div>
-                            <div className="form-group">
-                                <label>To</label>
-                                <input type="date" value={assignTo} onChange={(e) => setAssignTo(e.target.value)} />
                             </div>
                         </div>
                         {selectedId && <BounceButton className="btn btn-primary btn-sm mt-2" onClick={handleAssign}>Set Assignment</BounceButton>}
@@ -429,10 +469,10 @@ export default function Workers() {
                     {selectedId && (
                         <div style={{ display: 'flex', gap: 12, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
                             <BounceButton className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/attendance')}>
-                                <CalendarDays size={16} /> Mark Attendance
+                                <CalendarDays size={16} /> {t('attendance.mark_attendance')}
                             </BounceButton>
                             <BounceButton className="btn btn-danger" style={{ flex: 1 }} onClick={handleDelete}>
-                                <Trash2 size={16} /> Delete Worker
+                                <Trash2 size={16} /> {t('common.delete')}
                             </BounceButton>
                         </div>
                     )}

@@ -30,6 +30,55 @@
     font-size: 0.75rem;
 }
 
+/* Export Dropdown */
+.export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.export-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    min-width: 180px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    padding: 6px;
+}
+
+.export-dropdown:hover .export-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.export-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.export-menu button:hover {
+    background: var(--bg-app);
+    color: var(--text-accent);
+}
+
 /* KPI summary cards */
 .report-summary-cards {
     display: grid;

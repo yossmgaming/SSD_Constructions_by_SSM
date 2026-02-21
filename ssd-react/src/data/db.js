@@ -23,6 +23,7 @@ export const KEYS = {
     workerRates: 'workerRates',
     workRates: 'workRates',
     bankAccounts: 'bankAccounts',
+    agreements: 'agreements',
 };
 
 // --- Supabase Async CRUD Functions ---
@@ -90,6 +91,56 @@ export async function remove(table, id) {
 export async function query(table, filterFn) {
     const all = await getAll(table);
     return all.filter(filterFn);
+}
+
+// Efficient equality check using Supabase server-side filtering
+export async function queryEq(table, column, value) {
+    const { data, error } = await supabase.from(table).select('*').eq(column, value);
+    if (error) {
+        console.error(`Error querying ${table} by ${column}=${value}:`, error);
+        return [];
+    }
+    return data || [];
+}
+
+/**
+ * Advanced server-side querying
+ * @param {string} table 
+ * @param {object} options { filters: { eq: {}, range: { column, from, to } }, orderBy: { column, ascending }, limit: number }
+ */
+export async function queryAdvanced(table, { filters = {}, orderBy = {}, limit = null } = {}) {
+    let q = supabase.from(table).select('*');
+
+    // Filtering
+    if (filters.eq) {
+        Object.entries(filters.eq).forEach(([col, val]) => {
+            if (val !== undefined && val !== null) q = q.eq(col, val);
+        });
+    }
+
+    // Range
+    if (filters.range) {
+        const { column, from, to } = filters.range;
+        if (from) q = q.gte(column, from);
+        if (to) q = q.lte(column, to);
+    }
+
+    // Ordering
+    if (orderBy.column) {
+        q = q.order(orderBy.column, { ascending: !!orderBy.ascending });
+    }
+
+    // Limiting
+    if (limit) {
+        q = q.limit(limit);
+    }
+
+    const { data, error } = await q;
+    if (error) {
+        console.error(`Error in queryAdvanced for ${table}:`, error);
+        return [];
+    }
+    return data || [];
 }
 
 // Warning: upsert using a custom match function is tricky with Supabase. 

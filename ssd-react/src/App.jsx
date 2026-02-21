@@ -13,6 +13,7 @@ import Advances from './pages/Advances';
 import Rates from './pages/Rates';
 import Suppliers from './pages/Suppliers';
 import BankAccounts from './pages/BankAccounts'; // Added import
+import AgreementGenerator from './pages/AgreementGenerator';
 
 import Settings from './pages/Settings';
 import { seedIfEmpty } from './data/db';
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/boq-generator" element={<BOQGenerator />} />
+          <Route path="/agreements" element={<AgreementGenerator />} />
           <Route path="/project-overview" element={<ProjectFinancialOverview />} />
           <Route path="/advances" element={<Advances />} />
           <Route path="/rates" element={<Rates />} />

@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, AlertTriangle, Package, Trash2 } from 'lucide-react';
+import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
+import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
+import ExportDropdown from '../components/ExportDropdown';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
 import { MaterialCategories, MeasurementUnits } from '../models/enums';
 import './Materials.css';
@@ -12,6 +15,7 @@ import BounceButton from '../components/BounceButton';
 const emptyForm = { name: '', category: '', customCategory: '', unit: '', customUnit: '', quantity: '', cost: '', minStock: '', supplierId: '', notes: '' };
 
 export default function Materials() {
+    const { t } = useTranslation();
     const [materials, setMaterials] = useState([]);
     const [form, setForm] = useState(emptyForm);
     const [selectedId, setSelectedId] = useState(null);
@@ -32,7 +36,48 @@ export default function Materials() {
     const [workRates, setWorkRates] = useState([]);
     const [projectMaterials, setProjectMaterials] = useState([]);
 
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
+
     useEffect(() => { loadData(); }, []);
+
+    const handleExport = async (format) => {
+        const exportData = materials.map(m => ({
+            Material: m.name,
+            Category: m.category,
+            Unit: m.unit,
+            Quantity: m.quantity,
+            UnitCost: m.cost,
+            TotalValue: (m.quantity || 0) * (m.cost || 0),
+            MinStock: m.minStock,
+            Notes: m.notes
+        }));
+
+        const columns = [
+            { header: 'Material Name', key: 'Material' },
+            { header: 'Category', key: 'Category' },
+            { header: 'Unit', key: 'Unit' },
+            { header: 'Qty in Stock', key: 'Quantity' },
+            { header: 'Unit Cost (LKR)', key: 'UnitCost' },
+            { header: 'Total Value (LKR)', key: 'TotalValue' },
+            { header: 'Reorder Level', key: 'MinStock' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Company Material Inventory Report';
+        const fileName = 'Material_Inventory_List';
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    };
 
     async function loadData() {
         setIsLoading(true);
@@ -63,7 +108,7 @@ export default function Materials() {
     }, [selectedId, projectMaterials]);
 
     async function assignToProject() {
-        if (!assignProject) return alert('Select a project');
+        if (!assignProject) return alert(t('attendance.select_project') || 'Select a project');
         if (!assignQty || parseFloat(assignQty) <= 0) return alert('Enter a valid quantity');
         setIsLoading(true);
         try {
@@ -198,24 +243,24 @@ export default function Materials() {
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
     const columns = [
-        { key: 'name', label: 'Name' },
-        { key: 'category', label: 'Category' },
+        { key: 'name', label: t('common.name') },
+        { key: 'category', label: t('common.category') },
         {
-            key: 'quantity', label: 'Qty', render: (v, row) => {
+            key: 'quantity', label: t('materials.stock_qty'), render: (v, row) => {
                 const isLow = row.minStock && v <= row.minStock;
                 return (
                     <span className={isLow ? 'low-stock-qty' : ''}>
                         {v} {row.unit || ''}
                         {/* ✅ Low stock badge */}
-                        {isLow && <span className="low-stock-badge">Low</span>}
+                        {isLow && <span className="low-stock-badge">{t('materials.low_stock')}</span>}
                     </span>
                 );
             }
         },
-        { key: 'cost', label: 'Unit Cost', render: (v) => fmt(v) },
+        { key: 'cost', label: t('materials.unit_cost'), render: (v) => fmt(v) },
         {
             /* ✅ Total value column */
-            key: 'quantity', label: 'Total Value', render: (v, row) => {
+            key: 'quantity', label: t('dashboard.total'), render: (v, row) => {
                 const total = (row.quantity || 0) * (row.cost || 0);
                 return <span className="total-value">{fmt(total)}</span>;
             }
@@ -225,36 +270,39 @@ export default function Materials() {
     return (
         <div className="crud-page materials-page">
             <div className="page-header">
-                <h1>Materials</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> New Material</BounceButton>
+                <h1>{t('materials.title')}</h1>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('materials.new_material')}</BounceButton>
+                </div>
             </div>
 
             {/* ✅ Stock summary cards */}
             <div className="stock-summary">
                 <div className="stock-card">
-                    <div className="stock-card-label">Total Items</div>
+                    <div className="stock-card-label">{t('materials.total_items')}</div>
                     <div className="stock-card-value"><CountUp to={stockSummary.totalItems} /></div>
                 </div>
                 <div className="stock-card">
-                    <div className="stock-card-label">Total Stock Value</div>
+                    <div className="stock-card-label">{t('materials.total_stock_value')}</div>
                     <div className="stock-card-value value-green"><span className="currency-prefix">LKR</span> <CountUp to={stockSummary.totalValue} separator="," /></div>
                 </div>
                 <div className={`stock-card ${stockSummary.lowStockCount > 0 ? 'stock-card-alert' : ''}`}>
-                    <div className="stock-card-label">{stockSummary.lowStockCount > 0 && <AlertTriangle size={13} />} Low Stock Items</div>
+                    <div className="stock-card-label">{stockSummary.lowStockCount > 0 && <AlertTriangle size={13} />} {t('materials.low_stock_items')}</div>
                     <div className={`stock-card-value ${stockSummary.lowStockCount > 0 ? 'value-red' : ''}`}><CountUp to={stockSummary.lowStockCount} /></div>
                 </div>
             </div>
 
             <div className="filter-bar">
                 <div className="filter-group" style={{ flex: 2 }}>
-                    <label>Search</label>
-                    <input placeholder="Search by name or category..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <label>{t('common.search')}</label>
+                    <input placeholder={t('projects.search_placeholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
                 {/* ✅ Category filter */}
                 <div className="filter-group" style={{ flex: 1 }}>
-                    <label>Category</label>
+                    <label>{t('common.category')}</label>
                     <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-                        <option>All</option>
+                        <option value="All">{t('common.all')}</option>
                         {allCategories.map((c) => <option key={c}>{c}</option>)}
                     </select>
                 </div>
@@ -262,24 +310,24 @@ export default function Materials() {
 
             {/* ✅ Material count */}
             <div className="result-count">
-                Showing <strong>{filtered.length}</strong> of <strong>{materials.length}</strong> material{materials.length !== 1 ? 's' : ''}
-                {(search || catFilter !== 'All') && <span className="filter-active-tag">Filtered</span>}
+                {t('common.showing')} <strong>{filtered.length}</strong> {t('common.of')} <strong>{materials.length}</strong> {t('nav.materials')}
+                {(search || catFilter !== 'All') && <span className="filter-active-tag">{t('common.filtered')}</span>}
             </div>
 
             <div className="crud-layout" style={{ gridTemplateColumns: '1fr' }}>
-                <Card title="Material List">
-                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectMaterial} emptyMessage="No materials found" />
+                <Card title={t('materials.material_list')}>
+                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectMaterial} emptyMessage={t('materials.no_materials')} />
                 </Card>
 
                 <Modal
                     isOpen={isModalOpen}
                     onClose={() => { setIsModalOpen(false); handleClear(); }}
-                    title={selectedId ? 'Edit Material' : 'New Material'}
+                    title={selectedId ? t('materials.edit_material') : t('materials.new_material')}
                     onSave={handleSave}
                     onDelete={selectedId ? handleDelete : undefined}
                 >
                     <div className="form-group">
-                        <label>Material Name</label>
+                        <label>{t('materials.material_name')}</label>
                         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={isNameDuplicate(form.name) ? 'input-error' : ''} />
                         {/* ✅ Duplicate warning */}
                         {isNameDuplicate(form.name) && <span className="field-error">⚠ A material with this name already exists</span>}
@@ -287,92 +335,93 @@ export default function Materials() {
 
                     {/* ✅ Category dropdown */}
                     <div className="form-group">
-                        <label>Category</label>
+                        <label>{t('common.category')}</label>
                         <select value={allCategories.includes(form.category) ? form.category : 'Other'} onChange={(e) => {
                             if (e.target.value === 'Other') setForm({ ...form, category: 'Other', customCategory: '' });
                             else setForm({ ...form, category: e.target.value, customCategory: '' });
                         }}>
                             {allCategories.map((c) => <option key={c}>{c}</option>)}
-                            <option>Other</option>
+                            <option value="Other">{t('payments.categories.other')}</option>
                         </select>
                     </div>
                     {(form.category === 'Other') && (
                         <div className="form-group">
-                            <label>Custom Category</label>
-                            <input placeholder="Enter category..." value={form.customCategory} onChange={(e) => setForm({ ...form, customCategory: e.target.value })} />
+                            <label>{t('projects.custom_type')}</label>
+                            <input placeholder="..." value={form.customCategory} onChange={(e) => setForm({ ...form, customCategory: e.target.value })} />
                         </div>
                     )}
 
                     <div className="form-grid">
                         <div className="form-group">
-                            <label>Quantity</label>
+                            <label>{t('materials.stock_qty')}</label>
                             <input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
                         </div>
                         {/* ✅ Unit dropdown from shared enums */}
                         <div className="form-group">
-                            <label>Unit</label>
+                            <label>{t('nav.tools')}</label>
                             <select value={MeasurementUnits.includes(form.unit) ? form.unit : 'Other'} onChange={(e) => {
                                 if (e.target.value === 'Other') setForm({ ...form, unit: 'Other', customUnit: '' });
                                 else setForm({ ...form, unit: e.target.value, customUnit: '' });
                             }}>
                                 {MeasurementUnits.map((u) => <option key={u}>{u}</option>)}
+                                <option value="Other">{t('payments.categories.other')}</option>
                             </select>
                         </div>
                     </div>
                     {(form.unit === 'Other') && (
                         <div className="form-group">
-                            <label>Custom Unit</label>
-                            <input placeholder="Enter unit..." value={form.customUnit} onChange={(e) => setForm({ ...form, customUnit: e.target.value })} />
+                            <label>{t('projects.custom_type')}</label>
+                            <input placeholder="..." value={form.customUnit} onChange={(e) => setForm({ ...form, customUnit: e.target.value })} />
                         </div>
                     )}
 
                     <div className="form-grid">
                         <div className="form-group">
                             {/* ✅ Cost preview */}
-                            <label>Unit Cost (LKR) {form.cost && <span className="rate-preview">{fmt(form.cost)}</span>}</label>
+                            <label>{t('materials.unit_cost')} (LKR) {form.cost && <span className="rate-preview">{fmt(form.cost)}</span>}</label>
                             <input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
                         </div>
                         {/* ✅ Minimum stock level */}
                         <div className="form-group">
-                            <label>Min Stock Level</label>
-                            <input type="number" placeholder="Reorder threshold" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
+                            <label>{t('materials.min_stock')}</label>
+                            <input type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
                         </div>
                     </div>
 
                     {/* Total value preview */}
                     {form.quantity && form.cost && (
                         <div className="total-preview" style={{ marginBottom: 16, padding: '8px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
-                            Total Value: <strong style={{ color: 'var(--text-primary)' }}>{fmt(form.quantity * form.cost)}</strong>
+                            {t('dashboard.total')}: <strong style={{ color: 'var(--text-primary)' }}>{fmt(form.quantity * form.cost)}</strong>
                         </div>
                     )}
 
                     {/* ✅ Supplier dropdown */}
                     <div className="form-group">
-                        <label>Supplier</label>
+                        <label>{t('nav.suppliers')}</label>
                         <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-                            <option value="">— None —</option>
+                            <option value="">— {t('common.all')} —</option>
                             {suppliers.filter((s) => s.isActive !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
 
                     {/* ✅ Notes */}
                     <div className="form-group">
-                        <label>Notes</label>
-                        <textarea placeholder="Specs, brand, grade..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                        <label>{t('common.notes')}</label>
+                        <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                     </div>
 
                     {/* Project Assignment Section */}
                     <div className="assignment-section" style={{ borderTop: '1px solid var(--border-color)', marginTop: 16, paddingTop: 16 }}>
-                        <h4 style={{ fontSize: '0.875rem', marginBottom: 12 }}>📁 Project Assignment</h4>
+                        <h4 style={{ fontSize: '0.875rem', marginBottom: 12 }}>📁 {t('materials.project_assignment')}</h4>
                         {!selectedId ? (
-                            <p className="text-muted-hint" style={{ fontSize: '0.8125rem' }}>Save the material first to assign it to projects.</p>
+                            <p className="text-muted-hint" style={{ fontSize: '0.8125rem' }}>{t('dashboard.no_projects')}</p>
                         ) : (
                             <>
                                 <div className="form-grid">
                                     <div className="form-group">
-                                        <label>Project</label>
+                                        <label>{t('common.project')}</label>
                                         <select value={assignProject} onChange={(e) => setAssignProject(e.target.value)}>
-                                            <option value="">— Select —</option>
+                                            <option value="">— {t('common.all')} —</option>
                                             {projects.map((p) => (
                                                 <option key={p.id} value={p.id}>
                                                     {p.name} {p.status !== 'Ongoing' ? `[${p.status}]` : ''}
@@ -381,26 +430,26 @@ export default function Materials() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>Qty</label>
+                                        <label>{t('materials.stock_qty')}</label>
                                         <input type="number" placeholder="0" value={assignQty} onChange={(e) => setAssignQty(e.target.value)} />
                                     </div>
                                 </div>
 
                                 <div className="form-grid">
                                     <div className="form-group">
-                                        <label>Date</label>
+                                        <label>{t('common.date')}</label>
                                         <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
                                     </div>
                                     <div className="form-group">
-                                        <label>Notes (opt)</label>
-                                        <input placeholder="Assignment notes" value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} />
+                                        <label>{t('common.notes')}</label>
+                                        <input value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} />
                                     </div>
                                 </div>
-                                <BounceButton className="btn btn-primary btn-sm mt-2" onClick={assignToProject}><Plus size={14} /> Assign to Project</BounceButton>
+                                <BounceButton className="btn btn-primary btn-sm mt-2" onClick={assignToProject}><Plus size={14} /> {t('materials.assign_to_project')}</BounceButton>
 
                                 {assignments.length > 0 && (
                                     <div className="history-list mt-4" style={{ maxHeight: '120px', overflowY: 'auto', background: 'var(--bg-card)', padding: 8, borderRadius: 6, border: '1px solid var(--border-color)' }}>
-                                        <div className="history-header" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: 8 }}>Assigned to {assignments.length} project{assignments.length !== 1 ? 's' : ''}</div>
+                                        <div className="history-header" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: 8 }}>{t('materials.project_assignment')} ({assignments.length})</div>
                                         {assignments.map((a) => (
                                             <div key={a.id} className="history-item" style={{ fontSize: '0.8125rem', padding: '4px 0', borderBottom: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div className="history-item-info">

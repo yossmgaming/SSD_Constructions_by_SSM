@@ -1,13 +1,17 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Briefcase, CalendarDays, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { ChevronLeft, ChevronRight, Briefcase, CalendarDays, Clock, Download, ChevronDown } from 'lucide-react';
+import ExportDropdown from '../components/ExportDropdown';
 import Card from '../components/Card';
-import { getAll, query, customUpsert, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import './Attendance.css';
 import BounceButton from '../components/BounceButton';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function Attendance() {
+    const { t, i18n } = useTranslation();
     const [workers, setWorkers] = useState([]);
     const [projects, setProjects] = useState([]);
     const [attendances, setAttendances] = useState([]);
@@ -17,11 +21,16 @@ export default function Attendance() {
     const [workerAssignments, setWorkerAssignments] = useState([]);
     const [search, setSearch] = useState('');
     const [currentDate, setCurrentDate] = useState(new Date());
+    const month = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
     const [menu, setMenu] = useState(null); // { day, x, y }
     const [customHoursInput, setCustomHoursInput] = useState('');
     const [showCustomInput, setShowCustomInput] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingExport, setIsLoadingExport] = useState(false);
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -39,7 +48,8 @@ export default function Attendance() {
             ]);
             setWorkers(wrks);
             setProjects(projs);
-            setAttendances(atts);
+            // Sort attendances by date (ascending) to keep data organized
+            setAttendances([...atts].sort((a, b) => (a.date || '').localeCompare(b.date || '')));
             setProjectWorkers(pws);
         } catch (error) {
             console.error(error);
@@ -129,20 +139,58 @@ export default function Attendance() {
     }, []);
 
     // Auto-refresh when window gains focus (in case user updated workers in another tab)
-    useEffect(() => {
-        function onFocus() {
-            setRefreshKey(k => k + 1);
-            if (selectedWorker) detectWorkerProjects(selectedWorker); // Refresh assignments
-        }
-        window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
-    }, [selectedWorker, detectWorkerProjects]);
+    const handleExport = async (format) => {
+        const exportData = attendances.map(a => {
+            const worker = workers.find(w => w.id === a.workerId);
+            const project = projects.find(p => p.id === a.projectId);
 
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfWeek = new Date(year, month, 1).getDay();
-    const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            // Proper hours: use hoursWorked if it's a number (even 0), then hours, then derive from status
+            const hours = (a.hoursWorked != null) ? a.hoursWorked
+                : (a.hours != null) ? a.hours
+                    : a.isHalfDay ? 4
+                        : a.isPresent ? 8
+                            : 0;
+
+            return {
+                Date: a.date,
+                Worker: worker?.fullName || '',
+                Project: project?.name || '',
+                Status: a.status || (a.isHalfDay ? 'Half Day' : a.isPresent ? 'Present' : 'Absent'),
+                Hours: hours,
+                Notes: a.notes || ''
+            };
+        }).sort((a, b) => b.Date.localeCompare(a.Date));
+
+        const columns = [
+            { header: 'Date', key: 'Date' },
+            { header: 'Worker', key: 'Worker' },
+            { header: 'Project', key: 'Project' },
+            { header: 'Status', key: 'Status' },
+            { header: 'Hours', key: 'Hours' },
+            { header: 'Notes', key: 'Notes' }
+        ];
+
+        const title = 'Worker Attendance Detailed Logs';
+        const fileName = 'Attendance_Records';
+
+        setIsLoadingExport(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoadingExport(false);
+        }
+    }
+
+    const monthName = currentDate.toLocaleString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'long', year: 'numeric' });
+    const TRANSLATED_DAYS = [
+        t('days.sun') || 'Sun', t('days.mon') || 'Mon', t('days.tue') || 'Tue',
+        t('days.wed') || 'Wed', t('days.thu') || 'Thu', t('days.fri') || 'Fri', t('days.sat') || 'Sat'
+    ];
 
     const attendanceRecords = useMemo(() => {
         if (!selectedWorker) return [];
@@ -219,56 +267,84 @@ export default function Attendance() {
         }
 
         const dateStr = getDateStr(day);
+        const projId = selectedProject ? parseInt(selectedProject) : null;
 
-        // Find existing record for this specific day/project to update
-        const existing = getAttendance(day);
+        // Determine correct status string
+        let statusStr = '';
+        if (isPresent) {
+            if (hoursWorked === 8 && !isHalfDay) statusStr = 'Present';
+            else if (hoursWorked === 4 && isHalfDay) statusStr = 'Half Day';
+            else statusStr = `${hoursWorked}h`;
+        } else {
+            statusStr = 'Absent';
+        }
 
         const updateData = {
             workerId: selectedWorker.id,
-            projectId: selectedProject ? parseInt(selectedProject) : null,
+            projectId: projId,
             date: dateStr,
             isPresent,
-            isHalfDay,
+            isHalfDay: isPresent && hoursWorked === 4 && isHalfDay,
             hoursWorked,
-            // Explicitly clear legacy fields if they exist to prevent calculation errors
             hours: null,
-            status: isPresent ? (isHalfDay ? 'Half Day' : 'Present') : 'Absent'
+            status: statusStr
         };
 
-        setIsLoading(true);
-        try {
+        // Find existing record from local state first (fast)
+        const existing = getAttendance(day);
+
+        // OPTIMISTIC UPDATE: Update state immediately
+        const tempId = existing ? existing.id : `temp-${Date.now()}`;
+        const previousAttendances = [...attendances];
+
+        setAttendances(prev => {
             if (existing) {
-                await customUpsert(KEYS.attendances, (a) => a.id === existing.id, updateData);
+                return prev.map(a => a.id === existing.id ? { ...updateData, id: existing.id } : a);
             } else {
-                await customUpsert(KEYS.attendances, () => false, updateData);
+                return [...prev, { ...updateData, id: tempId }].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
             }
+        });
+
+        try {
+            if (existing && typeof existing.id === 'number') {
+                // Direct update by known ID — no full table scan
+                await update(KEYS.attendances, existing.id, updateData);
+            } else {
+                // Server-side check: prevent duplicate by querying worker+date
+                const serverMatch = await queryEq(KEYS.attendances, 'workerId', selectedWorker.id);
+                const exactMatch = serverMatch.find(a => a.date === dateStr && a.projectId === projId);
+
+                if (exactMatch) {
+                    await update(KEYS.attendances, exactMatch.id, updateData);
+                } else {
+                    await create(KEYS.attendances, updateData);
+                }
+            }
+            // Silent refresh in background
             setRefreshKey((k) => k + 1);
-            await detectWorkerProjects(selectedWorker); // Refresh project assignments
+            detectWorkerProjects(selectedWorker);
         } catch (error) {
-            console.error(error);
-        } finally {
-            setIsLoading(false);
+            console.error('Attendance save error:', error);
+            setAttendances(previousAttendances);
+            alert("Failed to sync with database. Reverting changes.");
         }
     }
 
     async function clearAttendance(day) {
         const existing = getAttendance(day);
-        if (existing) {
-            setIsLoading(true);
+        if (existing && typeof existing.id === 'number') {
+            const previousAttendances = [...attendances];
+
+            // Optimistic remove from local state
+            setAttendances(prev => prev.filter(a => a.id !== existing.id));
+
             try {
-                await customUpsert(KEYS.attendances, (a) => a.id === existing.id, {
-                    isPresent: false,
-                    isHalfDay: false,
-                    hoursWorked: 0,
-                    hours: null,
-                    status: 'Absent'
-                });
+                await remove(KEYS.attendances, existing.id);
                 setRefreshKey((k) => k + 1);
-                await detectWorkerProjects(selectedWorker);
+                detectWorkerProjects(selectedWorker);
             } catch (error) {
-                console.error(error);
-            } finally {
-                setIsLoading(false);
+                console.error('Clear attendance error:', error);
+                setAttendances(previousAttendances);
             }
         }
     }
@@ -379,8 +455,7 @@ export default function Attendance() {
         if (!menu) return;
         const hours = parseFloat(customHoursInput);
         if (isNaN(hours) || hours <= 0 || hours > 24) return;
-        const isHalf = hours <= 4;
-        markAttendance(menu.day, true, isHalf, hours);
+        markAttendance(menu.day, true, false, hours); // Pass false for isHalfDay, markAttendance will handle formatting
         closeMenu();
     }
 
@@ -400,11 +475,14 @@ export default function Attendance() {
 
     return (
         <div className="attendance-page">
-            <div className="page-header"><h1>Attendance</h1></div>
+            <div className="page-header">
+                <h1>{t('attendance.title')}</h1>
+                <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+            </div>
 
             <div className="attendance-layout">
-                <Card title="Workers">
-                    <input placeholder="Search worker..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 12 }} />
+                <Card title={t('workers.title')}>
+                    <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 12 }} />
                     <div className="worker-search-list" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                         {filteredWorkers.map((w) => {
                             // Quick check if this worker has any project assigned
@@ -433,7 +511,7 @@ export default function Attendance() {
                         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                             <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
                                 <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}>
-                                    <option value="">All Projects</option>
+                                    <option value="">{t('attendance.all_projects') || t('common.all')}</option>
                                     {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                             </div>
@@ -445,10 +523,10 @@ export default function Attendance() {
                         </div>
 
                         <div className="legend">
-                            <span><span className="legend-dot present" /> Full Day</span>
-                            <span><span className="legend-dot half" /> Half Day</span>
-                            <span><span className="legend-dot custom" /> Custom</span>
-                            <span><span className="legend-dot absent" /> Absent</span>
+                            <span><span className="legend-dot present" /> {t('attendance.present')}</span>
+                            <span><span className="legend-dot half" /> {t('attendance.half_day')}</span>
+                            <span><span className="legend-dot custom" /> {t('attendance.overtime')}</span>
+                            <span><span className="legend-dot absent" /> {t('attendance.absent')}</span>
                         </div>
                     </div>
 
@@ -457,7 +535,7 @@ export default function Attendance() {
                         <div className="worker-assignments-card">
                             <div className="assignments-header">
                                 <Briefcase size={16} />
-                                <span>{selectedWorker.fullName}'s Project Assignments</span>
+                                <span>{selectedWorker.fullName}{t('attendance.worker_assignments_suffix') || "'s Project Assignments"}</span>
                             </div>
                             <div className="assignments-list">
                                 {workerAssignments.map((a) => (
@@ -477,11 +555,11 @@ export default function Attendance() {
                                             {a.firstDate && (
                                                 <span className="assignment-detail">
                                                     <CalendarDays size={12} />
-                                                    {new Date(a.firstDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                    {a.lastDate && a.lastDate !== a.firstDate && ` → ${new Date(a.lastDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                                                    {new Date(a.firstDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })}
+                                                    {a.lastDate && a.lastDate !== a.firstDate && ` → ${new Date(a.lastDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })}`}
                                                 </span>
                                             )}
-                                            <span className="assignment-detail"><Clock size={12} /> {a.daysWorked} days · {a.totalHours}h</span>
+                                            <span className="assignment-detail"><Clock size={12} /> {a.daysWorked} {t('attendance.days')} · {a.totalHours}{t('attendance.hours_short')}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -491,22 +569,22 @@ export default function Attendance() {
 
                     {selectedWorker && (
                         <div className="attendance-summary-bar">
-                            <div className="summary-chip present">Present: <strong>{presentDays}</strong></div>
-                            <div className="summary-chip half">Half Days: <strong>{halfDays}</strong></div>
-                            <div className="summary-chip absent">Absent: <strong>{absentDays}</strong></div>
-                            <div className="summary-chip hours">Total Hours: <strong>{totalHours}</strong></div>
+                            <div className="summary-chip present">{t('attendance.present')}: <strong>{presentDays}</strong></div>
+                            <div className="summary-chip half">{t('attendance.half_day')}: <strong>{halfDays}</strong></div>
+                            <div className="summary-chip absent">{t('attendance.absent')}: <strong>{absentDays}</strong></div>
+                            <div className="summary-chip hours">{t('attendance.hours')}: <strong>{totalHours}</strong></div>
                         </div>
                     )}
 
                     <div className="attendance-hint">
                         {selectedWorker
-                            ? '💡 Left-click to quick toggle  •  Right-click for options'
-                            : 'Select a worker to view / mark attendance'}
+                            ? t('attendance.hint_active') || '💡 Left-click to quick toggle  •  Right-click for options'
+                            : t('attendance.hint_empty') || 'Select a worker to view / mark attendance'}
                     </div>
 
                     {selectedWorker && (
                         <div className="calendar-grid">
-                            {DAYS.map((d) => <div key={d} className="calendar-header">{d}</div>)}
+                            {TRANSLATED_DAYS.map((d) => <div key={d} className="calendar-header">{d}</div>)}
                             {calendarCells.map((day, i) => {
                                 if (day === null) return <div key={`e${i}`} className="calendar-day empty" />;
 
@@ -514,12 +592,11 @@ export default function Attendance() {
                                 const att = getAttendance(day);
                                 const isAssigned = isDateInAssignment(day);
 
-                                let statusClass = 'calendar-day'; // Reverted to original class
+                                let statusClass = 'calendar-day';
                                 if (isToday) statusClass += ' today';
 
                                 if (!isAssigned) statusClass += ' not-assigned';
                                 else if (att?.isPresent && !att.isHalfDay) statusClass += ' present';
-                                // Logic:
                                 else if (att?.isHalfDay) statusClass += ' half-day';
                                 else if (att?.isPresent && att?.status?.endsWith('h')) statusClass += ' custom-hours';
                                 else if (att && !att.isPresent) statusClass += ' absent';
@@ -527,13 +604,18 @@ export default function Attendance() {
                                 return (
                                     <div
                                         key={i}
-                                        className={`${statusClass} ${isAssigned ? '' : ''}`}
+                                        className={statusClass}
                                         onClick={() => handleLeftClick(day)}
                                         onContextMenu={(e) => handleContextMenu(e, day)}
                                     >
                                         <span className="day-number">{day}</span>
                                         {att && att.status && (
-                                            <span className="atten-status">{att.status}</span>
+                                            <span className="atten-status">
+                                                {att.status === 'Present' ? t('attendance.present_short') || 'P' :
+                                                    att.status === 'Half Day' ? t('attendance.half_day_short') || 'H' :
+                                                        att.status === 'Absent' ? t('attendance.absent_short') || 'A' :
+                                                            att.status}
+                                            </span>
                                         )}
                                     </div>
                                 );
@@ -550,20 +632,20 @@ export default function Attendance() {
                     className="attendance-context-menu"
                     style={{ top: menu.y, left: menu.x }}
                 >
-                    <div className="ctx-menu-header">Day {menu.day} — {selectedWorker?.fullName}</div>
+                    <div className="ctx-menu-header">{t('common.date')} {menu.day} — {selectedWorker?.fullName}</div>
                     <BounceButton className="ctx-menu-item present" onClick={() => handleMenuAction('full')}>
-                        <span className="ctx-dot present" /> Full Day (8h)
+                        <span className="ctx-dot present" /> {t('attendance.present')} (8h)
                     </BounceButton>
                     <BounceButton className="ctx-menu-item half" onClick={() => handleMenuAction('half')}>
-                        <span className="ctx-dot half" /> Half Day (4h)
+                        <span className="ctx-dot half" /> {t('attendance.half_day')} (4h)
                     </BounceButton>
                     <BounceButton className="ctx-menu-item absent" onClick={() => handleMenuAction('absent')}>
-                        <span className="ctx-dot absent" /> Absent
+                        <span className="ctx-dot absent" /> {t('attendance.absent')}
                     </BounceButton>
                     <div className="ctx-menu-divider" />
                     {!showCustomInput ? (
                         <BounceButton className="ctx-menu-item custom" onClick={() => handleMenuAction('custom')}>
-                            <span className="ctx-dot custom" /> Custom Hours...
+                            <span className="ctx-dot custom" /> {t('attendance.overtime')}...
                         </BounceButton>
                     ) : (
                         <div className="ctx-custom-input">
@@ -572,18 +654,18 @@ export default function Attendance() {
                                 min="0.5"
                                 max="24"
                                 step="0.5"
-                                placeholder="Hours (e.g. 6)"
+                                placeholder={t('attendance.hours') + " (e.g. 6)"}
                                 value={customHoursInput}
                                 onChange={(e) => setCustomHoursInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && submitCustomHours()}
                                 autoFocus
                             />
-                            <BounceButton className="btn btn-primary btn-sm" onClick={submitCustomHours}>Set</BounceButton>
+                            <BounceButton className="btn btn-primary btn-sm" onClick={submitCustomHours}>{t('common.save')}</BounceButton>
                         </div>
                     )}
                     <div className="ctx-menu-divider" />
                     <BounceButton className="ctx-menu-item clear" onClick={() => handleMenuAction('clear')}>
-                        ✕ Clear
+                        ✕ {t('common.clear')}
                     </BounceButton>
                 </div>
             )}

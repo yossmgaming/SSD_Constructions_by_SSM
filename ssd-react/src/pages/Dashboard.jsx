@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FolderKanban, Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import {
@@ -6,13 +7,14 @@ import {
     ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import Card from '../components/Card';
-import { getAll, KEYS } from '../data/db';
+import { getAll, queryEq, queryAdvanced, KEYS } from '../data/db';
 import './Dashboard.css';
 import BounceButton from '../components/BounceButton';
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#94a3b8'];
 
 export default function Dashboard() {
+    const { t } = useTranslation();
     const [projects, setProjects] = useState([]);
     const [workers, setWorkers] = useState([]);
     const [materials, setMaterials] = useState([]);
@@ -27,41 +29,54 @@ export default function Dashboard() {
         if (!dateStr) return '';
         const diff = Date.now() - new Date(dateStr).getTime();
         const mins = Math.floor(diff / 60000);
-        if (mins < 1) return 'Just now';
-        if (mins < 60) return `${mins}m ago`;
+        if (mins < 1) return t('dashboard.just_now');
+        if (mins < 60) return `${mins}${t('dashboard.m_ago')}`;
         const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
+        if (hrs < 24) return `${hrs}${t('dashboard.h_ago')}`;
         const days = Math.floor(hrs / 24);
-        return `${days}d ago`;
+        return `${days}${t('dashboard.d_ago')}`;
     }
 
     async function loadData() {
         setIsLoading(true);
         try {
-            const [p, w, m, pay, adv] = await Promise.all([
-                getAll(KEYS.projects),
-                getAll(KEYS.workers),
-                getAll(KEYS.materials),
-                getAll(KEYS.payments),
-                getAll(KEYS.advances)
+            // Calculate 6 months ago for financial charts
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+            const dateFrom = sixMonthsAgo.toISOString().split('T')[0];
+
+            const [p, w, m, pay, adv, recentProjs, recentWorkers, recentMats, recentPays, recentAdvs] = await Promise.all([
+                queryEq(KEYS.projects, 'status', 'Ongoing'),
+                queryEq(KEYS.workers, 'status', 'Active'),
+                getAll(KEYS.materials), // Usually doesn't grow indefinitely, but could be optimized later
+                queryAdvanced(KEYS.payments, { filters: { range: { column: 'date', from: dateFrom } } }),
+                queryAdvanced(KEYS.advances, { filters: { range: { column: 'date', from: dateFrom } } }),
+
+                // For activity feed: get last 10 of each
+                queryAdvanced(KEYS.projects, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
+                queryAdvanced(KEYS.workers, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
+                queryAdvanced(KEYS.materials, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
+                queryAdvanced(KEYS.payments, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
+                queryAdvanced(KEYS.advances, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 })
             ]);
+
             setProjects(p);
             setWorkers(w);
             setMaterials(m);
             setPayments(pay);
             setAdvances(adv || []);
 
-            // Activity feed
+            // Activity feed - compiled from recent records
             const feed = [];
-            p.forEach((r) => feed.push({ text: `Project "${r.name}" created`, time: r.createdAt, color: 'blue' }));
-            w.forEach((r) => feed.push({ text: `Worker ${r.fullName} added (${r.role})`, time: r.createdAt, color: 'green' }));
-            m.forEach((r) => feed.push({ text: `Material "${r.name}" registered`, time: r.createdAt, color: 'orange' }));
-            pay.forEach((r) => {
+            recentProjs.forEach((r) => feed.push({ text: `Project "${r.name}" created`, time: r.createdAt, color: 'blue' }));
+            recentWorkers.forEach((r) => feed.push({ text: `Worker ${r.fullName} added (${r.role})`, time: r.createdAt, color: 'green' }));
+            recentMats.forEach((r) => feed.push({ text: `Material "${r.name}" registered`, time: r.createdAt, color: 'orange' }));
+            recentPays.forEach((r) => {
                 const proj = p.find((x) => x.id === r.projectId);
                 const dir = r.direction === 'In' ? '↗' : '↙';
                 feed.push({ text: `${dir} ${r.category || 'Payment'} — LKR ${(r.amount || 0).toLocaleString()} ${proj ? `(${proj.name})` : ''}`, time: r.createdAt || r.date, color: r.direction === 'In' ? 'green' : 'rose' });
             });
-            adv?.forEach((r) => {
+            recentAdvs?.forEach((r) => {
                 const proj = p.find((x) => x.id === r.projectId);
                 const wrk = w.find((x) => x.id === r.workerId);
                 feed.push({ text: `↙ Advance — LKR ${(r.amount || 0).toLocaleString()} ${wrk ? `to ${wrk.fullName}` : ''} ${proj ? `(${proj.name})` : ''}`, time: r.createdAt || r.date, color: 'rose' });
@@ -172,17 +187,17 @@ export default function Dashboard() {
     };
 
     const statCards = [
-        { label: 'Active Projects', value: <CountUp to={metrics.activeProjects} />, icon: FolderKanban, color: 'indigo', sub: `${projects.length} total` },
-        { label: 'Active Workers', value: <CountUp to={metrics.activeWorkers} />, icon: Users, color: 'emerald', sub: `${workers.length} total` },
-        { label: 'Money In', value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></>, icon: ArrowUpRight, color: 'emerald', sub: 'Total received' },
-        { label: 'Money Out', value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></>, icon: ArrowDownRight, color: 'rose', sub: 'Total spent' },
+        { label: t('dashboard.active_projects'), value: <CountUp to={metrics.activeProjects} />, icon: FolderKanban, color: 'indigo', sub: `${projects.length} ${t('dashboard.total')}` },
+        { label: t('dashboard.total_workers'), value: <CountUp to={metrics.activeWorkers} />, icon: Users, color: 'emerald', sub: `${workers.length} ${t('dashboard.total')}` },
+        { label: t('dashboard.money_in'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></>, icon: ArrowUpRight, color: 'emerald', sub: t('dashboard.total_received') },
+        { label: t('dashboard.money_out'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></>, icon: ArrowDownRight, color: 'rose', sub: t('dashboard.total_spent') },
     ];
 
     return (
         <div className="dashboard">
             <div className="page-header">
-                <h1>Dashboard</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={loadData}>Refresh</BounceButton>
+                <h1>{t('dashboard.title')}</h1>
+                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={loadData}>{t('dashboard.refresh')}</BounceButton>
             </div>
 
             {/* ─── Stat Cards ─────────────────────────── */}
@@ -202,13 +217,13 @@ export default function Dashboard() {
             {/* ─── Net Cash Flow banner ────────────────── */}
             <div className={`cash-flow-banner ${metrics.net >= 0 ? 'positive' : 'negative'}`}>
                 <TrendingUp size={18} />
-                <span>Net Cash Flow: <strong>LKR <CountUp to={metrics.net} separator="," /></strong></span>
-                <span className="cash-flow-note">{materials.length} materials · {payments.length} transactions</span>
+                <span>{t('dashboard.net_cash_flow')}: <strong>LKR <CountUp to={metrics.net} separator="," /></strong></span>
+                <span className="cash-flow-note">{materials.length} {t('nav.materials').toLowerCase()} · {payments.length} {t('nav.payments').toLowerCase()}</span>
             </div>
 
             {/* ─── Charts Row 1 ────────────────────────── */}
             <div className="dashboard-charts-row">
-                <Card title="Cash Flow Trend" className="dash-chart-card">
+                <Card title={t('dashboard.cash_flow_trend')} className="dash-chart-card">
                     {monthlyFlow.length > 0 ? (
                         <ResponsiveContainer width="100%" height={220}>
                             <AreaChart data={monthlyFlow} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -226,14 +241,14 @@ export default function Dashboard() {
                                 <XAxis dataKey="label" fontSize={11} tick={{ fill: '#94a3b8' }} />
                                 <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
                                 <Tooltip content={<ChartTooltip />} />
-                                <Area type="monotone" dataKey="In" stroke="#10b981" fill="url(#dashGradIn)" strokeWidth={2} name="Money In" />
-                                <Area type="monotone" dataKey="Out" stroke="#ef4444" fill="url(#dashGradOut)" strokeWidth={2} name="Money Out" />
+                                <Area type="monotone" dataKey="In" stroke="#10b981" fill="url(#dashGradIn)" strokeWidth={2} name={t('dashboard.money_in')} />
+                                <Area type="monotone" dataKey="Out" stroke="#ef4444" fill="url(#dashGradOut)" strokeWidth={2} name={t('dashboard.money_out')} />
                             </AreaChart>
                         </ResponsiveContainer>
-                    ) : <div className="chart-empty-sm">No transactions yet</div>}
+                    ) : <div className="chart-empty-sm">{t('dashboard.no_transactions')}</div>}
                 </Card>
 
-                <Card title="Expense Breakdown" className="dash-chart-card">
+                <Card title={t('dashboard.expense_breakdown')} className="dash-chart-card">
                     {expensePie.length > 0 ? (
                         <ResponsiveContainer width="100%" height={220}>
                             <PieChart>
@@ -245,12 +260,12 @@ export default function Dashboard() {
                                 <Tooltip content={<PieTooltip />} />
                             </PieChart>
                         </ResponsiveContainer>
-                    ) : <div className="chart-empty-sm">No expenses yet</div>}
+                    ) : <div className="chart-empty-sm">{t('dashboard.no_expenses')}</div>}
                 </Card>
             </div>
 
             {/* ─── Project Budget Progress ─────────────── */}
-            <Card title="Project Budget Progress" className="dash-bar-card">
+            <Card title={t('dashboard.project_budget_progress')} className="dash-bar-card">
                 {projectProgress.length > 0 ? (
                     <>
                         <ResponsiveContainer width="100%" height={200}>
@@ -259,9 +274,9 @@ export default function Dashboard() {
                                 <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} />
                                 <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
                                 <Tooltip content={<ChartTooltip />} />
-                                <Bar dataKey="Budget" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="Budget" />
-                                <Bar dataKey="Received" fill="#10b981" radius={[4, 4, 0, 0]} name="Received" />
-                                <Bar dataKey="Spent" fill="#ef4444" radius={[4, 4, 0, 0]} name="Spent" />
+                                <Bar dataKey="Budget" fill="#e2e8f0" radius={[4, 4, 0, 0]} name={t('dashboard.budget')} />
+                                <Bar dataKey="Received" fill="#10b981" radius={[4, 4, 0, 0]} name={t('dashboard.received')} />
+                                <Bar dataKey="Spent" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.spent')} />
                             </BarChart>
                         </ResponsiveContainer>
                         <div className="progress-pills">
@@ -276,14 +291,14 @@ export default function Dashboard() {
                             ))}
                         </div>
                     </>
-                ) : <div className="chart-empty-sm">No projects yet</div>}
+                ) : <div className="chart-empty-sm">{t('dashboard.no_projects')}</div>}
             </Card>
 
             {/* ─── Activity + Projects ─────────────────── */}
             <div className="dashboard-grid">
-                <Card title="Recent Activity">
+                <Card title={t('dashboard.recent_activity')}>
                     {activities.length === 0 ? (
-                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>No activity yet</div>
+                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_activity')}</div>
                     ) : activities.map((a, i) => (
                         <div className="activity-item" key={i}>
                             <div className={`activity-dot ${a.color}`} />
@@ -295,9 +310,9 @@ export default function Dashboard() {
                     ))}
                 </Card>
 
-                <Card title="Active Projects">
+                <Card title={t('dashboard.active_projects')}>
                     {projects.length === 0 ? (
-                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>No projects yet</div>
+                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_projects')}</div>
                     ) : (
                         projects.slice(0, 5).map((p) => (
                             <div className="project-mini" key={p.id}>

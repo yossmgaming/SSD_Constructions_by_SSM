@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './Sidebar';
 import Iridescence from './Iridescence';
 import BounceButton from './BounceButton';
@@ -35,7 +36,18 @@ export default function Layout() {
                     speed={1}
                 />
                 <div className="layout-inner-content">
-                    <Outlet />
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={location.pathname}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            style={{ height: '100%' }}
+                        >
+                            <Outlet />
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
             </main>
         </div>

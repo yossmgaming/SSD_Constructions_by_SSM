@@ -3,10 +3,13 @@ import {
     PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Legend, AreaChart, Area
 } from 'recharts';
+import { Download, ChevronDown, FileSpreadsheet } from 'lucide-react';
+import ExportDropdown from '../components/ExportDropdown';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
-import { getAll, query, KEYS } from '../data/db';
+import { getAll, queryEq, queryAdvanced, KEYS } from '../data/db';
+import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import './Reports.css';
 import BounceButton from '../components/BounceButton';
 
@@ -37,14 +40,29 @@ export default function Reports() {
     async function loadData() {
         setIsLoading(true);
         try {
+            // Default to last 12 months to avoid "forever" load if no dates specified
+            let payFilter = {};
+            let advFilter = {};
+
+            if (dateFrom || dateTo) {
+                payFilter = { range: { column: 'date', from: dateFrom, to: dateTo } };
+                advFilter = { range: { column: 'date', from: dateFrom, to: dateTo } };
+            } else {
+                const oneYearAgo = new Date();
+                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+                const defaultFrom = oneYearAgo.toISOString().split('T')[0];
+                payFilter = { range: { column: 'date', from: defaultFrom } };
+                advFilter = { range: { column: 'date', from: defaultFrom } };
+            }
+
             const [projs, wrks, mats, sups, pays, atts, advs] = await Promise.all([
                 getAll(KEYS.projects),
                 getAll(KEYS.workers),
                 getAll(KEYS.materials),
                 getAll(KEYS.suppliers),
-                getAll(KEYS.payments),
-                getAll(KEYS.attendances),
-                getAll(KEYS.advances)
+                queryAdvanced(KEYS.payments, { filters: payFilter }),
+                getAll(KEYS.attendances), // Attendance might still be large, but usually needs processing
+                queryAdvanced(KEYS.advances, { filters: advFilter })
             ]);
             setProjects(projs);
             setWorkers(wrks);
@@ -66,6 +84,27 @@ export default function Reports() {
         if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
         if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
         return v;
+    };
+
+    const PieTooltip = ({ active, payload }) => {
+        if (!active || !payload?.length) return null;
+        return (
+            <div className="dash-tooltip">
+                <p><strong>{payload[0].name}:</strong> {fmt(payload[0].value)}</p>
+            </div>
+        );
+    };
+
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (!active || !payload?.length) return null;
+        return (
+            <div className="dash-tooltip">
+                <p style={{ marginBottom: 4 }}><strong>{label}</strong></p>
+                {payload.map((entry, i) => (
+                    <p key={i} style={{ color: entry.color }}>{entry.name}: {fmt(entry.value)}</p>
+                ))}
+            </div>
+        );
     };
 
     // Date filters
@@ -240,27 +279,89 @@ export default function Reports() {
     }), [projects, payments, advances]);
 
     // Tooltips
-    const CustomTooltip = ({ active, payload, label }) => {
-        if (!active || !payload?.length) return null;
-        return (
-            <div className="chart-tooltip">
-                <p className="chart-tooltip-label">{label || payload[0]?.name}</p>
-                {payload.map((p, i) => (
-                    <p key={i} style={{ color: p.color || p.fill }}><strong>{p.name}:</strong> {fmt(p.value)}</p>
-                ))}
-            </div>
-        );
+    const handleExport = async (format) => {
+        let exportData = [];
+        let exportColumns = [];
+        let fileName = '';
+        let title = '';
+
+        if (reportType === 'Overview' || reportType === 'Projects') {
+            exportData = projectReport.map(p => ({
+                Project: p.name,
+                Client: p.client,
+                Status: p.status,
+                Budget: p.budget,
+                Received: p.received,
+                Spent: p.spent,
+                Profit: p.profit,
+                Remaining: p.remaining
+            }));
+            exportColumns = [
+                { header: 'Project', key: 'Project' },
+                { header: 'Client', key: 'Client' },
+                { header: 'Status', key: 'Status' },
+                { header: 'Budget (LKR)', key: 'Budget' },
+                { header: 'Received (LKR)', key: 'Received' },
+                { header: 'Spent (LKR)', key: 'Spent' },
+                { header: 'Profit/Loss (LKR)', key: 'Profit' },
+                { header: 'Balance (LKR)', key: 'Remaining' }
+            ];
+            fileName = 'Project_Summary_Report';
+            title = 'Project Financial Summary Report';
+        } else if (reportType === 'Workers') {
+            exportData = workerReport.map(w => ({
+                Worker: w.name,
+                Role: w.role,
+                Days: w.daysWorked,
+                Earned: w.totalEarned,
+                Paid: w.totalPaid,
+                Adv: w.totalAdv,
+                Due: w.outstanding
+            }));
+            exportColumns = [
+                { header: 'Worker', key: 'Worker' },
+                { header: 'Role', key: 'Role' },
+                { header: 'Days Worked', key: 'Days' },
+                { header: 'Total Earned', key: 'Earned' },
+                { header: 'Total Paid', key: 'Paid' },
+                { header: 'Advances', key: 'Adv' },
+                { header: 'Outstanding', key: 'Due' }
+            ];
+            fileName = 'Worker_Payroll_Report';
+            title = 'Worker Payroll & Performance Report';
+        } else if (reportType === 'Performance') {
+            exportData = perfData.map(w => ({
+                Worker: w.name,
+                Role: w.role,
+                Attendance: `${w.attendanceRate}%`,
+                Score: `${w.overall}%`,
+                Grade: w.grade
+            }));
+            exportColumns = [
+                { header: 'Worker', key: 'Worker' },
+                { header: 'Role', key: 'Role' },
+                { header: 'Attendance %', key: 'Attendance' },
+                { header: 'Overall Score', key: 'Score' },
+                { header: 'Grade', key: 'Grade' }
+            ];
+            fileName = 'Worker_Performance_Report';
+            title = 'Worker Performance Rankings';
+        }
+
+        setIsLoading(true);
+        setIsLoading(true);
+        try {
+            if (format === 'pdf') await exportToPDF({ title, data: exportData, columns: exportColumns, fileName });
+            else if (format === 'excel') exportToExcel({ title, data: exportData, columns: exportColumns, fileName });
+            else if (format === 'word') await exportToWord({ title, data: exportData, columns: exportColumns, fileName });
+            else if (format === 'csv') exportToCSV(exportData, fileName);
+        } catch (e) {
+            console.error("Export failed:", e);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const PieTooltip = ({ active, payload }) => {
-        if (!active || !payload?.length) return null;
-        const d = payload[0];
-        return (
-            <div className="chart-tooltip">
-                <p><strong>{d.name}:</strong> {fmt(d.value)}</p>
-            </div>
-        );
-    };
 
     // Column definitions for tables
     const projectColumns = [
@@ -286,7 +387,10 @@ export default function Reports() {
 
     return (
         <div className="reports-page">
-            <div className="page-header"><h1>Reports & Analytics</h1></div>
+            <div className="page-header">
+                <h1>Reports & Analytics</h1>
+                <ExportDropdown onExport={handleExport} isLoading={isLoading} />
+            </div>
 
             {/* Filters */}
             <div className="reports-filters">

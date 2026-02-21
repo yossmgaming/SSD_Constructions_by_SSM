@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
 import { getAll, create, update, remove, query, KEYS } from '../data/db';
@@ -16,6 +17,7 @@ const WORK_CATEGORIES = [
 const UNITS = MeasurementUnits;
 
 export default function Rates() {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('worker');
     const [workerRates, setWorkerRates] = useState([]);
     const [workRates, setWorkRates] = useState([]);
@@ -33,7 +35,7 @@ export default function Rates() {
     const [wrOvertime, setWrOvertime] = useState('');
 
     // Work rate form
-    const [wkCategory, setWkCategory] = useState('Tiling');
+    const [wkCategory, setWkCategory] = useState('Masonry');
     const [wkCustomCategory, setWkCustomCategory] = useState('');
     const [wkName, setWkName] = useState('');
     const [wkRate, setWkRate] = useState('');
@@ -60,15 +62,21 @@ export default function Rates() {
 
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
+    // Category mapping for display
+    const getTranslatedCategory = (cat) => {
+        const key = cat.toLowerCase();
+        return t(`rates.categories.${key}`) || cat;
+    };
+
     // --- Worker Rates ---
     async function addWorkerRate() {
         const role = wrRole === 'Other' ? wrCustomRole.trim() : wrRole;
-        if (!role) return alert('Select or enter a role');
-        if (!wrHourly && !wrDaily) return alert('Enter at least an hourly or daily rate');
+        if (!role) return alert(t('common.is_required'));
+        if (!wrHourly && !wrDaily) return alert(t('rates.enter_rates_error') || 'Enter at least an hourly or daily rate');
 
         // Check duplicate
         const exists = workerRates.find((r) => r.role.toLowerCase() === role.toLowerCase());
-        if (exists) return alert(`Rate for "${role}" already exists. Edit it instead.`);
+        if (exists) return alert(`${t('common.already_exists')}: "${role}"`);
 
         setIsLoading(true);
         try {
@@ -88,7 +96,7 @@ export default function Rates() {
     }
 
     async function deleteWorkerRate(id) {
-        if (!confirm('Delete this rate?')) return;
+        if (!confirm(t('common.delete_confirm'))) return;
         setIsLoading(true);
         try {
             await remove(KEYS.workerRates, id);
@@ -102,9 +110,9 @@ export default function Rates() {
     // --- Work Rates ---
     async function addWorkRate() {
         const category = wkCategory === 'Other' ? wkCustomCategory.trim() : wkCategory;
-        if (!category) return alert('Select or enter a category');
-        if (!wkName.trim()) return alert('Enter a work name');
-        if (!wkRate) return alert('Enter a rate');
+        if (!category) return alert(t('common.category') + ' ' + t('common.is_required'));
+        if (!wkName.trim()) return alert(t('rates.work_name') + ' ' + t('common.is_required'));
+        if (!wkRate) return alert(t('common.amount') + ' ' + t('common.is_required'));
 
         setIsLoading(true);
         try {
@@ -115,7 +123,7 @@ export default function Rates() {
                 unit: wkUnit,
                 description: wkDescription.trim(),
             });
-            setWkCategory('Tiling'); setWkCustomCategory(''); setWkName(''); setWkRate(''); setWkUnit('sqft'); setWkDescription('');
+            setWkCategory('Masonry'); setWkCustomCategory(''); setWkName(''); setWkRate(''); setWkUnit('sqft'); setWkDescription('');
             setIsWorkModalOpen(false);
             await loadAll();
         } catch (error) {
@@ -125,7 +133,7 @@ export default function Rates() {
     }
 
     async function deleteWorkRate(id) {
-        if (!confirm('Delete this rate?')) return;
+        if (!confirm(t('common.delete_confirm'))) return;
         setIsLoading(true);
         try {
             await remove(KEYS.workRates, id);
@@ -185,41 +193,41 @@ export default function Rates() {
     return (
         <div className="rates-page">
             <div className="page-header">
-                <h1>Rate Management</h1>
+                <h1>{t('rates.title')}</h1>
                 {activeTab === 'worker' ? (
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => setIsWorkerModalOpen(true)}><Plus size={18} /> New Worker Rate</BounceButton>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => setIsWorkerModalOpen(true)}><Plus size={18} /> {t('rates.new_worker_rate')}</BounceButton>
                 ) : (
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => setIsWorkModalOpen(true)}><Plus size={18} /> New Work Rate</BounceButton>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => setIsWorkModalOpen(true)}><Plus size={18} /> {t('rates.new_work_rate')}</BounceButton>
                 )}
             </div>
 
             <div className="rates-tabs">
                 <BounceButton className={`rates-tab ${activeTab === 'worker' ? 'active' : ''}`} onClick={() => setActiveTab('worker')}>
-                    👷 Worker Hourly Rates
+                    👷 {t('rates.worker_rates')}
                 </BounceButton>
                 <BounceButton className={`rates-tab ${activeTab === 'work' ? 'active' : ''}`} onClick={() => setActiveTab('work')}>
-                    🔨 Work & Service Rates
+                    🔨 {t('rates.service_rates')}
                 </BounceButton>
             </div>
 
             {/* ========== WORKER RATES TAB ========== */}
             {activeTab === 'worker' && (
                 <div className="rates-content">
-                    <Modal isOpen={isWorkerModalOpen} onClose={() => setIsWorkerModalOpen(false)} title="Add Worker Rate" onSave={addWorkerRate}>
+                    <Modal isOpen={isWorkerModalOpen} onClose={() => setIsWorkerModalOpen(false)} title={t('rates.new_worker_rate')} onSave={addWorkerRate}>
                         <div className="form-group">
-                            <label>Worker Type</label>
+                            <label>{t('common.type')}</label>
                             <select value={wrRole} onChange={(e) => setWrRole(e.target.value)}>
-                                {WorkerRoles.map((r) => <option key={r}>{r}</option>)}
+                                {WorkerRoles.map((r) => <option key={r} value={r}>{r}</option>)}
                             </select>
                         </div>
                         {wrRole === 'Other' && (
                             <div className="form-group">
-                                <label>Custom Type</label>
-                                <input placeholder="Enter type..." value={wrCustomRole} onChange={(e) => setWrCustomRole(e.target.value)} />
+                                <label>{t('projects.custom_type')}</label>
+                                <input placeholder="..." value={wrCustomRole} onChange={(e) => setWrCustomRole(e.target.value)} />
                             </div>
                         )}
                         <div className="form-group">
-                            <label>Hourly Rate (LKR)</label>
+                            <label>{t('rates.hourly_rate')} (LKR)</label>
                             <input
                                 type="number"
                                 placeholder="0.00"
@@ -232,26 +240,26 @@ export default function Rates() {
                             />
                         </div>
                         <div className="form-group">
-                            <label>Daily Rate (LKR)</label>
+                            <label>{t('workers.daily_rate')} (LKR)</label>
                             <input type="number" placeholder="0.00" value={wrDaily} onChange={(e) => setWrDaily(e.target.value)} />
                         </div>
                         <div className="form-group">
-                            <label>Overtime Rate (LKR/hr)</label>
+                            <label>{t('rates.overtime_rate')} (LKR/hr)</label>
                             <input type="number" placeholder="0.00" value={wrOvertime} onChange={(e) => setWrOvertime(e.target.value)} />
                         </div>
                     </Modal>
 
-                    <Card title={`Worker Rates (${workerRatesSorted.length})`}>
+                    <Card title={`${t('rates.worker_rates')} (${workerRatesSorted.length})`}>
                         {workerRatesSorted.length === 0 ? (
-                            <div className="empty-state">No worker rates defined yet. Add one above.</div>
+                            <div className="empty-state">{t('common.no_data') || 'No worker rates defined yet.'}</div>
                         ) : (
                             <div className="rates-table">
                                 <div className="rates-table-header">
-                                    <span>Worker Type</span>
-                                    <span>Hourly Rate</span>
-                                    <span>Daily Rate</span>
-                                    <span>Overtime Rate</span>
-                                    <span>Actions</span>
+                                    <span>{t('common.role')}</span>
+                                    <span>{t('rates.hourly_rate')}</span>
+                                    <span>{t('workers.daily_rate')}</span>
+                                    <span>{t('rates.overtime_rate')}</span>
+                                    <span>{t('common.actions')}</span>
                                 </div>
                                 {workerRatesSorted.map((r) => (
                                     <div className="rates-table-row" key={r.id}>
@@ -288,53 +296,53 @@ export default function Rates() {
             {/* ========== WORK RATES TAB ========== */}
             {activeTab === 'work' && (
                 <div className="rates-content">
-                    <Modal isOpen={isWorkModalOpen} onClose={() => setIsWorkModalOpen(false)} title="Add Work Rate" onSave={addWorkRate}>
+                    <Modal isOpen={isWorkModalOpen} onClose={() => setIsWorkModalOpen(false)} title={t('rates.new_work_rate')} onSave={addWorkRate}>
                         <div className="form-group">
-                            <label>Category</label>
+                            <label>{t('common.category')}</label>
                             <select value={wkCategory} onChange={(e) => setWkCategory(e.target.value)}>
-                                {WORK_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                                {WORK_CATEGORIES.map((c) => <option key={c} value={c}>{getTranslatedCategory(c)}</option>)}
                             </select>
                         </div>
                         {wkCategory === 'Other' && (
                             <div className="form-group">
-                                <label>Custom Category</label>
-                                <input placeholder="Enter category..." value={wkCustomCategory} onChange={(e) => setWkCustomCategory(e.target.value)} />
+                                <label>{t('projects.custom_type')}</label>
+                                <input placeholder="..." value={wkCustomCategory} onChange={(e) => setWkCustomCategory(e.target.value)} />
                             </div>
                         )}
                         <div className="form-group">
-                            <label>Work Name</label>
-                            <input placeholder="e.g. Floor Tiling 2x2" value={wkName} onChange={(e) => setWkName(e.target.value)} />
+                            <label>{t('rates.work_name')}</label>
+                            <input placeholder="..." value={wkName} onChange={(e) => setWkName(e.target.value)} />
                         </div>
                         <div className="form-group">
-                            <label>Rate (LKR)</label>
+                            <label>{t('common.amount')} (LKR)</label>
                             <input type="number" placeholder="0.00" value={wkRate} onChange={(e) => setWkRate(e.target.value)} />
                         </div>
                         <div className="form-group">
-                            <label>Per Unit</label>
+                            <label>{t('rates.per_unit')}</label>
                             <select value={wkUnit} onChange={(e) => setWkUnit(e.target.value)}>
-                                {UNITS.map((u) => <option key={u}>{u}</option>)}
+                                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                             </select>
                         </div>
                         <div className="form-group" style={{ flex: '1 1 100%' }}>
-                            <label>Description (optional)</label>
-                            <input placeholder="Additional details..." value={wkDescription} onChange={(e) => setWkDescription(e.target.value)} />
+                            <label>{t('common.description')} ({t('common.optional') || 'optional'})</label>
+                            <input placeholder="..." value={wkDescription} onChange={(e) => setWkDescription(e.target.value)} />
                         </div>
                     </Modal>
 
-                    <Card title={`Work Rates (${workRatesSorted.length})`}>
+                    <Card title={`${t('rates.service_rates')} (${workRatesSorted.length})`}>
                         {workRatesSorted.length === 0 ? (
-                            <div className="empty-state">No work rates defined yet. Add one above.</div>
+                            <div className="empty-state">{t('common.no_data') || 'No work rates defined yet.'}</div>
                         ) : (
                             Object.entries(grouped).map(([cat, items]) => (
                                 <div key={cat} className="work-category-group">
-                                    <div className="work-category-label">{cat}</div>
+                                    <div className="work-category-label">{getTranslatedCategory(cat)}</div>
                                     <div className="rates-table">
                                         <div className="rates-table-header work-header">
-                                            <span>Work Name</span>
-                                            <span>Rate</span>
-                                            <span>Unit</span>
-                                            <span>Description</span>
-                                            <span>Actions</span>
+                                            <span>{t('rates.work_name')}</span>
+                                            <span>{t('common.amount')}</span>
+                                            <span>{t('nav.tools')}</span>
+                                            <span>{t('common.description')}</span>
+                                            <span>{t('common.actions')}</span>
                                         </div>
                                         {items.map((r) => (
                                             <div className="rates-table-row" key={r.id}>
@@ -344,7 +352,7 @@ export default function Rates() {
                                                         <span><input type="number" className="inline-edit" value={editData.ratePerUnit} onChange={(e) => setEditData({ ...editData, ratePerUnit: e.target.value })} /></span>
                                                         <span>
                                                             <select className="inline-edit" value={editData.unit} onChange={(e) => setEditData({ ...editData, unit: e.target.value })}>
-                                                                {UNITS.map((u) => <option key={u}>{u}</option>)}
+                                                                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                                                             </select>
                                                         </span>
                                                         <span><input className="inline-edit" value={editData.description || ''} onChange={(e) => setEditData({ ...editData, description: e.target.value })} /></span>

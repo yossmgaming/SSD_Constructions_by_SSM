@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LayoutPanelTopIcon } from './icons/LayoutPanelTopIcon';
 import { ConstructionIcon } from './icons/ConstructionIcon';
 import { SmileIcon } from './icons/SmileIcon';
@@ -14,37 +15,44 @@ import { HandCoinsIcon } from './icons/HandCoinsIcon';
 import { CogIcon } from './icons/CogIcon';
 import { PackageIcon } from './icons/PackageIcon';
 import { LandmarkIcon } from './icons/LandmarkIcon';
+import { FileSignatureIcon } from './icons/FileSignatureIcon';
 import GradientText from './GradientText';
 import GlareHover from './GlareHover';
 import logoSrc from '../../Logo/Logo_16-9.png';
 import './Sidebar.css';
 
 const navItems = [
-    { to: '/', label: 'Dashboard', icon: LayoutPanelTopIcon },
-    { to: '/projects', label: 'Projects', icon: ConstructionIcon },
-    { to: '/workers', label: 'Workers', icon: SmileIcon },
-    { to: '/materials', label: 'Materials', icon: PackageIcon },
-    { to: '/suppliers', label: 'Suppliers', icon: TruckIcon },
-    { to: '/payments', label: 'Payments', icon: DollarSignIcon },
-    { to: '/attendance', label: 'Attendance', icon: CalendarCheckIcon },
-    { to: '/reports', label: 'Reports', icon: ChartSplineIcon },
+    { to: '/', label: 'nav.dashboard', icon: LayoutPanelTopIcon },
+    { to: '/projects', label: 'nav.projects', icon: ConstructionIcon },
+    { to: '/workers', label: 'nav.workers', icon: SmileIcon },
+    { to: '/materials', label: 'nav.materials', icon: PackageIcon },
+    { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon },
+    { to: '/payments', label: 'nav.payments', icon: DollarSignIcon },
+    { to: '/attendance', label: 'nav.attendance', icon: CalendarCheckIcon },
+    { to: '/reports', label: 'nav.reports', icon: ChartSplineIcon },
 ];
 
 const financeItems = [
-    { to: '/project-overview', label: 'Project Overview', icon: BuildingIcon },
-    { to: '/bank-accounts', label: 'Bank Accounts', icon: LandmarkIcon },
+    { to: '/project-overview', label: 'nav.project_overview', icon: BuildingIcon },
+    { to: '/bank-accounts', label: 'nav.bank_accounts', icon: LandmarkIcon },
 ];
 
 const toolItems = [
-    { to: '/boq-generator', label: 'BOQ Generator', icon: CalculatorIcon },
-    { to: '/advances', label: 'Advances', icon: ClipboardIcon },
-    { to: '/rates', label: 'Rates', icon: HandCoinsIcon },
+    { to: '/boq-generator', label: 'nav.boq_generator', icon: CalculatorIcon },
+    { to: '/agreements', label: 'nav.agreements', icon: FileSignatureIcon },
+    { to: '/advances', label: 'nav.advances', icon: ClipboardIcon },
+    { to: '/rates', label: 'nav.rates', icon: HandCoinsIcon },
 ];
 
 
 
 export default function Sidebar({ isOpen, onClose }) {
     const location = useLocation();
+    const { t, i18n } = useTranslation();
+
+    const changeLanguage = (lng) => {
+        i18n.changeLanguage(lng);
+    };
 
     const NavItem = ({ item }) => {
         const iconRef = useRef(null);
@@ -64,7 +72,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     showBorder={false}
                     className="sidebar-link-text"
                 >
-                    {item.label}
+                    {t(item.label)}
                 </GradientText>
             </NavLink>
         );
@@ -86,14 +94,14 @@ export default function Sidebar({ isOpen, onClose }) {
                 {navItems.map(renderLink)}
 
                 <div className="sidebar-divider" />
-                <div className="sidebar-section-label">Finance</div>
+                <div className="sidebar-section-label">{t('nav.finance')}</div>
                 {financeItems.map(renderLink)}
 
                 <div className="sidebar-divider" />
-                <div className="sidebar-section-label">Tools</div>
+                <div className="sidebar-section-label">{t('nav.tools')}</div>
                 {toolItems.map(renderLink)}
-                <div className="sidebar-section-label">System</div>
-                <NavItem item={{ to: '/settings', label: 'Settings', icon: CogIcon }} />
+                <div className="sidebar-section-label">{t('nav.system')}</div>
+                <NavItem item={{ to: '/settings', label: 'nav.settings', icon: CogIcon }} />
             </nav>
 
             <div className="sidebar-footer">
