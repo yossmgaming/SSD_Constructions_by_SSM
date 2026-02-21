@@ -274,7 +274,7 @@ export default function Workers() {
         {
             key: 'actions', label: '', render: (_, row) => (
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button className="icon-btn edit-btn" title="Edit Worker" onClick={(e) => { e.stopPropagation(); selectWorker(row); }}><Pencil size={14} /></button>
+                    <BounceButton className="icon-btn edit-btn" title="Edit Worker" onClick={(e) => { e.stopPropagation(); selectWorker(row); }}><Pencil size={14} /></BounceButton>
                 </div>
             )
         }

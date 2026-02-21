@@ -3,14 +3,15 @@ import { Database, Info, Globe, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/Card';
+import BounceButton from '../components/BounceButton';
 import './Settings.css';
 
 export default function Settings() {
     const { t, i18n } = useTranslation();
 
     const languages = [
-        { code: 'en', name: 'English', native: 'English', flag: '🇬🇧' },
-        { code: 'sn', name: 'Sinhala', native: 'සිංහල', flag: '🇱🇰' }
+        { code: 'en', name: 'English', native: 'English' },
+        { code: 'sn', name: 'Sinhala', native: 'සිංහල' }
     ];
 
     const handleLanguageChange = (code) => {
@@ -46,27 +47,24 @@ export default function Settings() {
 
                             <div className="language-options">
                                 {languages.map((lang) => (
-                                    <button
+                                    <BounceButton
                                         key={lang.code}
                                         className={`lang-option-card ${i18n.language === lang.code ? 'active' : ''}`}
                                         onClick={() => handleLanguageChange(lang.code)}
                                     >
-                                        <div className="lang-flag">{lang.flag}</div>
                                         <div className="lang-info">
                                             <span className="lang-native">{lang.native}</span>
                                             <span className="lang-name">{lang.name}</span>
                                         </div>
                                         {i18n.language === lang.code && (
                                             <motion.div
-                                                className="check-badge"
-                                                layoutId="activeCheck"
-                                                initial={{ scale: 0 }}
-                                                animate={{ scale: 1 }}
+                                                className="active-indicator"
+                                                layoutId="activeLangIndicator"
                                             >
-                                                <Check size={16} />
+                                                <Check size={16} color="#fff" />
                                             </motion.div>
                                         )}
-                                    </button>
+                                    </BounceButton>
                                 ))}
                             </div>
                         </div>

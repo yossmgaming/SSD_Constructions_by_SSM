@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Folder } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
@@ -412,7 +412,7 @@ export default function Materials() {
 
                     {/* Project Assignment Section */}
                     <div className="assignment-section" style={{ borderTop: '1px solid var(--border-color)', marginTop: 16, paddingTop: 16 }}>
-                        <h4 style={{ fontSize: '0.875rem', marginBottom: 12 }}>📁 {t('materials.project_assignment')}</h4>
+                        <h4 style={{ fontSize: '0.875rem', marginBottom: 12, display: 'flex', alignItems: 'center' }}><Folder size={16} style={{ marginRight: 6, opacity: 0.7 }} /> {t('materials.project_assignment')}</h4>
                         {!selectedId ? (
                             <p className="text-muted-hint" style={{ fontSize: '0.8125rem' }}>{t('dashboard.no_projects')}</p>
                         ) : (

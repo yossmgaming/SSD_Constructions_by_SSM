@@ -3,7 +3,7 @@ import {
     PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Legend
 } from 'recharts';
-import { Download, ChevronDown, FileText } from 'lucide-react';
+import { Download, ChevronDown, FileText, User, Box, ClipboardList, Banknote, Archive, Clock } from 'lucide-react';
 import ExportDropdown from '../components/ExportDropdown';
 import CountUp from '../components/CountUp';
 import Card from '../components/Card';
@@ -361,12 +361,12 @@ export default function ProjectFinancialOverview() {
                     {/* Detailed cost breakdown */}
                     <Card title="Detailed Cost Breakdown" style={{ marginTop: 20 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                            <div className="summary-bar"><span>👷 Worker Pay</span><strong>LKR <CountUp to={overview.workerCost} separator="," /></strong></div>
-                            <div className="summary-bar"><span>🧱 Material Purchase</span><strong>LKR <CountUp to={overview.materialCost} separator="," /></strong></div>
-                            <div className="summary-bar"><span>📋 Project Expenses</span><strong>LKR <CountUp to={overview.expenseCost} separator="," /></strong></div>
-                            <div className="summary-bar"><span>💰 Advances Paid</span><strong>LKR <CountUp to={overview.advanceCost + overview.totalAdvances} separator="," /></strong></div>
-                            <div className="summary-bar"><span>📦 Other</span><strong>LKR <CountUp to={overview.otherCost} separator="," /></strong></div>
-                            <div className="summary-bar"><span>⏳ Remaining Advances</span><strong>LKR <CountUp to={overview.remainingAdvances} separator="," /></strong></div>
+                            <div className="summary-bar"><span><User size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Worker Pay</span><strong>LKR <CountUp to={overview.workerCost} separator="," /></strong></div>
+                            <div className="summary-bar"><span><Box size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Material Purchase</span><strong>LKR <CountUp to={overview.materialCost} separator="," /></strong></div>
+                            <div className="summary-bar"><span><ClipboardList size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Project Expenses</span><strong>LKR <CountUp to={overview.expenseCost} separator="," /></strong></div>
+                            <div className="summary-bar"><span><Banknote size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Advances Paid</span><strong>LKR <CountUp to={overview.advanceCost + overview.totalAdvances} separator="," /></strong></div>
+                            <div className="summary-bar"><span><Archive size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Other</span><strong>LKR <CountUp to={overview.otherCost} separator="," /></strong></div>
+                            <div className="summary-bar"><span><Clock size={16} style={{ marginRight: 6, opacity: 0.7 }} /> Remaining Advances</span><strong>LKR <CountUp to={overview.remainingAdvances} separator="," /></strong></div>
                         </div>
                         <div className="summary-bar" style={{ marginTop: 12, background: overview.profit >= 0 ? '#f0fdf4' : '#fef2f2', borderLeft: `3px solid ${overview.profit >= 0 ? '#10b981' : '#ef4444'}` }}>
                             <span><strong>Remaining to Collect:</strong></span>

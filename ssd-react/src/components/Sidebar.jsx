@@ -105,7 +105,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </nav>
 
             <div className="sidebar-footer">
-                <span className="sidebar-footer-text">SSD Construction Manager V 2.0</span>
+                <span className="sidebar-footer-text">SSD Construction Manager V 3.0</span>
             </div>
         </aside>
     );

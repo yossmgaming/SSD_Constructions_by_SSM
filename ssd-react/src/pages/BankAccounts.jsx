@@ -201,7 +201,7 @@ export default function BankAccounts() {
                                         </div>
                                     </div>
                                     <div className="acc-actions">
-                                        <button className="icon-btn delete-btn" onClick={() => handleDeleteAccount(account.id)}><Trash2 size={14} /></button>
+                                        <BounceButton className="icon-btn delete-btn" onClick={() => handleDeleteAccount(account.id)}><Trash2 size={14} /></BounceButton>
                                     </div>
                                 </div>
                                 <div className="acc-card-body">
