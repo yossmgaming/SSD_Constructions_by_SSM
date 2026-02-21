@@ -46,6 +46,10 @@ const toolItems = [
 
 const settingsItem = { to: '/settings', label: 'nav.settings', icon: CogIcon };
 
+const systemItems = [
+    { to: '/settings', label: 'nav.settings', icon: CogIcon }
+];
+
 const NavItem = ({ item, onClose, t }) => {
     const iconRef = useRef(null);
     return (
@@ -103,7 +107,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 <div className="sidebar-section-label">{t('nav.tools')}</div>
                 {toolItems.map(renderLink)}
                 <div className="sidebar-section-label">{t('nav.system')}</div>
-                <NavItem key={settingsItem.to} item={settingsItem} onClose={onClose} t={t} />
+                {systemItems.map(renderLink)}
             </nav>
 
             <div className="sidebar-footer">
