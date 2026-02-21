@@ -96,11 +96,21 @@ export default function AgreementGenerator() {
             if (!worker) return;
             title = `Employment Agreement - ${worker.fullName || worker.name}`;
             expectedTitlePart = 'Employment Agreement';
+        } else if (type === 'Management') {
+            const worker = workers.find(w => String(w.id) === String(entityId));
+            if (!worker) return;
+            title = `Management Agreement - ${worker.fullName || worker.name}`;
+            expectedTitlePart = 'Management Agreement';
         } else if (type === 'Supplier') {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
             if (!supplier) return;
             title = `Supplier Agreement - ${supplier.name}`;
             expectedTitlePart = 'Supplier Agreement';
+        } else if (type === 'Subcontractor') {
+            const supplier = suppliers.find(s => String(s.id) === String(entityId));
+            if (!supplier) return;
+            title = `Domestic Subcontractor Agreement - ${supplier.name}`;
+            expectedTitlePart = 'Domestic Subcontractor Agreement';
         }
 
         // Check if an agreement already exists for this type and entity and expected title
@@ -324,6 +334,55 @@ export default function AgreementGenerator() {
                 <p>The Employee will be on probation for a period of three (3) months. During probation, the agreement may be terminated with 1 week's notice. Thereafter, a minimum of 1 month's notice is required for termination without cause.</p>
             `;
         }
+        else if (type === 'Management') {
+            const worker = workers.find(w => String(w.id) === String(entityId));
+            if (!worker) return;
+            title = `Management Agreement - ${worker.fullName || worker.name}`;
+
+            // Calculate monthly equivalent (roughly 26 days)
+            const dailyRate = Number(worker.dailyRate || 0);
+            const monthlyEst = dailyRate * 26;
+            const isBelowMin = monthlyEst > 0 && monthlyEst < 30000;
+
+            if (isBelowMin) {
+                blockReason = "Statutory Minimum Wage Violation: The estimated monthly wage based on the daily rate is strictly below the mandatory LKR 30,000 minimum. Agreement signing is blocked until the rate is adjusted in the Workers module.";
+            }
+
+            content = `
+                <h1>SITE MANAGEMENT & SUPERVISOR AGREEMENT</h1>
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>This Management Agreement is entered into by and between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'}${worker.address ? `, residing at ${worker.address}` : ''} (hereinafter the "Employee").</p>
+
+                <h2>1. Position and Scope</h2>
+                <p>The Employee is hired for the management/supervisory position of <strong>${worker.role || 'Site Supervisor / Engineer'}</strong>. This role is governed by the <em>Shop and Office Employees Act</em>.</p>
+                
+                <h2>2. Remuneration & Statutory Contributions</h2>
+                <p><strong>Base Rate:</strong> LKR ${dailyRate.toLocaleString()} per day.</p>
+                ${isBelowMin ? `
+                <div class="clause-highlight" style="background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171;">
+                    <p><em>CRITICAL WARNING: The estimated monthly wage based on the daily rate is below the statutory minimum of LKR 30,000. Signing is strictly blocked.</em></p>
+                </div>
+                ` : ''}
+                <ul>
+                    <li>12% of earnings contributed to the Employees' Provident Fund (EPF) by the Employer.</li>
+                    <li>8% of earnings deducted as the Employee's contribution to the EPF.</li>
+                    <li>3% of earnings contributed to the Employees' Trust Fund (ETF) by the Employer.</li>
+                </ul>
+
+                <h2>3. Integrity & Reporting Clause</h2>
+                <ul>
+                    <li><strong>Attendance Tracking:</strong> The Employee is explicitly responsible for verifying all subordinate worker attendance using the biometric/system verification to eliminate time theft and "buddy punching."</li>
+                    <li><strong>Daily Digital Logs:</strong> The Employee mandates the submission of daily digital logs through the application, verifying weather, headcount, and work progress summaries.</li>
+                    <li><strong>Goal Setting & Labor Efficiency:</strong> The Employee is responsible for meeting daily/weekly Project Goals, tracked against the "Labor Efficiency Variance" comparing budgeted BOQ hours vs actual biometric hours.</li>
+                </ul>
+
+                <h2>4. Material Stewardship</h2>
+                <p>The Employee is contractually liable for updating the Material Inventory in real-time. Unauthorized material deviations or failure to enforce SLS 107/375 quality standards constitutes Gross Negligence.</p>
+
+                <h2>5. Probation and Termination</h2>
+                <p>The Employee will be on probation for a period of three (3) months. Notice period is 1 month for termination without cause post-probation.</p>
+            `;
+        }
         else if (type === 'Supplier') {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
             if (!supplier) return;
@@ -348,6 +407,32 @@ export default function AgreementGenerator() {
 
                 <h2>4. Payment Terms</h2>
                 <p>Payments will be settled via direct bank transfer (SLIPS/JustPay/CEFT) to the Supplier's designated bank account within 14 days of invoice submission and material verification.</p>
+            `;
+        }
+        else if (type === 'Subcontractor') {
+            const supplier = suppliers.find(s => String(s.id) === String(entityId));
+            if (!supplier) return;
+            title = `Domestic Subcontractor Agreement - ${supplier.name}`;
+
+            content = `
+                <h1>DOMESTIC SUBCONTRACTOR AGREEMENT</h1>
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>This Subcontractor Agreement is made between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Main Contractor") and <strong>${supplier.name}</strong>${supplier.address ? `, located at ${supplier.address},` : ''} (hereinafter the "Subcontractor").</p>
+
+                <h2>1. Scope of Externalized Work</h2>
+                <p>The Subcontractor agrees to execute the specialized works as detailed in the attached Memorandum of Understanding (MOU) / Work Order, conforming to the exact specifications of the Main Contractor's BOQ.</p>
+
+                <h2>2. "Measure and Pay" Clause</h2>
+                <p>Payments shall strictly be based on <strong>actual on-site measurements</strong> of completed work, verified daily or weekly by an SSD Engineer. Advance payments are subject to explicit approval.</p>
+
+                <h2>3. Joint Liability & Statutory EPF/ETF</h2>
+                <p>The Subcontractor holds sole legal responsibility for the EPF/ETF contributions and insurance of their own workforce. The Subcontractor agrees to indemnify the Main Contractor against any labor or statutory claims made by the Subcontractor's personnel.</p>
+
+                <h2>4. Regulatory Compliance</h2>
+                <p>Where applicable, the Subcontractor shall comply with the Construction Industry Guarantee Fund Levy (CIGFL) if their subcontract scope triggers the statutory thresholds.</p>
+
+                <h2>5. Default and Termination</h2>
+                <p>Failure to meet progress milestones or quality (SLS) standards grants the Main Contractor the right to terminate this agreement with 7 days written notice, recovering any losses from pending payments.</p>
             `;
         }
 
@@ -460,7 +545,7 @@ export default function AgreementGenerator() {
 
     if (isLoading) return <div className="loading-screen">Loading Agreements...</div>;
 
-    const entities = type === 'Client' ? projects : type === 'Worker' ? workers : suppliers;
+    const entities = type === 'Client' ? projects : (type === 'Worker' || type === 'Management') ? workers : suppliers;
 
     return (
         <div className="agreement-container page-animate">
@@ -487,7 +572,9 @@ export default function AgreementGenerator() {
                             <select value={type} onChange={e => { setType(e.target.value); setEntityId(''); setClientSubType('LetterOfAcceptance'); }}>
                                 <option value="Client">Client Contracts (SBD-03)</option>
                                 <option value="Worker">Worker Employment</option>
+                                <option value="Management">Management (Supervisors/Engineers)</option>
                                 <option value="Supplier">Supplier Agreement</option>
+                                <option value="Subcontractor">Subcontractor Agreement</option>
                             </select>
                         </div>
 
