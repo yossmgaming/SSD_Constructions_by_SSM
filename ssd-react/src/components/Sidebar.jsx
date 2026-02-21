@@ -44,6 +44,8 @@ const toolItems = [
     { to: '/rates', label: 'nav.rates', icon: HandCoinsIcon },
 ];
 
+const settingsItem = { to: '/settings', label: 'nav.settings', icon: CogIcon };
+
 const NavItem = ({ item, onClose, t }) => {
     const iconRef = useRef(null);
     return (
@@ -101,7 +103,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 <div className="sidebar-section-label">{t('nav.tools')}</div>
                 {toolItems.map(renderLink)}
                 <div className="sidebar-section-label">{t('nav.system')}</div>
-                <NavItem item={{ to: '/settings', label: 'nav.settings', icon: CogIcon }} onClose={onClose} t={t} />
+                <NavItem key={settingsItem.to} item={settingsItem} onClose={onClose} t={t} />
             </nav>
 
             <div className="sidebar-footer">

@@ -202,10 +202,10 @@ export default function Rates() {
             </div>
 
             <div className="rates-tabs">
-                <BounceButton className={`rates - tab ${activeTab === 'worker' ? 'active' : ''} `} onClick={() => setActiveTab('worker')}>
+                <BounceButton className={`rates-tab ${activeTab === 'worker' ? 'active' : ''}`} onClick={() => setActiveTab('worker')}>
                     <HardHat size={16} className="tab-icon" /> {t('rates.worker_rates')}
                 </BounceButton>
-                <BounceButton className={`rates - tab ${activeTab === 'work' ? 'active' : ''} `} onClick={() => setActiveTab('work')}>
+                <BounceButton className={`rates-tab ${activeTab === 'work' ? 'active' : ''}`} onClick={() => setActiveTab('work')}>
                     <Hammer size={16} className="tab-icon" /> {t('rates.service_rates')}
                 </BounceButton>
             </div>
