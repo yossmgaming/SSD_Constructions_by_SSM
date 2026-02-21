@@ -143,7 +143,7 @@ export default function AgreementGenerator() {
                     <p>The <strong>Effective Date of Commencement</strong> shall be 14 days from the date of this letter. You are hereby instructed to commence mobilization of equipment and personnel to the site immediately.</p>
                     <h2>3. Time for Completion & Liquidated Damages</h2>
                     <p>The Contractor shall complete the Works within <strong>${durationStr} calendar days</strong> from the Commencement Date, as per the Contract Data.</p>
-                    <p>In the event of delay attributable to the Contractor, <strong>Liquidated Damages</strong> shall be applied at <strong>LKR 25,000 per calendar day</strong>, capped at 10% of the Contract Price.</p>
+                    <p>In the event of delay attributable to the Contractor, <strong>Liquidated Damages</strong> shall be applied at <strong>0.05% of the Initial Contract Price per calendar day</strong>, capped at 10% of the Contract Price.</p>
                     <h2>4. Performance Security</h2>
                     <p>You are hereby requested to furnish the Performance Security in the amount of 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) within 14 days of receipt of this letter.</p>
                     ${isCIGFL ? `
@@ -156,7 +156,7 @@ export default function AgreementGenerator() {
                     <h1>CONTRACT AGREEMENT (SBD-03)</h1>
                     <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
                     <p><strong>Parties:</strong></p>
-                    <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong> (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
+                    <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong>${project.location ? `, with project location at ${project.location},` : ''} (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
                     
                     <h2>1. Priority of Documents</h2>
                     <p>The following documents shall be deemed to form and be read and construed as part of this Agreement in the following order of priority:</p>
@@ -289,7 +289,7 @@ export default function AgreementGenerator() {
             content = `
                 <h1>EMPLOYMENT AGREEMENT</h1>
                 <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Employment Agreement is entered into by and between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'} (hereinafter the "Employee").</p>
+                <p>This Employment Agreement is entered into by and between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'}${worker.address ? `, residing at ${worker.address}` : ''} (hereinafter the "Employee").</p>
 
                 <h2>1. Position and Grade</h2>
                 <p>The Employee is hired for the position of <strong>${worker.role || 'Construction Worker'}</strong>.</p>
@@ -331,7 +331,7 @@ export default function AgreementGenerator() {
             content = `
                 <h1>SUPPLIER AGREEMENT</h1>
                 <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Supplier Agreement is made between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Buyer") and <strong>${supplier.name}</strong> (hereinafter the "Supplier").</p>
+                <p>This Supplier Agreement is made between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Buyer") and <strong>${supplier.name}</strong>${supplier.address ? `, located at ${supplier.address},` : ''} (hereinafter the "Supplier").</p>
 
                 <h2>1. Scope of Supply</h2>
                 <p>The Supplier agrees to provide construction materials under the category of <strong>${supplier.category || 'General Materials'}</strong> conforming to requested specifications.</p>
