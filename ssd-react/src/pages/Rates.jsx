@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Pencil, HardHat, Hammer } from 'lucide-react';
+import { Plus, Trash2, Pencil, HardHat, Hammer, Edit3, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
