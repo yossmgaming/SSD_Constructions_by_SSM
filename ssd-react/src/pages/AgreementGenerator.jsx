@@ -309,9 +309,9 @@ export default function AgreementGenerator() {
 
     return (
         <div className="agreement-container page-animate">
-            <div className="section-header">
-                <h2>Agreement Generator</h2>
-                <div className="header-actions">
+            <div className="page-header">
+                <h1>{t('nav.agreements', { defaultValue: 'Agreement Generator' })}</h1>
+                <div className="page-header-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     {currentAgreement && currentAgreement.status !== 'Signed' && (
                         <BounceButton className="btn btn-primary" onClick={handleSaveDraft} disabled={isSaving}>
                             <SaveIcon size={18} /> {isSaving ? 'Saving...' : 'Save Draft'}

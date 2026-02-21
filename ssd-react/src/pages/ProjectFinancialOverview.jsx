@@ -247,12 +247,6 @@ export default function ProjectFinancialOverview() {
                 <h1>Project Financial Overview</h1>
                 <div style={{ display: 'flex', gap: 10 }}>
                     <ExportDropdown
-                        onExport={handleBOQExport}
-                        isLoading={isLoading}
-                        disabled={!selectedId}
-                        label="Export BOQ"
-                    />
-                    <ExportDropdown
                         onExport={handleExport}
                         isLoading={isLoading}
                         disabled={!selectedId}

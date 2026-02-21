@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, HardHat, Hammer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
@@ -60,12 +60,12 @@ export default function Rates() {
         }
     }
 
-    const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} `;
 
     // Category mapping for display
     const getTranslatedCategory = (cat) => {
         const key = cat.toLowerCase();
-        return t(`rates.categories.${key}`) || cat;
+        return t(`rates.categories.${key} `) || cat;
     };
 
     // --- Worker Rates ---
@@ -202,11 +202,11 @@ export default function Rates() {
             </div>
 
             <div className="rates-tabs">
-                <BounceButton className={`rates-tab ${activeTab === 'worker' ? 'active' : ''}`} onClick={() => setActiveTab('worker')}>
-                    👷 {t('rates.worker_rates')}
+                <BounceButton className={`rates - tab ${activeTab === 'worker' ? 'active' : ''} `} onClick={() => setActiveTab('worker')}>
+                    <HardHat size={16} className="tab-icon" /> {t('rates.worker_rates')}
                 </BounceButton>
-                <BounceButton className={`rates-tab ${activeTab === 'work' ? 'active' : ''}`} onClick={() => setActiveTab('work')}>
-                    🔨 {t('rates.service_rates')}
+                <BounceButton className={`rates - tab ${activeTab === 'work' ? 'active' : ''} `} onClick={() => setActiveTab('work')}>
+                    <Hammer size={16} className="tab-icon" /> {t('rates.service_rates')}
                 </BounceButton>
             </div>
 
