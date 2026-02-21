@@ -11,7 +11,9 @@ import { CheckCircle2Icon, FileSignatureIcon, SaveIcon } from 'lucide-react';
 export default function AgreementGenerator() {
     const { t } = useTranslation();
     const [type, setType] = useState('Client'); // 'Client', 'Worker', 'Supplier'
+    const [clientSubType, setClientSubType] = useState('LetterOfAcceptance');
     const [entityId, setEntityId] = useState('');
+    const [mouText, setMouText] = useState('');
 
     // Data
     const [projects, setProjects] = useState([]);
@@ -37,7 +39,7 @@ export default function AgreementGenerator() {
 
     useEffect(() => {
         generatePreview();
-    }, [type, entityId, projects, workers, suppliers]);
+    }, [type, clientSubType, mouText, entityId, projects, workers, suppliers]);
 
     async function loadData() {
         setIsLoading(true);
@@ -66,70 +68,142 @@ export default function AgreementGenerator() {
             return;
         }
 
-        // Check if an agreement already exists for this type and entity
-        const existing = agreements.find(a => a.type === type && String(a.entityId) === String(entityId));
+        let content = '';
+        let title = '';
+        let blockReason = null;
+        let expectedTitlePart = '';
+
+        if (type === 'Client') {
+            const project = projects.find(p => String(p.id) === String(entityId));
+            if (!project) return;
+
+            let subTitle = '';
+            if (clientSubType === 'LetterOfAcceptance') subTitle = 'Letter of Acceptance';
+            if (clientSubType === 'ContractAgreement') subTitle = 'Contract Agreement';
+            if (clientSubType === 'MOU') subTitle = 'Memorandum of Understanding';
+            if (clientSubType === 'AcceptedBOQ') subTitle = 'Accepted BOQ Reference';
+            if (clientSubType === 'ConditionsOfContract') subTitle = 'Conditions of Contract';
+
+            title = `${subTitle} - ${project.name}`;
+            expectedTitlePart = subTitle;
+        } else if (type === 'Worker') {
+            const worker = workers.find(w => String(w.id) === String(entityId));
+            if (!worker) return;
+            title = `Employment Agreement - ${worker.fullName || worker.name}`;
+            expectedTitlePart = 'Employment Agreement';
+        } else if (type === 'Supplier') {
+            const supplier = suppliers.find(s => String(s.id) === String(entityId));
+            if (!supplier) return;
+            title = `Supplier Agreement - ${supplier.name}`;
+            expectedTitlePart = 'Supplier Agreement';
+        }
+
+        // Check if an agreement already exists for this type and entity and expected title
+        const existing = agreements.find(a => a.type === type && String(a.entityId) === String(entityId) && a.title.includes(expectedTitlePart));
         if (existing) {
             setCurrentAgreement(existing);
             return;
         }
 
-        let content = '';
-        let title = '';
-        let blockReason = null;
-
         if (type === 'Client') {
             const project = projects.find(p => String(p.id) === String(entityId));
-            if (!project) return;
-            title = `Contract Agreement - ${project.name}`;
-
             const amt = Number(project.contractValue || 0);
             const isCIGFL = amt > 15000000;
             const isResidential = project.projectType === 'Residential';
 
-            content = `
-                <h1>CONTRACT AGREEMENT (SBD-03)</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p><strong>Parties:</strong></p>
-                <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong> (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
-                
-                <h2>1. Priority of Documents</h2>
-                <p>The following documents shall be deemed to form and be read and construed as part of this Agreement in the following order of priority:</p>
-                <ul>
-                    <li>(a) The Letter of Acceptance</li>
-                    <li>(b) This Contract Agreement</li>
-                    <li>(c) The Memorandum of Understanding (MOU)</li>
-                    <li>(d) The Accepted Bill of Quantities (BOQ)</li>
-                    <li>(e) The Conditions of Contract</li>
-                </ul>
+            if (clientSubType === 'LetterOfAcceptance') {
+                const levyPercent = amt > 50000000 ? 1 : 0.25;
+                const perfSec = amt * 0.05;
+                content = `
+                    <h1>LETTER OF ACCEPTANCE</h1>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>To:</strong> SSD CONSTRUCTIONS</p>
+                    <p><strong>Subject: Notification of Award for ${project.name}</strong></p>
+                    <p>This is to notify you that your bid for the execution of the <strong>${project.name}</strong> has been accepted by our agency.</p>
+                    <h2>1. Contract Value</h2>
+                    <p>The accepted Contract Sum is <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.</p>
+                    <h2>2. Performance Security</h2>
+                    <p>You are hereby requested to furnish the Performance Security in the amount of 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) within 14 days of receipt of this letter.</p>
+                    ${isCIGFL ? `
+                    <h2>3. CIGFL Levy Deduction</h2>
+                    <p>Under the Finance Act No. 5 of 2005 (CIGFL), a deduction of ${levyPercent}% will be applied as this project value exceeds the LKR 15,000,000 threshold.</p>
+                    ` : ''}
+                `;
+            } else if (clientSubType === 'ContractAgreement') {
+                content = `
+                    <h1>CONTRACT AGREEMENT (SBD-03)</h1>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Parties:</strong></p>
+                    <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong> (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
+                    
+                    <h2>1. Priority of Documents</h2>
+                    <p>The following documents shall be deemed to form and be read and construed as part of this Agreement in the following order of priority:</p>
+                    <ul>
+                        <li>(a) The Letter of Acceptance</li>
+                        <li>(b) This Contract Agreement</li>
+                        <li>(c) The Memorandum of Understanding (MOU)</li>
+                        <li>(d) The Accepted Bill of Quantities (BOQ)</li>
+                        <li>(e) The Conditions of Contract</li>
+                    </ul>
+                    <h2>2. Formal Agreement</h2>
+                    <p>For the consideration of <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>, the Contractor agrees to execute and complete the Works and remedy any defects therein in conformity with the provisions of the Contract.</p>
+                `;
+            } else if (clientSubType === 'MOU') {
+                content = `
+                    <h1>MEMORANDUM OF UNDERSTANDING</h1>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Project:</strong> ${project.name}</p>
+                    <h2>Custom Clauses & Side-Agreements</h2>
+                    <div style="white-space: pre-wrap; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-family: monospace;">${mouText || '<em>No custom clauses entered yet. Use the text box to draft conditions.</em>'}</div>
+                `;
+            } else if (clientSubType === 'AcceptedBOQ') {
+                content = `
+                    <h1>ACCEPTED BILL OF QUANTITIES (BOQ)</h1>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Project:</strong> ${project.name}</p>
+                    <p><em>Reference to SLS 573:1982 Standard Method of Measurement</em></p>
+                    <h2>1. Acceptance of Rates</h2>
+                    <p>The rates and quantities specified in the final generated BOQ for this project are hereby locked and accepted as the baseline for all Interim Payment Certificates.</p>
+                    <h2>2. Contract Sum Binding</h2>
+                    <p>The final Accepted sum is <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>. Variations shall only be entertained subject to written approval via formal Variation Orders.</p>
+                `;
+            } else if (clientSubType === 'ConditionsOfContract') {
+                content = `
+                    <h1>CONDITIONS OF CONTRACT (Minor Contracts SBD-03)</h1>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Project:</strong> ${project.name}</p>
+                    
+                    <h2>1. Financial Clauses</h2>
+                    <ul>
+                        <li><strong>Advance Payment:</strong> The Employer shall pay an advance payment of maximum 30% of the Contract Price subject to an Advance Payment Guarantee.</li>
+                        <li><strong>Retention:</strong> A retention of 10% shall be deducted from each interim payment, up to a maximum limit of 5% of the Initial Contract Price.</li>
+                        <li><strong>Defects Liability Period:</strong> The Defects Liability Period is 365 Days from the date of taking over.</li>
+                    </ul>
 
-                <h2>2. Financial Clauses</h2>
-                <p><strong>Contract Value:</strong> LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                <ul>
-                    <li><strong>Advance Payment:</strong> The Employer shall pay an advance payment of maximum 30% of the Contract Price subject to an Advance Payment Guarantee.</li>
-                    <li><strong>Retention:</strong> A retention of 10% shall be deducted from each interim payment, up to a maximum limit of 5% of the Initial Contract Price.</li>
-                    <li><strong>Defects Liability Period:</strong> The Defects Liability Period is 365 Days from the date of taking over.</li>
-                </ul>
+                    <h2>2. Contractor Protections</h2>
+                    <ul>
+                        <li><strong>Suspension of Work:</strong> The Contractor reserves the right to suspend works in the event of non-payment of certified bills exceeding 14 days from due date.</li>
+                        <li><strong>Interest on Late Payment:</strong> Late payments shall incur an interest charge of 1.5% per month.</li>
+                    </ul>
+                    
+                    <h2>3. Dispute Resolution (CGF)</h2>
+                    <p>Any disputes arising from this contract shall be initially mediated through the Construction Guarantee Fund (CGF) dispute resolution framework before proceeding to formal arbitration.</p>
 
-                <h2>3. Contractor Protections</h2>
-                <ul>
-                    <li><strong>Suspension of Work:</strong> The Contractor reserves the right to suspend works in the event of non-payment of certified bills exceeding 14 days from due date.</li>
-                    <li><strong>Interest on Late Payment:</strong> Late payments shall incur an interest charge of 1.5% per month.</li>
-                </ul>
-                
-                ${isCIGFL ? `
-                <div class="clause-highlight">
-                    <h2>4. Tax & Regulatory Compliance (CIGFL)</h2>
-                    <p>As this contract exceeds LKR 15,000,000, it is subject to the Construction Industry Guarantee Fund Levy (CIGFL). The Contractor's CIDA registration (CPC/DS/KU/4717) is maintained accordingly.</p>
-                </div>
-                ` : ''}
+                    ${isCIGFL ? `
+                    <div class="clause-highlight">
+                        <h2>4. Tax & Regulatory Compliance (CIGFL)</h2>
+                        <p>As this contract exceeds LKR 15,000,000, it is subject to the Construction Industry Guarantee Fund Levy (CIGFL). The Contractor's CIDA registration (CPC/DS/KU/4717) is maintained accordingly.</p>
+                    </div>
+                    ` : ''}
 
-                ${isResidential ? `
-                <div class="clause-highlight">
-                    <h2>5. Construction Escrow (Residential)</h2>
-                    <p>Both parties agree that milestone payments may be facilitated via a Construction Escrow account to ensure financial security and timely disbursements.</p>
-                </div>
-                ` : ''}
-            `;
+                    ${isResidential ? `
+                    <div class="clause-highlight">
+                        <h2>5. Construction Escrow (Residential)</h2>
+                        <p>Both parties agree that milestone payments may be facilitated via a Construction Escrow account to ensure financial security and timely disbursements.</p>
+                    </div>
+                    ` : ''}
+                `;
+            }
         }
         else if (type === 'Worker') {
             const worker = workers.find(w => String(w.id) === String(entityId));
@@ -328,13 +402,26 @@ export default function AgreementGenerator() {
                 <Card className="agreement-sidebar">
                     <div className="agreement-form">
                         <div className="form-group">
-                            <label>Agreement Type</label>
-                            <select value={type} onChange={e => { setType(e.target.value); setEntityId(''); }}>
-                                <option value="Client">Client Contract (SBD-03)</option>
+                            <label>Agreement Category</label>
+                            <select value={type} onChange={e => { setType(e.target.value); setEntityId(''); setClientSubType('LetterOfAcceptance'); }}>
+                                <option value="Client">Client Contracts (SBD-03)</option>
                                 <option value="Worker">Worker Employment</option>
                                 <option value="Supplier">Supplier Agreement</option>
                             </select>
                         </div>
+
+                        {type === 'Client' && (
+                            <div className="form-group">
+                                <label>SBD-03 Document Type</label>
+                                <select value={clientSubType} onChange={e => { setClientSubType(e.target.value); setCurrentAgreement(null); setMouText(''); }}>
+                                    <option value="LetterOfAcceptance">Letter of Acceptance</option>
+                                    <option value="ContractAgreement">Contract Agreement</option>
+                                    <option value="MOU">Memorandum of Understanding</option>
+                                    <option value="AcceptedBOQ">Accepted BOQ</option>
+                                    <option value="ConditionsOfContract">Conditions of Contract</option>
+                                </select>
+                            </div>
+                        )}
 
                         <div className="form-group">
                             <label>Select {type}</label>
@@ -363,6 +450,19 @@ export default function AgreementGenerator() {
                                 </BounceButton>
                             )}
                             <small className="mt-2 text-muted">Serves as an electronic record under the Electronic Transactions Act</small>
+                        </div>
+                    )}
+
+                    {type === 'Client' && clientSubType === 'MOU' && currentAgreement && currentAgreement.status === 'Draft' && currentAgreement.id === 'temp_new' && (
+                        <div className="form-group" style={{ marginTop: '20px' }}>
+                            <label>Custom MOU Clauses</label>
+                            <textarea
+                                value={mouText}
+                                onChange={e => setMouText(e.target.value)}
+                                placeholder="Enter custom project clauses, access times, or side-deals here..."
+                                rows={6}
+                                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', resize: 'vertical' }}
+                            />
                         </div>
                     )}
                 </Card>
