@@ -186,6 +186,88 @@ function drawLetterhead(doc, logoBase64) {
  * EXPORT AGREEMENT TO PDF
  */
 export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
+    // --- UNICODE PATH: Browser print for Sinhala/Tamil (jsPDF cannot render Unicode scripts) ---
+    const lang = agreement.exportLanguage || 'en';
+    if (lang === 'sn' || lang === 'ta') {
+        const fontImport = lang === 'sn'
+            ? '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+Sinhala:wght@400;700&display=swap");'
+            : '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;700&display=swap");';
+        const fontFamily = lang === 'sn' ? "'Noto Serif Sinhala', serif" : "'Noto Serif Tamil', serif";
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { alert('Please allow popups to export the PDF.'); return; }
+
+        printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${fileName}</title>
+<style>
+${fontImport}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: ${fontFamily}; font-size: 11pt; color: #000; }
+.page { width: 210mm; min-height: 297mm; padding: 20mm 20mm 25mm 20mm; margin: auto; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 14px; }
+.header-right { text-align: right; font-size: 9pt; }
+.header-right .company { font-size: 13pt; font-weight: bold; font-family: Arial, sans-serif; }
+.content h1 { font-size: 15pt; font-weight: bold; text-align: center; margin: 12px 0 8px 0; }
+.content h2 { font-size: 11pt; font-weight: bold; margin: 12px 0 4px 0; }
+.content p { margin: 4px 0 8px 0; line-height: 1.5; }
+.content ul { margin: 4px 0 8px 20px; }
+.content li { margin-bottom: 4px; line-height: 1.5; }
+.content ol { margin: 4px 0 8px 20px; }
+.signatures { margin-top: 40px; display: flex; justify-content: space-between; }
+.sig-block { text-align: center; width: 45%; }
+.sig-line { border-top: 1px solid #000; margin-top: 40px; margin-bottom: 6px; }
+.footer { position: fixed; bottom: 10mm; left: 20mm; right: 20mm; font-size: 8pt; color: #666; display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 4px; font-family: Arial, sans-serif; }
+${agreement.status === 'Signed' ? '.watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80pt; color: rgba(16,185,129,0.15); font-weight: bold; font-family: Arial; z-index: 0; pointer-events: none; }' : ''}
+@media print { @page { margin: 0; } .page { margin: 0; padding: 20mm; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-left"><strong style="font-size:13pt;font-family:Arial">${COMPANY.name}</strong></div>
+    <div class="header-right">
+      <div class="company">${COMPANY.name}</div>
+      <div>${COMPANY.proprietor}</div>
+      <div>${COMPANY.address}</div>
+      <div>Phone: ${COMPANY.phones}</div>
+      <div>Reg: ${COMPANY.registration}</div>
+    </div>
+  </div>
+  ${agreement.status === 'Signed' ? '<div class="watermark">SIGNED</div>' : ''}
+  <div class="content">${htmlContent}</div>
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-line"></div>
+      <div style="font-family:Arial"><strong>For SSD CONSTRUCTIONS</strong></div>
+      <div style="font-family:Arial;font-size:9pt">Authorized Signatory</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line"></div>
+      <div style="font-family:Arial"><strong>For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : agreement.type === 'Supplier' ? 'Supplier' : agreement.type === 'Subcontractor' ? 'Subcontractor' : 'Party'}</strong></div>
+      <div style="font-family:Arial;font-size:9pt">Authorized Signatory</div>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  <span>${COMPANY.footerReg}</span>
+  <span>${COMPANY.email}</span>
+</div>
+<script>
+  // Wait for fonts to load, then print
+  document.fonts.ready.then(() => {
+    setTimeout(() => { window.print(); }, 600);
+  });
+<\/script>
+</body>
+</html>`);
+        printWindow.document.close();
+        return;
+    }
+
+    // --- ENGLISH PATH: jsPDF as before ---
     try {
         const doc = new jsPDF();
         const logoBase64 = await getBase64Image(LOGO_PATH);
