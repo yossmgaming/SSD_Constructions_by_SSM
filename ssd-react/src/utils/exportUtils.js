@@ -143,6 +143,46 @@ export async function exportBOQ({ project, items, fileName }) {
 }
 
 /**
+ * Helper to decode basic HTML entities for PDF/Word text
+ */
+function decodeHTML(html) {
+    if (!html) return '';
+    return html
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#39;/g, "'");
+}
+
+/**
+ * Helper to draw standard branded letterhead on a PDF page
+ */
+function drawLetterhead(doc, logoBase64) {
+    if (logoBase64) {
+        doc.setFillColor(255, 255, 255);
+        doc.rect(15, 8, 55, 18, 'F');
+        doc.addImage(logoBase64, 'PNG', 15, 8, 55, 18, 'main_logo');
+    }
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0);
+    doc.text(COMPANY.name, 195, 15, { align: 'right' });
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(COMPANY.proprietor, 195, 22, { align: 'right' });
+    doc.text(COMPANY.address, 195, 27, { align: 'right' });
+    doc.text(`Phone: ${COMPANY.phones}`, 195, 32, { align: 'right' });
+    doc.text(`Reg: ${COMPANY.registration}`, 195, 37, { align: 'right' });
+
+    doc.setDrawColor(200);
+    doc.line(15, 42, 195, 42);
+}
+
+/**
  * EXPORT AGREEMENT TO PDF
  */
 export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
@@ -150,33 +190,15 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
         const doc = new jsPDF();
         const logoBase64 = await getBase64Image(LOGO_PATH);
 
-        if (logoBase64) {
-            doc.setFillColor(255, 255, 255);
-            doc.rect(15, 8, 55, 18, 'F');
-            doc.addImage(logoBase64, 'PNG', 15, 8, 55, 18, 'main_logo');
-        }
-
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(COMPANY.name, 195, 15, { align: 'right' });
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(COMPANY.proprietor, 195, 22, { align: 'right' });
-        doc.text(COMPANY.address, 195, 27, { align: 'right' });
-        doc.text(`Phone: ${COMPANY.phones}`, 195, 32, { align: 'right' });
-        doc.text(`Reg: ${COMPANY.registration}`, 195, 37, { align: 'right' });
-
-        doc.setDrawColor(200);
-        doc.line(15, 42, 195, 42);
+        drawLetterhead(doc, logoBase64);
 
         // High-Fidelity HTML to PDF Parser
         doc.setFont('times', 'normal');
         doc.setFontSize(10);
         doc.setTextColor(0);
 
-        const contentPieces = htmlContent
-            .replace(/&nbsp;/g, ' ')
+        const decodedContent = decodeHTML(htmlContent);
+        const contentPieces = decodedContent
             .split(/(<\/?h[1-2]>|<\/?strong>|<\/?p>|<\/?ul>|<\/?li>|<br\s*\/?>)/gi)
             .filter(p => p && p.trim() !== '');
 
@@ -232,9 +254,10 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
             if (!cleanText) continue;
 
             // List Indentation
-            const currentX = isList ? marginX + 5 : marginX;
-            const prefix = isList ? '• ' : '';
-            const wrapWidth = isList ? maxWidth - 10 : maxWidth;
+            const isListItemContent = isList && !piece.match(/<li/i);
+            const currentX = isListItemContent ? marginX + 5 : marginX;
+            const prefix = isListItemContent ? '• ' : '';
+            const wrapWidth = isListItemContent ? maxWidth - 10 : maxWidth;
 
             const lines = doc.splitTextToSize(prefix + cleanText, wrapWidth);
             for (const line of lines) {
@@ -253,7 +276,9 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
                     doc.text(COMPANY.email, pageWidth - emailWidth - 15, pageHeight - 15);
 
                     doc.addPage();
-                    y = 25; // 25mm top margin on new page
+                    drawLetterhead(doc, logoBase64); // Repeat header on every page
+
+                    y = 52; // Reset height to start after letterhead
                     doc.setFont('times', 'normal');
                     doc.setFontSize(10);
                     doc.setTextColor(0);
@@ -264,7 +289,11 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
         }
 
         y += 20;
-        if (y > pageHeight - 40) { doc.addPage(); y = 20; }
+        if (y > pageHeight - 40) {
+            doc.addPage();
+            drawLetterhead(doc, logoBase64);
+            y = 52;
+        }
 
         // Signatures
         doc.setFont('helvetica', 'bold');
@@ -321,9 +350,9 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
     const logoBase64 = await getBase64Image(LOGO_PATH);
     const logoUint8 = logoBase64 ? Uint8Array.from(atob(logoBase64.split(',')[1]), c => c.charCodeAt(0)) : null;
 
+    const decodedContent = decodeHTML(htmlContent);
     // Parse HTML into docx Paragraphs with native formatting
-    const blocks = htmlContent
-        .replace(/&nbsp;/g, ' ')
+    const blocks = decodedContent
         .split(/(<\/?h[1-2]>|<\/?p>|<\/?ul>|<\/?li>)/gi)
         .filter(b => b && b.trim() !== '');
 

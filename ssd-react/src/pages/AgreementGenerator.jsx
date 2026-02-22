@@ -19,7 +19,8 @@ export default function AgreementGenerator() {
     const [voCost, setVoCost] = useState('');
     const [voTime, setVoTime] = useState('');
 
-    // Data
+    const [exportLanguage, setExportLanguage] = useState('en'); // 'en', 'sn', 'ta'
+    const [selectedRuleSet, setSelectedRuleSet] = useState('Standard'); // 'Standard', 'Strict', 'Comprehensive'
     const [projects, setProjects] = useState([]);
     const [workers, setWorkers] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
@@ -43,7 +44,7 @@ export default function AgreementGenerator() {
 
     useEffect(() => {
         generatePreview();
-    }, [type, clientSubType, mouText, voDescription, voReason, voCost, voTime, entityId, projects, workers, suppliers]);
+    }, [type, clientSubType, mouText, voDescription, voReason, voCost, voTime, entityId, projects, workers, suppliers, exportLanguage, selectedRuleSet]);
 
     async function loadData() {
         setIsLoading(true);
@@ -77,53 +78,139 @@ export default function AgreementGenerator() {
         let blockReason = null;
         let expectedTitlePart = '';
 
+        // Helper to get translated strings for fixed labels based on exportLanguage
+        const lex = {
+            en: {
+                date: 'Date',
+                subject: 'Subject',
+                parties: 'Parties',
+                employer: 'Employer',
+                employee: 'Employee',
+                management: 'Management',
+                supplier: 'Supplier',
+                subcontractor: 'Subcontractor',
+                client: 'Client',
+                worker: 'Worker',
+                accountant: 'Accountant',
+                authorized: 'Authorized Signatory',
+                for: 'For',
+                nic: 'NIC No',
+                residing: 'residing at',
+                probation: 'Probation and Termination',
+                conduct: 'Operational Conduct & Safety',
+                statutory: 'Statutory Contributions',
+                remuneration: 'Remuneration',
+                position: 'Position and Grade',
+                rules: {
+                    biometric: 'Attendance Tracking: The Employee is explicitly responsible for verifying all subordinate worker attendance using the biometric/system verification to eliminate time theft and "buddy punching."',
+                    logs: 'Daily Digital Logs: The Employee mandates the submission of daily digital logs through the application, verifying weather, headcount, and work progress summaries.',
+                    safety: 'Personal Protective Equipment (PPE) is mandatory at all times on site. Repeated safety violations will result in dismissal.',
+                    arbitration: 'Dispute Resolution: Any dispute arising out of this agreement shall be settled through arbitration under the Arbitration Act No. 11 of 1995.',
+                    confidentiality: 'Confidentiality: The parties shall maintain strict confidentiality regarding project pricing, BOQ rates, and internal construction methodologies.',
+                    insurance: 'Insurance & Liability: The Employer maintains Workmen Compensation Insurance, but any damage caused by the gross negligence of the Employee shall be recoverable from wages.'
+                }
+            },
+            sn: {
+                date: 'දිනය',
+                subject: 'විෂය',
+                parties: 'පාර්ශවයන්',
+                employer: 'සේව්‍යයා',
+                employee: 'සේවකයා',
+                management: 'කළමනාකරණය',
+                supplier: 'සැපයුම්කරු',
+                subcontractor: 'අනුකොන්ත්‍රාත්කරු',
+                client: 'සේවාදායකයා',
+                worker: 'සේවකයා',
+                accountant: 'ගණකාධිකාරී',
+                authorized: 'බලයලත් අත්සන',
+                for: 'සඳහා',
+                nic: 'ජාතික හැඳුනුම්පත් අංකය',
+                residing: 'පදිංචි ලිපිනය',
+                probation: 'පරිවාස කාලය සහ සේවය අවසන් කිරීම',
+                conduct: 'මෙහෙයුම් හැසිරීම සහ ආරක්ෂාව',
+                statutory: 'ව්‍යවස්ථාපිත දායකත්වයන්',
+                remuneration: 'ප්‍රතිලාභ',
+                position: 'තනතුර සහ ශ්‍රේණිය',
+                rules: {
+                    biometric: 'පැමිණීම ලුහුබැඳීම: ජෛවමිතික/පද්ධති සත්‍යාපනය භාවිතා කරමින් සියලුම යටත් සේවකයින්ගේ පැමිණීම තහවුරු කිරීම සඳහා සේවකයා පැහැදිලිවම වගකිව යුතුය.',
+                    logs: 'දෛනික ඩිජිටල් සටහන්: යෙදුම හරහා දෛනික ඩිජිටල් සටහන් ඉදිරිපත් කිරීම සේවකයා විසින් අනිවාර්ය කරනු ලැබේ.',
+                    safety: 'පුද්ගලික ආරක්ෂක උපකරණ (PPE) සෑම විටම අනිවාර්ය වේ. ආරක්ෂක නීති නැවත නැවතත් උල්ලංඝනය කිරීම සේවයෙන් ඉවත් කිරීමට හේතු වේ.',
+                    arbitration: 'ආරවුල් නිරාකරණය: මෙම ගිවිසුමෙන් පැන නගින ඕනෑම ආරවුලක් 1995 අංක 11 දරණ බේරුම්කරණ පනත යටතේ විසඳිය යුතුය.',
+                    confidentiality: 'රහස්‍යභාවය: ව්‍යාපෘති මිලකරණය සහ අභ්‍යන්තර ඉදිකිරීම් ක්‍රමවේද පිළිබඳව පාර්ශවයන් දැඩි රහස්‍යභාවයක් පවත්වා ගත යුතුය.',
+                    insurance: 'රක්ෂණය සහ වගකීම: සේව්‍යයා සේවක වන්දි රක්ෂණයක් පවත්වාගෙන යනු ලබන අතර, සේවකයාගේ නොසැලකිල්ල නිසා සිදුවන හානිය වැටුපෙන් අය කරගත හැක.'
+                }
+            },
+            ta: {
+                date: 'தேதி',
+                subject: 'பொருள்',
+                parties: 'தரப்பினர்',
+                employer: 'வேலை வழங்குபவர்',
+                employee: 'ஊழியர்',
+                management: 'நிர்வாகம்',
+                supplier: 'வழங்குநர்',
+                subcontractor: 'உள் ஒப்பந்ததாரர்',
+                client: 'வாடிக்கையாளர்',
+                worker: 'தொழிலாளி',
+                accountant: 'கணக்காளர்',
+                authorized: 'அங்கீகரிக்கப்பட்ட கையொப்பம்',
+                for: 'சார்பாக',
+                nic: 'தேசிய அடையாள அட்டை எண்',
+                residing: 'முகவரி',
+                probation: 'ஆய்வுக் காலம் மற்றும் பணி நீக்கம்',
+                conduct: 'செயல்பாட்டு நடத்தை மற்றும் பாதுகாப்பு',
+                statutory: 'சட்டரீதியான பங்களிப்புகள்',
+                remuneration: 'ஊதியம்',
+                position: 'பதவி மற்றும் தரம்',
+                rules: {
+                    biometric: 'வருகை கண்காணிப்பு: பயோமெட்ரிக் முறையைப் பயன்படுத்தி அனைத்து தொழிலாளர்களின் வருகையையும் சரிபார்க்க ஊழியர் பொறுப்பு.',
+                    logs: 'டிஜிட்டல் பதிவுகள்: விண்ணப்பம் மூலம் தினசரி டிஜிட்டல் பதிவுகளை சமர்ப்பிப்பதை ஊழியர் கட்டாயமாக்குகிறார்.',
+                    safety: 'தனிப்பட்ட பாதுகாப்பு உபகரணங்கள் (PPE) தளத்தில் எப்போதும் கட்டாயமாகும். பாதுகாப்பு மீறல்கள் பணிநீக்கத்திற்கு வழிவகுக்கும்.',
+                    arbitration: 'சர்ச்சை தீர்வு: இந்த ஒப்பந்தத்தின் மூலம் ஏற்படும் சர்ச்சைகள் 1995 ஆம் ஆண்டின் 11 ஆம் எண் நடுவர் சட்டத்தின் கீழ் தீர்க்கப்படும்.',
+                    confidentiality: 'ரகசியத்தன்மை: திட்ட விலை மற்றும் கட்டுமான முறைகள் குறித்து தரப்பினர் ரகசியத்தை பேண வேண்டும்.',
+                    insurance: 'காப்பீடு மற்றும் பொறுப்பு: ஊழியரின் அலட்சியத்தால் ஏற்படும் சேதங்கள் ஊதியத்தில் இருந்து வசூலிக்கப்படும்.'
+                }
+            }
+        };
+
+        const l = lex[exportLanguage] || lex.en;
+
         if (type === 'Client') {
             const project = projects.find(p => String(p.id) === String(entityId));
             if (!project) return;
 
             let subTitle = '';
-            if (clientSubType === 'LetterOfAcceptance') subTitle = 'Letter of Acceptance';
-            if (clientSubType === 'ContractAgreement') subTitle = 'Contract Agreement';
-            if (clientSubType === 'MOU') subTitle = 'Memorandum of Understanding';
-            if (clientSubType === 'AcceptedBOQ') subTitle = 'Accepted BOQ Reference';
-            if (clientSubType === 'ConditionsOfContract') subTitle = 'Conditions of Contract';
+            if (clientSubType === 'LetterOfAcceptance') subTitle = exportLanguage === 'en' ? 'Letter of Acceptance' : exportLanguage === 'sn' ? 'පිළිගැනීමේ ලිපිය' : 'ஏற்பு கடிதம்';
+            if (clientSubType === 'ContractAgreement') subTitle = exportLanguage === 'en' ? 'Contract Agreement' : exportLanguage === 'sn' ? 'ගිවිසුම' : 'ஒப்பந்தம்';
+            if (clientSubType === 'MOU') subTitle = 'MOU';
+            if (clientSubType === 'AcceptedBOQ') subTitle = 'Accepted BOQ';
+            if (clientSubType === 'ConditionsOfContract') subTitle = 'Conditions';
             if (clientSubType === 'VariationOrder') subTitle = 'Variation Order';
 
             title = `${subTitle} - ${project.name}`;
             expectedTitlePart = subTitle;
-        } else if (type === 'Worker') {
+        } else if (type === 'Worker' || type === 'Management' || type === 'Accountant') {
             const worker = workers.find(w => String(w.id) === String(entityId));
             if (!worker) return;
-            title = `Employment Agreement - ${worker.fullName || worker.name}`;
-            expectedTitlePart = 'Employment Agreement';
-        } else if (type === 'Management') {
-            const worker = workers.find(w => String(w.id) === String(entityId));
-            if (!worker) return;
-            title = `Management Agreement - ${worker.fullName || worker.name}`;
-            expectedTitlePart = 'Management Agreement';
-        } else if (type === 'Supplier') {
+            const subTitle = type === 'Worker' ? l.worker : type === 'Management' ? l.management : l.accountant;
+            title = `${subTitle} Agreement - ${worker.fullName || worker.name}`;
+            expectedTitlePart = subTitle;
+        } else {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
             if (!supplier) return;
-            title = `Supplier Agreement - ${supplier.name}`;
-            expectedTitlePart = 'Supplier Agreement';
-        } else if (type === 'Subcontractor') {
-            const supplier = suppliers.find(s => String(s.id) === String(entityId));
-            if (!supplier) return;
-            title = `Domestic Subcontractor Agreement - ${supplier.name}`;
-            expectedTitlePart = 'Domestic Subcontractor Agreement';
-        } else if (type === 'Accountant') {
-            const worker = workers.find(w => String(w.id) === String(entityId));
-            if (!worker) return;
-            title = `Accountant Service Agreement - ${worker.fullName || worker.name}`;
-            expectedTitlePart = 'Accountant Service Agreement';
+            const subTitle = type === 'Supplier' ? l.supplier : l.subcontractor;
+            title = `${subTitle} Agreement - ${supplier.name}`;
+            expectedTitlePart = subTitle;
         }
 
-        // Check if an agreement already exists for this type and entity and expected title
-        const existing = agreements.find(a => a.type === type && String(a.entityId) === String(entityId) && a.title.includes(expectedTitlePart));
+        // Check if an agreement already exists
+        const existing = agreements.find(a => a.type === type && String(a.entityId) === String(entityId) && a.title.includes(expectedTitlePart) && (a.exportLanguage || 'en') === exportLanguage);
         if (existing) {
             setCurrentAgreement(existing);
             return;
         }
+
+        // Whitespace scrubbing helper for templates
+        const clean = (str) => str.replace(/\s+/g, ' ').trim();
 
         if (type === 'Client') {
             const project = projects.find(p => String(p.id) === String(entityId));
@@ -208,275 +295,65 @@ export default function AgreementGenerator() {
                     <p><em>Reference to SLS 573:1982 Standard Method of Measurement</em></p>
                     <h2>1. Acceptance of Rates</h2>
                     <p>The rates and quantities specified in the final generated BOQ for this project are hereby locked and accepted as the baseline for all Interim Payment Certificates.</p>
-                    <h2>2. Contract Sum Binding</h2>
-                    <p>The final Accepted sum is <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>. Variations shall only be entertained subject to written approval via formal Variation Orders.</p>
-                    <h2>3. Re-measurement & Quantity Variance</h2>
-                    <p>If executed quantities vary by more than ±15% from the initial BOQ quantities, the rates for those specific items may be subject to review and renegotiation.</p>
-                    <h2>4. Price Fluctuation Adjustments</h2>
-                    <p>If the project duration exceeds 6 months due to delays not attributable to the Contractor, material price adjustments shall be allowed based on official indices to account for construction inflation.</p>
+                    <h1>${exportLanguage === 'en' ? 'CONTRACT AGREEMENT' : exportLanguage === 'sn' ? 'කොන්ත්‍රාත් ගිවිසුම' : 'ஒப்பந்த ஒப்பந்தம்'}</h1>
+                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>${l.parties}:</strong> ${project.client || 'Client'} & SSD CONSTRUCTIONS</p>
+                    <p>${clean(`This Agreement is made between the Employer and SSD CONSTRUCTIONS regarding the project ${project.name}.`)}</p>
+                    <h2>Conditions</h2>
+                    <p>${l.rules.arbitration}</p>
+                    <p>${l.rules.confidentiality}</p>
                 `;
-            } else if (clientSubType === 'ConditionsOfContract') {
-                content = `
-                    <h1>CONDITIONS OF CONTRACT (Minor Contracts SBD-03)</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Project:</strong> ${project.name}</p>
-                    
-                    <h2>1. Payment & Certification Procedure</h2>
-                    <ul>
-                        <li>The Contractor shall submit the Interim Payment Certificate (IPC).</li>
-                        <li>The Engineer/Employer must certify the IPC within <strong>7 days</strong> of submission.</li>
-                        <li>The Employer shall pay the certified amount within <strong>14 days</strong> of certification.</li>
-                        <li><em>If no certification response is provided within 7 days, the IPC is deemed approved.</em></li>
-                    </ul>
-
-                    <h2>2. Financial Clauses</h2>
-                    <ul>
-                        <li><strong>Advance Payment:</strong> The Employer shall pay an advance payment of maximum 30% of the Contract Price subject to an Advance Payment Guarantee.</li>
-                        <li><strong>Retention:</strong> A retention of 10% shall be deducted from each interim payment, up to a maximum limit of 5% of the Initial Contract Price.</li>
-                        <li><strong>Defects Liability Period:</strong> The Defects Liability Period is 365 Days from the date of taking over.</li>
-                        <li><strong>Interest on Late Payment:</strong> Late payments shall incur an interest charge of 1.5% per month.</li>
-                    </ul>
-
-                    <h2>3. Suspension Rights</h2>
-                    <p>The Contractor reserves the right to suspend works in the event of:</p>
-                    <ul>
-                        <li>Non-payment of certified bills exceeding 14 days from due date.</li>
-                        <li>Employer interference or failure to release the site.</li>
-                        <li>Failure of the Employer/Consultant to provide necessary working drawings in a timely manner.</li>
-                    </ul>
-
-                    <h2>4. Termination Rights</h2>
-                    <p><strong>Employer Termination:</strong> The Employer may terminate the contract for abandonment of works, insolvency of the Contractor, or serious, repeated breach of contract.<br/>
-                    <strong>Contractor Termination:</strong> The Contractor may terminate the contract for 30+ days of non-payment, repeated suspension of works without cause by the Employer, or Employer insolvency.</p>
-                    
-                    <h2>5. Dispute Resolution</h2>
-                    <p>Disputes shall be handled through a tiered structure: 1) Site-level negotiation (7 days), followed by 2) Formal written dispute notice, followed by 3) Mediation through the Construction Guarantee Fund (CGF), and finally 4) Formal Arbitration under the Sri Lanka Arbitration Act.</p>
-
-                    ${isCIGFL ? `
-                    <div class="clause-highlight">
-                        <h2>Tax & Regulatory Compliance (CIGFL)</h2>
-                        <p>As this contract exceeds LKR 15,000,000, it is subject to the Construction Industry Guarantee Fund Levy (CIGFL). The Contractor's CIDA registration (CPC/DS/KU/4717) is maintained accordingly.</p>
-                    </div>
-                    ` : ''}
-
-                    ${isResidential ? `
-                    <div class="clause-highlight">
-                        <h2>Construction Escrow (Residential)</h2>
-                        <p>Both parties agree that milestone payments may be facilitated via a Construction Escrow account to ensure financial security and timely disbursements.</p>
-                    </div>
-                    ` : ''}
-                `;
-            } else if (clientSubType === 'VariationOrder') {
-                content = `
-                    <h1>VARIATION ORDER</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Project:</strong> ${project.name}</p>
-                    
-                    <div style="border: 1px solid #000; padding: 15px; margin-bottom: 20px;">
-                        <h2>Variation Details</h2>
-                        <p><strong>Description of Variation:</strong><br/> ${voDescription || '<em>Description not provided...</em>'}</p>
-                        <p><strong>Reason for Variation:</strong> ${voReason}</p>
-                        <hr/>
-                        <p><strong>Cost Impact:</strong> LKR ${Number(voCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                        <p><strong>Time Impact:</strong> ${voTime || '0'} Days</p>
-                        <p><strong>Revised Contract Sum:</strong> LKR ${(amt + Number(voCost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    </div>
-
-                    <h2>Authorization</h2>
-                    <p><em>"No variation shall be executed without written approval. Verbal instructions shall not be binding."</em></p>
-                    <p>By signing this Variation Order, both parties agree to the amended scope, cost, and time implications stated above.</p>
-                `;
+            } else {
+                content = `<h1>${title}</h1><p>${l.date}: ${new Date().toLocaleDateString()}</p><p>Content generation for this subtype is in progress for ${exportLanguage}.</p>`;
             }
         }
-        else if (type === 'Worker') {
+        else if (type === 'Worker' || type === 'Management' || type === 'Accountant') {
             const worker = workers.find(w => String(w.id) === String(entityId));
-            if (!worker) return;
-            title = `Employment Agreement - ${worker.fullName || worker.name}`;
-
-            // Calculate monthly equivalent (roughly 26 days)
             const dailyRate = Number(worker.dailyRate || 0);
             const monthlyEst = dailyRate * 26;
             const isBelowMin = monthlyEst > 0 && monthlyEst < 30000;
 
-            if (isBelowMin) {
-                blockReason = "Statutory Minimum Wage Violation: The estimated monthly wage based on the daily rate is strictly below the mandatory LKR 30,000 minimum. Agreement signing is blocked until the rate is adjusted in the Workers module.";
-            }
+            if (isBelowMin) blockReason = "Statutory Wage Violation (<30,000 LKR)";
 
             content = `
-                <h1>EMPLOYMENT AGREEMENT</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Employment Agreement is entered into by and between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'}${worker.address ? `, residing at ${worker.address}` : ''} (hereinafter the "Employee").</p>
-
-                <h2>1. Position and Grade</h2>
-                <p>The Employee is hired for the position of <strong>${worker.role || 'Construction Worker'}</strong>.</p>
+                <h1>${title.toUpperCase()}</h1>
+                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>${clean(`This Agreement is made between SSD CONSTRUCTIONS (${l.employer}) and ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '_______'} (${l.employee}).`)}</p>
                 
-                <h2>2. Remuneration</h2>
-                <p><strong>Base Rate:</strong> LKR ${dailyRate.toLocaleString()} per day.</p>
-                <p><strong>Overtime (OT):</strong> Any work exceeding 8 hours per day shall be paid at 1.5 times the normal hourly rate, as mandated by the Shop and Office Employees Act.</p>
+                <h2>1. ${l.position}</h2>
+                <p>${clean(`The Employee is hired for the position of ${worker.role || (type === 'Accountant' ? 'Accountant' : 'Worker')}.`)}</p>
 
-                ${isBelowMin ? `
-                <div class="clause-highlight" style="background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171;">
-                    <p><em>CRITICAL WARNING: The estimated monthly wage based on the daily rate is below the statutory minimum of LKR 30,000. Signing is strictly blocked.</em></p>
-                </div>
-                ` : ''}
+                <h2>2. ${l.remuneration}</h2>
+                <p>LKR ${dailyRate.toLocaleString()} per day.</p>
+                <p>${l.rules.insurance}</p>
 
-                <h2>3. Statutory Contributions</h2>
-                <p>The Employer shall comply with national statutory requirements:</p>
+                <h2>3. ${l.statutory}</h2>
+                <ul><li>EPF: 12% Employer, 8% Employee</li><li>ETF: 3% Employer</li></ul>
+
+                <h2>4. ${l.conduct}</h2>
                 <ul>
-                    <li>12% of earnings contributed to the Employees' Provident Fund (EPF) by the Employer.</li>
-                    <li>8% of earnings deducted as the Employee's contribution to the EPF.</li>
-                    <li>3% of earnings contributed to the Employees' Trust Fund (ETF) by the Employer.</li>
+                    <li>${l.rules.safety}</li>
+                    ${(selectedRuleSet === 'Strict' || selectedRuleSet === 'Comprehensive') ? `<li>${l.rules.biometric}</li><li>${l.rules.logs}</li>` : ''}
+                    ${selectedRuleSet === 'Comprehensive' ? `<li>${l.rules.arbitration}</li><li>${l.rules.confidentiality}</li>` : ''}
                 </ul>
 
-                <h2>4. Operational Conduct & Safety</h2>
-                <ul>
-                    <li><strong>Attendance:</strong> Daily biometric or system attendance marking is mandatory. Fraudulent marking or proxy attendance is grounds for immediate termination without prior notice.</li>
-                    <li><strong>Site Safety:</strong> Wearing provided Personal Protective Equipment (PPE) is mandatory at all times on site. Repeated safety violations will result in dismissal.</li>
-                    <li><strong>Damage Liability:</strong> Gross negligence causing damage to tools, machinery, or materials shall make the Employee liable, and associated costs may be recovered from wages.</li>
-                </ul>
-
-                <h2>5. Probation and Termination</h2>
-                <p>The Employee will be on probation for a period of three (3) months. During probation, the agreement may be terminated with 1 week's notice. Thereafter, a minimum of 1 month's notice is required for termination without cause.</p>
+                <h2>5. ${l.probation}</h2>
+                <p>${exportLanguage === 'en' ? '3 Months probation apply.' : exportLanguage === 'sn' ? 'මාස 3 ක පරිවාස කාලයක් අදාළ වේ.' : '3 மாத ஆய்வுக் காலம் பொருந்தும்.'}</p>
             `;
         }
-        else if (type === 'Management') {
-            const worker = workers.find(w => String(w.id) === String(entityId));
-            if (!worker) return;
-            title = `Management Agreement - ${worker.fullName || worker.name}`;
-
-            // Calculate monthly equivalent (roughly 26 days)
-            const dailyRate = Number(worker.dailyRate || 0);
-            const monthlyEst = dailyRate * 26;
-            const isBelowMin = monthlyEst > 0 && monthlyEst < 30000;
-
-            if (isBelowMin) {
-                blockReason = "Statutory Minimum Wage Violation: The estimated monthly wage based on the daily rate is strictly below the mandatory LKR 30,000 minimum. Agreement signing is blocked until the rate is adjusted in the Workers module.";
-            }
-
-            content = `
-                <h1>SITE MANAGEMENT & SUPERVISOR AGREEMENT</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Management Agreement is entered into by and between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'}${worker.address ? `, residing at ${worker.address}` : ''} (hereinafter the "Employee").</p>
-
-                <h2>1. Position and Scope</h2>
-                <p>The Employee is hired for the management/supervisory position of <strong>${worker.role || 'Site Supervisor / Engineer'}</strong>. This role is governed by the <em>Shop and Office Employees Act</em>.</p>
-                
-                <h2>2. Remuneration & Statutory Contributions</h2>
-                <p><strong>Base Rate:</strong> LKR ${dailyRate.toLocaleString()} per day.</p>
-                ${isBelowMin ? `
-                <div class="clause-highlight" style="background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171;">
-                    <p><em>CRITICAL WARNING: The estimated monthly wage based on the daily rate is below the statutory minimum of LKR 30,000. Signing is strictly blocked.</em></p>
-                </div>
-                ` : ''}
-                <ul>
-                    <li>12% of earnings contributed to the Employees' Provident Fund (EPF) by the Employer.</li>
-                    <li>8% of earnings deducted as the Employee's contribution to the EPF.</li>
-                    <li>3% of earnings contributed to the Employees' Trust Fund (ETF) by the Employer.</li>
-                </ul>
-
-                <h2>3. Integrity & Reporting Clause</h2>
-                <ul>
-                    <li><strong>Attendance Tracking:</strong> The Employee is explicitly responsible for verifying all subordinate worker attendance using the biometric/system verification to eliminate time theft and "buddy punching."</li>
-                    <li><strong>Daily Digital Logs:</strong> The Employee mandates the submission of daily digital logs through the application, verifying weather, headcount, and work progress summaries.</li>
-                    <li><strong>Goal Setting & Labor Efficiency:</strong> The Employee is responsible for meeting daily/weekly Project Goals, tracked against the "Labor Efficiency Variance" comparing budgeted BOQ hours vs actual biometric hours.</li>
-                </ul>
-
-                <h2>4. Material Stewardship</h2>
-                <p>The Employee is contractually liable for updating the Material Inventory in real-time. Unauthorized material deviations or failure to enforce SLS 107/375 quality standards constitutes Gross Negligence.</p>
-
-                <h2>5. Probation and Termination</h2>
-                <p>The Employee will be on probation for a period of three (3) months. Notice period is 1 month for termination without cause post-probation.</p>
-            `;
-        }
-        else if (type === 'Supplier') {
+        else {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
-            if (!supplier) return;
-            title = `Supplier Agreement - ${supplier.name}`;
-
             content = `
-                <h1>SUPPLIER AGREEMENT</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Supplier Agreement is made between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Buyer") and <strong>${supplier.name}</strong>${supplier.address ? `, located at ${supplier.address},` : ''} (hereinafter the "Supplier").</p>
-
-                <h2>1. Scope of Supply</h2>
-                <p>The Supplier agrees to provide construction materials under the category of <strong>${supplier.category || 'General Materials'}</strong> conforming to requested specifications.</p>
-
-                <h2>2. Quality Assurance & Replacements</h2>
-                <p>All materials supplied must meet relevant Sri Lankan Standards (e.g., SLS 107 for Cement, SLS 375 for Steel). The Buyer reserves the right to reject sub-standard materials at the Supplier's expense. <strong>Rejected material must be replaced by the Supplier within 3 days at their own expense.</strong></p>
-
-                <h2>3. Pricing & Delivery</h2>
-                <ul>
-                    <li><strong>Price Lock:</strong> Quoted rates are valid and locked for 60 days unless a written revision is specifically approved by the Buyer.</li>
-                    <li><strong>Delivery Delay Penalty:</strong> Late supply beyond the agreed delivery date shall attract a penalty of 1% of the invoice value per day of delay.</li>
-                </ul>
-
-                <h2>4. Payment Terms</h2>
-                <p>Payments will be settled via direct bank transfer (SLIPS/JustPay/CEFT) to the Supplier's designated bank account within 14 days of invoice submission and material verification.</p>
-            `;
-        }
-        else if (type === 'Subcontractor') {
-            const supplier = suppliers.find(s => String(s.id) === String(entityId));
-            if (!supplier) return;
-            title = `Domestic Subcontractor Agreement - ${supplier.name}`;
-
-            content = `
-                <h1>DOMESTIC SUBCONTRACTOR AGREEMENT</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Subcontractor Agreement is made between <strong>SSD CONSTRUCTIONS</strong> (hereinafter the "Main Contractor") and <strong>${supplier.name}</strong>${supplier.address ? `, located at ${supplier.address},` : ''} (hereinafter the "Subcontractor").</p>
-
-                <h2>1. Scope of Externalized Work</h2>
-                <p>The Subcontractor agrees to execute the specialized works as detailed in the attached Memorandum of Understanding (MOU) / Work Order, conforming to the exact specifications of the Main Contractor's BOQ.</p>
-
-                <h2>2. "Measure and Pay" Clause</h2>
-                <p>Payments shall strictly be based on <strong>actual on-site measurements</strong> of completed work, verified daily or weekly by an SSD Engineer. Advance payments are subject to explicit approval.</p>
-
-                <h2>3. Joint Liability & Statutory EPF/ETF</h2>
-                <p>The Subcontractor holds sole legal responsibility for the EPF/ETF contributions and insurance of their own workforce. The Subcontractor agrees to indemnify the Main Contractor against any labor or statutory claims made by the Subcontractor's personnel.</p>
-
-                <h2>4. Regulatory Compliance</h2>
-                <p>Where applicable, the Subcontractor shall comply with the Construction Industry Guarantee Fund Levy (CIGFL) if their subcontract scope triggers the statutory thresholds.</p>
-
-                <h2>5. Default and Termination</h2>
-                <p>Failure to meet progress milestones or quality (SLS) standards grants the Main Contractor the right to terminate this agreement with 7 days written notice, recovering any losses from pending payments.</p>
-            `;
-        }
-        else if (type === 'Accountant') {
-            const worker = workers.find(w => String(w.id) === String(entityId));
-            if (!worker) return;
-
-            content = `
-                <h1>ACCOUNTANT SERVICE & FINANCIAL COMPLIANCE AGREEMENT</h1>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>This Agreement is entered into by <strong>SSD CONSTRUCTIONS</strong> (the "Employer") and <strong>${worker.fullName || worker.name}</strong>, NIC No: ${worker.nic || '___________'} (the "Accountant").</p>
-
-                <h2>1. Strategic Objectives (The "Non-Payment Crisis" Bridge)</h2>
-                <p>The Accountant is specifically tasked with bridging the gap between field progress and financial finalization. Key responsibilities include:</p>
-                <ul>
-                    <li><strong>DSO Management:</strong> Monitoring "Days Sales Outstanding" to ensure certified work is collected within 30 days.</li>
-                    <li><strong>Liquidity Monitoring:</strong> Providing monthly reports ensuring a Current Ratio &gt; 1.1 and Quick Ratio &gt; 1.0.</li>
-                </ul>
-
-                <h2>2. Statutory & Tax Compliance</h2>
-                <ul>
-                    <li><strong>CIGFL Management:</strong> Responsible for registering and remitting the Construction Industry Guarantee Fund Levy (0.25% - 1%) for projects exceeding Rs. 15 Million.</li>
-                    <li><strong>APIT & EPF/ETF:</strong> Managing Advance Personal Income Tax (APIT) and ensuring 12% EPF / 3% ETF remittances to avoid labor audit red flags.</li>
-                </ul>
-
-                <h2>3. Fraud Prevention & Payroll Audit</h2>
-                <p>The Accountant shall act as the final check against phantom employee schemes and invoice fraud. It is a mandatory duty to reconcile <strong>biometric facial verification data</strong> against the payroll run for 100% labor cost accuracy.</p>
-
-                <h2>4. Bank Reconciliation & Digital Audit Trail</h2>
-                <p>Responsibility for settling all supplier and worker payments via <strong>LankaPay JustPay or SLIPS</strong> network to maintain a transparent, digital audit trail admissible under the Evidence Act.</p>
-
-                <h2>5. Legal Admissibility</h2>
-                <p>All financial records, digital balance sheets, and tax filings generated by the Accountant within the SSD system are maintained according to the <strong>Evidence (Special Provisions) Act No. 14 of 1995</strong> for admissibility in judicial forums.</p>
+                <h1>${title.toUpperCase()}</h1>
+                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>${clean(`SSD CONSTRUCTIONS (${l.client}) and ${supplier.name} (${type === 'Supplier' ? l.supplier : l.subcontractor}).`)}</p>
+                <h2>Conditions</h2>
+                <p>${l.rules.arbitration}</p>
+                <p>${l.rules.confidentiality}</p>
             `;
         }
 
         const newDoc = {
-            id: 'temp_new',
-            type,
-            entityId: parseInt(entityId),
             title,
             content,
             status: 'Draft',
@@ -642,6 +519,26 @@ export default function AgreementGenerator() {
                                 ))}
                             </select>
                         </div>
+
+                        <div className="form-group">
+                            <label>Export Language</label>
+                            <div className="language-toggle" style={{ display: 'flex', gap: '8px' }}>
+                                <button className={`btn-toggle ${exportLanguage === 'en' ? 'active' : ''}`} onClick={() => setExportLanguage('en')}>English</button>
+                                <button className={`btn-toggle ${exportLanguage === 'sn' ? 'active' : ''}`} onClick={() => setExportLanguage('sn')}>සිංහල</button>
+                                <button className={`btn-toggle ${exportLanguage === 'ta' ? 'active' : ''}`} onClick={() => setExportLanguage('ta')}>தமிழ்</button>
+                            </div>
+                        </div>
+
+                        {(type === 'Worker' || type === 'Management' || type === 'Accountant' || type === 'Subcontractor') && (
+                            <div className="form-group">
+                                <label>Agreement Rules</label>
+                                <select value={selectedRuleSet} onChange={e => setSelectedRuleSet(e.target.value)}>
+                                    <option value="Standard">Standard (Basic Legal)</option>
+                                    <option value="Strict">Strict (High Monitoring + Biometrics)</option>
+                                    <option value="Comprehensive">Comprehensive (Corporate SSD Standards)</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {currentAgreement && currentAgreement.status === 'Draft' && (
