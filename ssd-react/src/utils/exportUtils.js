@@ -170,41 +170,62 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
         doc.setDrawColor(200);
         doc.line(15, 42, 195, 42);
 
-        // Convert HTML to simple plain text with line breaks
-        const plainText = htmlContent
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<\/h[1-6]>/gi, '\n\n')
-            .replace(/<\/p>/gi, '\n\n')
-            .replace(/<\/li>/gi, '\n')
-            .replace(/<li>/gi, '  • ')
-            .replace(/<[^>]+>/g, '') // remove remaining HTML tags
+        // Print text with better formatting (Hand-parsed HTML for PDF)
+        const contentPieces = htmlContent
             .replace(/&nbsp;/g, ' ')
-            .replace(/\n\s*\n\s*\n/g, '\n\n') // remove excessive newlines
-            .trim();
-
-        doc.setFontSize(11);
-        doc.setTextColor(0);
+            .split(/(<\/?h[1-2]>|<\/?strong>|<\/?p>|<\/?ul>|<\/?li>|<br\s*\/?>)/gi)
+            .filter(p => p && p.trim() !== '');
 
         let y = 52;
         const pageHeight = doc.internal.pageSize.getHeight();
+        const marginX = 15;
+        const maxWidth = 180;
 
-        // Print text with wrapping
-        const lines = doc.splitTextToSize(plainText, 170);
-
-        for (let i = 0; i < lines.length; i++) {
-            if (y > pageHeight - 40) {
-                // Add footer
-                doc.setFontSize(8);
-                doc.setTextColor(100);
-                doc.text(COMPANY.footerReg, 15, pageHeight - 15);
-
-                doc.addPage();
-                y = 20;
+        for (const piece of contentPieces) {
+            if (piece.match(/<h1/i)) {
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                continue;
+            } else if (piece.match(/<h2/i)) {
                 doc.setFontSize(11);
-                doc.setTextColor(0);
+                doc.setFont('helvetica', 'bold');
+                y += 2;
+                continue;
+            } else if (piece.match(/<strong/i)) {
+                doc.setFont('helvetica', 'bold');
+                continue;
+            } else if (piece.match(/<(p|li)/i)) {
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                continue;
+            } else if (piece.match(/<\/(h1|h2|p|strong|li|ul)/i)) {
+                if (piece.match(/<\/(h1|h2|p|ul)/i)) y += 4;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                continue;
+            } else if (piece.match(/<br/i)) {
+                y += 6;
+                continue;
             }
-            doc.text(lines[i], 15, y);
-            y += 6;
+
+            // Normal text content
+            const cleanText = piece.replace(/<[^>]+>/g, '').trim();
+            if (!cleanText) continue;
+
+            const lines = doc.splitTextToSize(cleanText, maxWidth);
+            for (const line of lines) {
+                if (y > pageHeight - 35) {
+                    doc.setFontSize(8);
+                    doc.setTextColor(100);
+                    doc.text(COMPANY.footerReg, 15, pageHeight - 15);
+                    doc.addPage();
+                    y = 20;
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                }
+                doc.text(line, marginX, y);
+                y += 5.5;
+            }
         }
 
         y += 20;
@@ -252,25 +273,51 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
     const logoBase64 = await getBase64Image(LOGO_PATH);
     const logoUint8 = logoBase64 ? Uint8Array.from(atob(logoBase64.split(',')[1]), c => c.charCodeAt(0)) : null;
 
-    const plainText = htmlContent
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/h[1-6]>/gi, '\n\n')
-        .replace(/<\/p>/gi, '\n\n')
-        .replace(/<\/li>/gi, '\n')
-        .replace(/<li>/gi, '• ')
-        .replace(/<[^>]+>/g, '')
+    // Parse HTML into docx Paragraphs
+    const blocks = htmlContent
         .replace(/&nbsp;/g, ' ')
-        .replace(/\n\s*\n\s*\n/g, '\n\n')
-        .trim();
+        .split(/(<\/?h[1-2]>|<\/?p>|<\/?ul>|<\/?li>)/gi)
+        .filter(b => b && b.trim() !== '');
 
-    const paragraphs = plainText.split('\n\n').map(block => {
-        return new Paragraph({
-            children: block.split('\n').map((line, idx) => {
-                return new TextRun({ text: line, break: idx > 0 ? 1 : 0 });
-            }),
-            spacing: { after: 200 }
-        });
-    });
+    const paragraphs = [];
+    let currentBlockType = 'p';
+
+    for (const block of blocks) {
+        if (block.match(/<h1/i)) { currentBlockType = 'h1'; continue; }
+        if (block.match(/<h2/i)) { currentBlockType = 'h2'; continue; }
+        if (block.match(/<(p|li)/i)) { currentBlockType = 'p'; continue; }
+        if (block.match(/<\/(h1|h2|p|li|ul)/i)) { currentBlockType = 'p'; continue; }
+
+        const cleanText = block.replace(/<[^>]+>/g, '').trim();
+        if (!cleanText) continue;
+
+        // Handle inline strong tags within the block
+        const segments = block.split(/(<\/?strong>)/gi);
+        const children = [];
+        let isStrong = false;
+
+        for (const seg of segments) {
+            if (seg.match(/<strong/i)) { isStrong = true; continue; }
+            if (seg.match(/<\/strong/i)) { isStrong = false; continue; }
+
+            const text = seg.replace(/<[^>]+>/g, '').trim();
+            if (text) {
+                children.push(new TextRun({
+                    text: text,
+                    bold: isStrong || currentBlockType === 'h1' || currentBlockType === 'h2',
+                    size: currentBlockType === 'h1' ? 28 : currentBlockType === 'h2' ? 22 : 20
+                }));
+            }
+        }
+
+        if (children.length > 0) {
+            paragraphs.push(new Paragraph({
+                children,
+                spacing: { after: 120, before: currentBlockType.startsWith('h') ? 240 : 0 },
+                alignment: currentBlockType === 'h1' ? AlignmentType.CENTER : AlignmentType.LEFT
+            }));
+        }
+    }
 
     const doc = new Document({
         sections: [{
@@ -290,36 +337,36 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
                                     children: [
                                         new TableCell({
                                             width: { size: 30, type: WidthType.PERCENTAGE },
-                                            children: [logoUint8 ? new Paragraph({ children: [new ImageRun({ data: logoUint8, transformation: { width: 156, height: 50 } })] }) : new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true })] })],
+                                            children: [logoUint8 ? new Paragraph({ children: [new ImageRun({ data: logoUint8, transformation: { width: 140, height: 45 } })] }) : new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true })] })],
                                         }),
                                         new TableCell({
                                             width: { size: 70, type: WidthType.PERCENTAGE },
                                             children: [
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true, size: 28 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.proprietor, size: 18 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.address, size: 18 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.phones, size: 18 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.registration, size: 18 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true, size: 24 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.proprietor, size: 16 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.address, size: 16 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.phones, size: 16 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.registration, size: 16 })], alignment: AlignmentType.RIGHT }),
                                             ],
                                         }),
                                     ],
                                 }),
                             ],
                         }),
-                        new Paragraph({ border: { bottom: { color: "CCCCCC", space: 1, value: "single", size: 6 } }, spacing: { after: 400 } })
+                        new Paragraph({ border: { bottom: { color: "CCCCCC", space: 1, value: "single", size: 6 } }, spacing: { after: 300 } })
                     ],
                 }),
             },
             footers: {
                 default: new Footer({
                     children: [
-                        new Paragraph({ children: [new TextRun({ text: COMPANY.footerReg, color: "888888", size: 16 })], alignment: AlignmentType.LEFT }),
+                        new Paragraph({ children: [new TextRun({ text: COMPANY.footerReg, color: "888888", size: 14 })], alignment: AlignmentType.LEFT }),
                     ],
                 }),
             },
             children: [
                 ...paragraphs,
-                new Paragraph({ spacing: { before: 800 } }),
+                new Paragraph({ spacing: { before: 600 } }),
                 new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
                     borders: {
@@ -332,16 +379,16 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
                             children: [
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: "For SSD CONSTRUCTIONS", bold: true })] }),
-                                        new Paragraph({ text: "___________________________", spacing: { before: 600 } }),
-                                        new Paragraph({ text: "Authorized Signatory" }),
+                                        new Paragraph({ children: [new TextRun({ text: "For SSD CONSTRUCTIONS", bold: true, size: 20 })] }),
+                                        new Paragraph({ text: "___________________________", spacing: { before: 400 } }),
+                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18 })] }),
                                     ]
                                 }),
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: `For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, bold: true })], alignment: AlignmentType.RIGHT }),
-                                        new Paragraph({ text: "___________________________", spacing: { before: 600 }, alignment: AlignmentType.RIGHT }),
-                                        new Paragraph({ text: "Authorized Signatory", alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ children: [new TextRun({ text: `For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, bold: true, size: 20 })], alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ text: "___________________________", spacing: { before: 400 }, alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18 })], alignment: AlignmentType.RIGHT }),
                                     ]
                                 }),
                             ]

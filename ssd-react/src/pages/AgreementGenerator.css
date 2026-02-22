@@ -96,22 +96,23 @@
     font-family: "Times New Roman", Times, serif;
     position: relative;
     box-sizing: border-box;
+    overflow-wrap: break-word;
 }
 
 .document-preview h1 {
-    font-size: 24px;
+    font-size: 20px;
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
     text-transform: uppercase;
     font-weight: bold;
     border-bottom: 2px solid #cbd5e1;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
 }
 
 .document-preview h2 {
-    font-size: 16px;
-    margin-top: 25px;
-    margin-bottom: 15px;
+    font-size: 15px;
+    margin-top: 20px;
+    margin-bottom: 12px;
     text-transform: uppercase;
     color: #334155;
     font-weight: bold;
@@ -119,9 +120,9 @@
 
 .document-preview p,
 .document-preview li {
-    font-size: 14px;
-    line-height: 1.8;
-    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 10px;
     text-align: justify;
 }
 
