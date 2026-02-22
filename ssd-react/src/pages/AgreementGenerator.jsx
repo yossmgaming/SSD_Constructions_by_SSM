@@ -260,74 +260,139 @@ export default function AgreementGenerator() {
                     }
                 }
 
-                content = `
-                    <h1>LETTER OF ACCEPTANCE</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>To:</strong> SSD CONSTRUCTIONS</p>
-                    <p><strong>Subject: Notification of Award for ${project.name}</strong></p>
-                    <p>This is to notify you that your bid for the execution of the <strong>${project.name}</strong> has been accepted by our agency.</p>
-                    <h2>1. Contract Value</h2>
-                    <p>The accepted Contract Sum is <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.</p>
-                    <h2>2. Effective Date & Mobilization</h2>
-                    <p>The <strong>Effective Date of Commencement</strong> shall be 14 days from the date of this letter. You are hereby instructed to commence mobilization of equipment and personnel to the site immediately.</p>
-                    <h2>3. Time for Completion & Liquidated Damages</h2>
-                    <p>The Contractor shall complete the Works within <strong>${durationStr} calendar days</strong> from the Commencement Date, as per the Contract Data.</p>
-                    <p>In the event of delay attributable to the Contractor, <strong>Liquidated Damages</strong> shall be applied at <strong>0.05% of the Initial Contract Price per calendar day (LKR ${ldPerDay.toLocaleString(undefined, { minimumFractionDigits: 2 })})</strong>, capped at 10% of the Contract Price.</p>
-                    <h2>4. Performance Security</h2>
-                    <p>You are hereby requested to furnish the Performance Security in the amount of 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) within 14 days of receipt of this letter.</p>
-                    ${isCIGFL ? `
-                    <h2>5. CIGFL Levy Deduction</h2>
-                    <p>Under the Finance Act No. 5 of 2005 (CIGFL), a deduction of ${levyPercent}% will be applied as this project value exceeds the LKR 15,000,000 threshold.</p>
-                    ` : ''}
-                `;
+                if (exportLanguage === 'sn') {
+                    content = `
+                        <h1>ශ්‍රී ලංකා CIDA SBD-03 - පිළිගැනීමේ ලිපිය</h1>
+                        <p><strong>දිනය:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>ලබන්නා:</strong> SSD CONSTRUCTIONS</p>
+                        <p><strong>විෂය: ${project.name} සඳහා සම්මාන දැනුම්දීම</strong></p>
+                        <p>ඔබ <strong>${project.name}</strong> ව්‍යාපෘතිය සඳහා ඉදිරිපත් කළ ලදු ස්ථිරව පිළිගනු ලැබූ බව දන්වා සිටිමු.</p>
+                        <h2>1. ගිවිසුම් වටිනාකම</h2>
+                        <p>පිළිගත් ගිවිසුම් මුදල <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> වේ.</p>
+                        <h2>2. ආරම්භ දිනය සහ ක්‍රියා ගැන්වීම</h2>
+                        <p>ආරම්භ කිරීමේ ඵලදායී දිනය මෙම ලිපිය ලැබී දින 14 ක් ඇතුළත වේ. සේවා ස්ථානයට ජංගම හා කාර්ය මණ්ඩලය ගෙනයාම ප්‍රාරම්භ කළ යුතුය.</p>
+                        <h2>3. සම්පූර්ණ කිරීමේ කාලය සහ ද්‍රව හානි</h2>
+                        <p>කොන්ත්‍රාත්කරු <strong>දින ${durationStr}</strong> ඇතුළත කාර්යයන් සම්පූර්ණ කළ යුතුය.</p>
+                        <p>ප්‍රමාද සිදු වුවහොත් <strong>ද්‍රව හානි (LKR ${ldPerDay.toLocaleString(undefined, { minimumFractionDigits: 2 })} )</strong> අය කෙරේ.</p>
+                        <h2>4. කාර්යසාධන ඇපකරය</h2>
+                        <p>ගිවිසුම් මුදලෙන් 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) ලෙස කාර්යසාධන ඇපකරය දින 14 ඇතුළත සපයා ගත යුතුය.</p>
+                        ${isCIGFL ? `<h2>5. CIGFL ගාස්තු</h2><p>ව්‍යාපෘති අගය රු. ලක්ෂ 150 ඉක්මවන බැවින් ${levyPercent}% CIGFL ගාස්තු අය කෙරේ.</p>` : ''}
+                    `;
+                } else if (exportLanguage === 'ta') {
+                    content = `
+                        <h1>இலங்கை CIDA SBD-03 - ஏற்பு கடிதம்</h1>
+                        <p><strong>தேதி:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>பெறுநர்:</strong> SSD CONSTRUCTIONS</p>
+                        <p><strong>பொருள்: ${project.name} திட்டத்திற்கான விருது அறிவிப்பு</strong></p>
+                        <p><strong>${project.name}</strong> திட்டத்திற்கான உங்கள் ஏலம் ஏற்றுக்கொள்ளப்பட்டது.</p>
+                        <h2>1. ஒப்பந்த மதிப்பு</h2>
+                        <p>ஒப்பந்த தொகை <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.</p>
+                        <h2>2. தொடக்க தேதி</h2>
+                        <p>இக்கடிதம் பெற்ற 14 நாட்களுக்குள் தொடங்க வேண்டும்.</p>
+                        <h2>3. முடிவு காலம் மற்றும் தாமத அபராதம்</h2>
+                        <p><strong>${durationStr} நாட்களுக்குள்</strong> பணிகளை முடிக்க வேண்டும்.</p>
+                        <p>தாமதம் ஏற்பட்டால் <strong>LKR ${ldPerDay.toLocaleString(undefined, { minimumFractionDigits: 2 })} / நாள்</strong> அபராதம் விதிக்கப்படும்.</p>
+                        <h2>4. செயல்திறன் பத்திரம்</h2>
+                        <p>5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) 14 நாட்களுக்குள் செலுத்த வேண்டும்.</p>
+                        ${isCIGFL ? `<h2>5. CIGFL வரி</h2><p>திட்ட மதிப்பு ரூ. 15 மில்லியனுக்கு மேல் உள்ளதால் ${levyPercent}% CIGFL கழிக்கப்படும்.</p>` : ''}
+                    `;
+                } else {
+                    content = `
+                        <h1>LETTER OF ACCEPTANCE</h1>
+                        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>To:</strong> SSD CONSTRUCTIONS</p>
+                        <p><strong>Subject: Notification of Award for ${project.name}</strong></p>
+                        <p>This is to notify you that your bid for the execution of the <strong>${project.name}</strong> has been accepted.</p>
+                        <h2>1. Contract Value</h2>
+                        <p>The accepted Contract Sum is <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.</p>
+                        <h2>2. Effective Date & Mobilization</h2>
+                        <p>The Effective Date of Commencement shall be 14 days from the date of this letter.</p>
+                        <h2>3. Time for Completion & Liquidated Damages</h2>
+                        <p>The Contractor shall complete Works within <strong>${durationStr} calendar days</strong>.</p>
+                        <p>Liquidated Damages: <strong>0.05%/day (LKR ${ldPerDay.toLocaleString(undefined, { minimumFractionDigits: 2 })})</strong>, capped at 10%.</p>
+                        <h2>4. Performance Security</h2>
+                        <p>Furnish 5% (<strong>LKR ${perfSec.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>) within 14 days.</p>
+                        ${isCIGFL ? `<h2>5. CIGFL Levy</h2><p>Finance Act No. 5 of 2005: ${levyPercent}% CIGFL levy applies.</p>` : ''}
+                    `;
+                }
             } else if (clientSubType === 'ContractAgreement') {
-                content = `
-                    <h1>CONTRACT AGREEMENT (SBD-03)</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Parties:</strong></p>
-                    <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong>${project.location ? `, with project location at ${project.location},` : ''} (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
-                    
-                    <h2>1. Priority of Documents</h2>
-                    <p>The following documents shall be deemed to form and be read and construed as part of this Agreement in the following order of priority:</p>
-                    <ul>
-                        <li>(a) The Letter of Acceptance</li>
-                        <li>(b) This Contract Agreement</li>
-                        <li>(c) The Memorandum of Understanding (MOU)</li>
-                        <li>(d) The Accepted Bill of Quantities (BOQ)</li>
-                        <li>(e) The Conditions of Contract</li>
-                    </ul>
-                    <h2>2. Formal Agreement</h2>
-                    <p>For the consideration of <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>, the Contractor agrees to execute and complete the Works and remedy any defects therein in conformity with the provisions of the Contract.</p>
-                    <h2>3. Scope Definition & Variations</h2>
-                    <p>The Works shall strictly conform to the Accepted BOQ and drawings. Any work outside this scope shall require a written Variation Order. If no rate exists in the BOQ, pricing shall be determined by fair market rate plus 15% overhead and profit.</p>
-                    <h2>4. Access & Site Possession</h2>
-                    <p>The Employer shall provide uninterrupted site access. Delays due to land disputes, utility relocation, or third-party interference shall entitle the Contractor to a time extension and cost recovery.</p>
-                    <h2>5. Force Majeure</h2>
-                    <p>Neither party shall be liable for delays caused by Force Majeure events, which include but are not limited to: severe weather extremes, national strikes, government bans, severe fuel shortages, and sudden material import restrictions.</p>
-                `;
+                if (exportLanguage === 'sn') {
+                    content = `
+                        <h1>CIDA SBD-03 - ගිවිසුම</h1>
+                        <p><strong>දිනය:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>සේව්‍යයා:</strong> ${project.client || 'සේවාදායකයා'}</p>
+                        <p><strong>කොන්ත්‍රාත්කරු:</strong> SSD CONSTRUCTIONS</p>
+                        <p>මෙම ගිවිසුම Electronic Transactions Act No. 19 of 2006 යටතේ ඩිජිටල් ලෙස ක්‍රියාත්මක කෙරේ.</p>
+                        <h2>1. ලේඛන ප්‍රමුඛතාව</h2>
+                        <ol><li>පිළිගැනීමේ ලිපිය</li><li>ගිවිසුම</li><li>MOU</li><li>BOQ</li><li>ගිවිසුම් කොන්දේසි</li></ol>
+                        <h2>2. ගිවිසුම් මුදල</h2>
+                        <p>LKR <strong>${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></p>
+                        <h2>3. ප්‍රති සීමා සහ ස්ථාන</h2>
+                        <p>BOQ ට ප්‍රතිවිරුද්ධ වෙනස් කිරීම් ලිඛිත Variation Order නොමැතිව ගෙවනු නොලැබේ.</p>
+                        <h2>4. Force Majeure</h2>
+                        <p>ස්වාභාවික ව්‍යසන, රාජ්‍ය තහනම් හෝ ජාතික වැඩ් නබ් හේතු කිරීමෙන් ප්‍රමාද සඳහා කිසිම පාර්ශවය වගකිව නොයුතුය.</p>
+                    `;
+                } else if (exportLanguage === 'ta') {
+                    content = `
+                        <h1>CIDA SBD-03 - ஒப்பந்தம்</h1>
+                        <p><strong>தேதி:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>முதலாளி:</strong> ${project.client || 'வாடிக்கையாளர்'}</p>
+                        <p><strong>ஒப்பந்ததாரர்:</strong> SSD CONSTRUCTIONS</p>
+                        <p>இந்த ஒப்பந்தம் Electronic Transactions Act No. 19 of 2006 கீழ் டிஜிட்டல் முறையில் நிறைவேற்றப்படுகிறது.</p>
+                        <h2>1. ஆவண முன்னுரிமை</h2>
+                        <ol><li>ஏற்பு கடிதம்</li><li>ஒப்பந்தம்</li><li>MOU</li><li>BOQ</li><li>ஒப்பந்த நிபந்தனைகள்</li></ol>
+                        <h2>2. ஒப்பந்த மதிப்பு</h2>
+                        <p>LKR <strong>${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></p>
+                        <h2>3. வரம்பு மற்றும் மாறுபாடுகள்</h2>
+                        <p>BOQ க்கு வெளியே எந்த வேலையும் எழுத்துப்பூர்வ Variation Order இல்லாமல் செலுத்தப்படாது.</p>
+                        <h2>4. Force Majeure</h2>
+                        <p>இயற்கை பேரிடர், அரசு தடைகள் காரணமான தாமதங்களுக்கு எந்த தரப்பும் பொறுப்பாகாது.</p>
+                    `;
+                } else {
+                    content = `
+                        <h1>CONTRACT AGREEMENT (SBD-03)</h1>
+                        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>Parties:</strong></p>
+                        <p>This Contract Agreement is made between <strong>${project.client || 'Client Name'}</strong>${project.location ? `, with project location at ${project.location},` : ''} (hereinafter called "the Employer") and <strong>SSD CONSTRUCTIONS</strong> (hereinafter called "the Contractor").</p>
+                        <h2>1. Priority of Documents</h2>
+                        <ol><li>Letter of Acceptance</li><li>This Contract Agreement</li><li>MOU (if any)</li><li>Accepted BOQ</li><li>Conditions of Contract</li></ol>
+                        <h2>2. Formal Agreement</h2>
+                        <p>For the consideration of <strong>LKR ${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>, the Contractor agrees to execute and complete the Works in conformity with the Contract.</p>
+                        <h2>3. Scope & Variations</h2>
+                        <p>Any work outside the Accepted BOQ requires a written Variation Order. Pricing for new items shall be determined by fair market rate plus 15% overhead and profit.</p>
+                        <h2>4. Force Majeure</h2>
+                        <p>Neither party shall be liable for delays caused by severe weather, national strikes, government bans, or sudden material import restrictions.</p>
+                    `;
+                }
             } else if (clientSubType === 'MOU') {
+                const mouTitle = exportLanguage === 'sn' ? 'අවබෝධතා ගිවිසුම (MOU)' : exportLanguage === 'ta' ? 'புரிந்துணர்வு குறிப்பாணை (MOU)' : 'MEMORANDUM OF UNDERSTANDING';
+                const mouDateLabel = exportLanguage === 'sn' ? 'දිනය' : exportLanguage === 'ta' ? 'தேதி' : 'Date';
+                const mouProjectLabel = exportLanguage === 'sn' ? 'ව්‍යාපෘතිය' : exportLanguage === 'ta' ? 'திட்டம்' : 'Project';
+                const mouClausesLabel = exportLanguage === 'sn' ? 'විශේෂ වගන්ති සහ අනුෂාව ගිවිසුම්' : exportLanguage === 'ta' ? 'சிறப்பு ஷரத்துகள் மற்றும் பக்க ஒப்பந்தங்கள்' : 'Custom Clauses & Side-Agreements';
+                const mouEmptyMsg = exportLanguage === 'sn' ? '<em>අදාළ කිරීමේ වගන්ති නොමැත. පහත පෙළ කොටුව භාවිතය.</em>' : exportLanguage === 'ta' ? '<em>இன்னும் ஷரத்துகள் இல்லை. கீழே உள்ள உரை பெட்டியைப் பயன்படுத்தவும்.</em>' : '<em>No custom clauses entered yet. Use the text box to draft conditions.</em>';
                 content = `
-                    <h1>MEMORANDUM OF UNDERSTANDING</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Project:</strong> ${project.name}</p>
-                    <h2>Custom Clauses & Side-Agreements</h2>
-                    <div style="white-space: pre-wrap; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-family: monospace;">${mouText || '<em>No custom clauses entered yet. Use the text box to draft conditions.</em>'}</div>
+                    <h1>${mouTitle}</h1>
+                    <p><strong>${mouDateLabel}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>${mouProjectLabel}:</strong> ${project.name}</p>
+                    <h2>${mouClausesLabel}</h2>
+                    <div style="white-space: pre-wrap; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-family: monospace;">${mouText || mouEmptyMsg}</div>
                 `;
             } else if (clientSubType === 'AcceptedBOQ') {
+                const boqTitle = exportLanguage === 'sn' ? 'අනුමත ප්‍රමාණ ගිණුම (BOQ)' : exportLanguage === 'ta' ? 'ஏற்றுக்கொள்ளப்பட்ட அளவீடுகளின் பட்டியல் (BOQ)' : 'ACCEPTED BILL OF QUANTITIES (BOQ)';
+                const boqMeasureNote = exportLanguage === 'sn' ? 'SLS 573:1982 ප්‍රමිතිය යොමුව' : exportLanguage === 'ta' ? 'SLS 573:1982 அளவீட்டு தர குறிப்பு' : 'Reference to SLS 573:1982 Standard Method of Measurement';
+                const boqRatesHead = exportLanguage === 'sn' ? '1. ගාස්තු පිළිගැනීම' : exportLanguage === 'ta' ? '1. விலைகளை ஏற்றுக்கொள்ளுதல்' : '1. Acceptance of Rates';
+                const boqRatesBody = exportLanguage === 'sn' ? 'මෙම BOQ හි ගාස්තු සහ ප්‍රමාණ සියලුම අතුරු ගෙවීම් සඳහා රෙකමදාරු ලෙස අගුලු දමා ඇත.' : exportLanguage === 'ta' ? 'இந்த BOQ இல் உள்ள விலைகளும் அளவுகளும் அனைத்து இடைக்கால சான்றிதழ்களுக்கான அடிப்படையாக பூட்டப்பட ஏற்றுக்கொள்ளப்படுகின்றன.' : 'The rates and quantities in the final generated BOQ are hereby locked and accepted as the baseline for all Interim Payment Certificates.';
+                const boqClause2 = exportLanguage === 'sn' ? '2. මිනුම් ගෙවීම් ක්‍රමය' : exportLanguage === 'ta' ? '2. அளவீடு மற்றும் கட்டண முறை' : '2. Measure & Pay Clause';
+                const boqClause2Body = exportLanguage === 'sn' ? 'මෙය Measure and Pay ගිවිසුමකි. SSD ඉංජිනේරුවරයා දිනපතා ක්ෂේත්‍ර ප්‍රමාණ සත්‍යාපනය කරනු ලැබේ.' : exportLanguage === 'ta' ? 'இது Measure and Pay ஒப்பந்தம். SSD பொறியாளரால் தினசரி அளவீடுகள் சரிபார்க்கப்படும்.' : 'This is a Measure and Pay contract. Quantities in the BOQ are estimates; final payment is based on actual on-site measurements verified by SSD Engineers.';
                 content = `
-                    <h1>ACCEPTED BILL OF QUANTITIES (BOQ)</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Project:</strong> ${project.name}</p>
-                    <p><em>Reference to SLS 573:1982 Standard Method of Measurement</em></p>
-                    <h2>1. Acceptance of Rates</h2>
-                    <p>The rates and quantities specified in the final generated BOQ for this project are hereby locked and accepted as the baseline for all Interim Payment Certificates.</p>
-                    <h1>${exportLanguage === 'en' ? 'CONTRACT AGREEMENT' : exportLanguage === 'sn' ? 'කොන්ත්‍රාත් ගිවිසුම' : 'ஒப்பந்த ஒப்பந்தம்'}</h1>
-                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>${l.parties}:</strong> ${project.client || 'Client'} & SSD CONSTRUCTIONS</p>
-                    <p>${clean(`This Agreement is made between the Employer and SSD CONSTRUCTIONS regarding the project ${project.name}.`)}</p>
-                    <h2>Conditions</h2>
-                    <p>${l.rules.arbitration}</p>
-                    <p>${l.rules.confidentiality}</p>
+                    <h1>${boqTitle}</h1>
+                    <p><strong>${exportLanguage === 'sn' ? 'දිනය' : exportLanguage === 'ta' ? 'தேதி' : 'Date'}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>${exportLanguage === 'sn' ? 'ව්‍යාපෘතිය' : exportLanguage === 'ta' ? 'திட்டம்' : 'Project'}:</strong> ${project.name}</p>
+                    <p><em>${boqMeasureNote}</em></p>
+                    <h2>${boqRatesHead}</h2>
+                    <p>${boqRatesBody}</p>
+                    <h2>${boqClause2}</h2>
+                    <p>${boqClause2Body}</p>
                 `;
             } else if (clientSubType === 'ConditionsOfContract') {
                 content = `
@@ -396,121 +461,139 @@ export default function AgreementGenerator() {
                 content = `<h1>${title}</h1><p>${l.date}: ${new Date().toLocaleDateString()}</p><p>Content generation for this subtype is in progress for ${exportLanguage}.</p>`;
             }
         }
-        else if (type === 'Worker' || type === 'Management') {
+        else if (type === 'Worker') {
             const worker = workers.find(w => String(w.id) === String(entityId));
             const dailyRate = Number(worker.dailyRate || 0);
             const monthlyEst = dailyRate * 26;
-            const isBelowMin = monthlyEst > 0 && monthlyEst < 30000;
-
-            if (isBelowMin) blockReason = "Statutory Wage Violation (<30,000 LKR)";
-
-            // Role translation
+            if (monthlyEst > 0 && monthlyEst < 30000) blockReason = 'Statutory Wage Violation (<30,000 LKR)';
             const roleKey = (worker.role || '').toLowerCase();
             const translatedRole = l.roles[roleKey] || worker.role || l.worker;
-
+            const d = exportLanguage === 'sn' ? 'දිනය' : exportLanguage === 'ta' ? 'தேதி' : 'Date';
+            const workerTitle = exportLanguage === 'sn' ? 'සේවා ගිවිසුම' : exportLanguage === 'ta' ? 'வேலை ஒப்பந்தம்' : 'EMPLOYMENT AGREEMENT';
+            const andWord = exportLanguage === 'sn' ? 'සහ' : exportLanguage === 'ta' ? 'மற்றும்' : 'and';
+            const perDay = exportLanguage === 'sn' ? 'දිනකට' : exportLanguage === 'ta' ? 'ஒரு நாளைக்கு' : 'per day';
             content = `
-                <h1>${title.toUpperCase()}</h1>
-                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>${clean(`${exportLanguage === 'en' ? 'Agreement made between' : exportLanguage === 'sn' ? 'මෙම ගිවිසුම' : 'இந்த ஒப்பந்தம்'} SSD CONSTRUCTIONS (${l.employer}) ${exportLanguage === 'en' ? 'and' : exportLanguage === 'sn' ? 'සහ' : 'மற்றும்'} ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '_______'} (${l.employee}).`)}</p>
-                
+                <h1>${workerTitle}</h1>
+                <p><strong>${d}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>${exportLanguage === 'en' ? `Agreement between SSD CONSTRUCTIONS (${l.employer}) and ${worker.fullName || worker.name}, NIC: ${worker.nic || '___'} (${l.employee}).` : exportLanguage === 'sn' ? `SSD CONSTRUCTIONS (${l.employer}) ${andWord} ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '___'} (${l.employee}).` : `SSD CONSTRUCTIONS (${l.employer}) ${andWord} ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '___'} (${l.employee}).`}</p>
                 <h2>1. ${l.position}</h2>
-                <p>${clean(`${exportLanguage === 'en' ? 'The Employee is hired for the position of' : exportLanguage === 'sn' ? 'සේවකයා බඳවා ගනු ලබන්නේ' : 'ஊழியர் இந்த பதவிக்கு பணியமர்த்தப்படுகிறார்:'} <strong>${translatedRole}</strong>.`)}</p>
-
+                <p><strong>${translatedRole}</strong></p>
                 <h2>2. ${l.remuneration}</h2>
-                <p>LKR ${dailyRate.toLocaleString()} ${exportLanguage === 'en' ? 'per day' : exportLanguage === 'sn' ? 'දිනකට' : 'ஒரு நாளைக்கு'}.</p>
+                <p>LKR ${dailyRate.toLocaleString()} ${perDay}</p>
                 <p>${l.rules.insurance}</p>
-
                 <h2>3. ${l.statutory}</h2>
-                <ul><li>EPF: 12% Employer, 8% Employee</li><li>ETF: 3% Employer</li></ul>
-
-                <h2>4. ${l.conduct}</h2>
+                <ul><li>EPF: 12% ${exportLanguage === 'en' ? 'Employer' : exportLanguage === 'sn' ? 'සේව්‍යයා' : 'முதலாளி'}, 8% ${exportLanguage === 'en' ? 'Employee' : exportLanguage === 'sn' ? 'සේවකයා' : 'ஊழியர்'}</li><li>ETF: 3% ${exportLanguage === 'en' ? 'Employer' : exportLanguage === 'sn' ? 'සේව්‍යයා' : 'முதலாளி'}</li></ul>
+                <h2>4. ${exportLanguage === 'sn' ? 'සේවා කාල සීමා' : exportLanguage === 'ta' ? 'வேலை நேரம்' : 'Working Hours'}</h2>
+                <p>${exportLanguage === 'en' ? '45-hour work week. Overtime (OT) at 1.5x the normal hourly rate.' : exportLanguage === 'sn' ? 'සතිය 45 පැය. OT: සාමාන්‍ය පැය ගාස්තුවෙන් 1.5x.' : 'வாராந்திர 45 மணி நேரம். OT: சாதாரண மணி வீதத்தில் 1.5 மடங்கு.'}</p>
+                <h2>5. ${l.conduct}</h2>
                 <ul>
                     <li>${l.rules.safety}</li>
                     ${(selectedRuleSet === 'Strict' || selectedRuleSet === 'Comprehensive') ? `<li>${l.rules.biometric}</li><li>${l.rules.logs}</li>` : ''}
                     ${selectedRuleSet === 'Comprehensive' ? `<li>${l.rules.arbitration}</li><li>${l.rules.confidentiality}</li>` : ''}
                 </ul>
-
-                <h2>5. ${l.probation}</h2>
-                <p>${exportLanguage === 'en' ? '3 Months probation apply.' : exportLanguage === 'sn' ? 'මාස 3 ක පරිවාස කාලයක් අදාළ වේ.' : '3 மாத ஆய்வுக் காலம் பொருந்தும்.'}</p>
+                <h2>6. ${l.probation}</h2>
+                <p>${exportLanguage === 'en' ? '3–6 month probation. During probation: 1 week notice. After probation: 1–2 months notice based on length of service.' : exportLanguage === 'sn' ? 'මාස 3–6 පරිවාස කාලය. පරිවාස කාලය: සතිය 1 දැනුම්දීම. ස්ථිර: සේවා කාලය අනුව මාස 1-2.' : 'ஆய்வுக் காலம் 3–6 மாதம். ஆய்வுக் காலம்: 1 வாரம் அறிவிப்பு. நிரந்தரம்: சேவை நீளத்தைப் பொறுத்து 1–2 மாதம்.'}</p>
+            `;
+        }
+        else if (type === 'Management') {
+            const worker = workers.find(w => String(w.id) === String(entityId));
+            const dailyRate = Number(worker.dailyRate || 0);
+            const monthlyEst = dailyRate * 26;
+            if (monthlyEst > 0 && monthlyEst < 30000) blockReason = 'Statutory Wage Violation (<30,000 LKR)';
+            const roleKey = (worker.role || '').toLowerCase();
+            const translatedRole = l.roles[roleKey] || worker.role || l.management;
+            const mgmtTitle = exportLanguage === 'sn' ? 'කළමනාකරණ ගිවිසුම (Supervisor/Engineer)' : exportLanguage === 'ta' ? 'மேலாண்மை ஒப்பந்தம் (கண்காணிப்பாளர்/பொறியாளர்)' : 'MANAGEMENT EMPLOYMENT AGREEMENT (Supervisor / Engineer)';
+            content = `
+                <h1>${mgmtTitle}</h1>
+                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p>${exportLanguage === 'en' ? `This Agreement is made between SSD CONSTRUCTIONS and ${worker.fullName || worker.name}, NIC: ${worker.nic || '___'}.` : exportLanguage === 'sn' ? `SSD CONSTRUCTIONS සහ ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '___'} අතර ගිවිසුම.` : `SSD CONSTRUCTIONS மற்றும் ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '___'} இடையே ஒப்பந்தம்.`}</p>
+                <h2>1. ${l.position}</h2>
+                <p><strong>${translatedRole}</strong></p>
+                <h2>2. ${l.remuneration}</h2>
+                <p>LKR ${dailyRate.toLocaleString()} ${exportLanguage === 'sn' ? 'දිනකට' : exportLanguage === 'ta' ? 'நாளுக்கு' : 'per day'}</p>
+                <h2>3. ${l.statutory}</h2>
+                <ul><li>EPF 12% + 8% | ETF 3%</li></ul>
+                <h2>4. ${exportLanguage === 'sn' ? 'අඛණ්ඩතාව සහ වාර්තා කිරීම' : exportLanguage === 'ta' ? 'நேர்மை மற்றும் அறிக்கையிடல்' : 'Integrity & Reporting Duties'}</h2>
+                <ul>
+                    <li>${l.rules.biometric}</li>
+                    <li>${l.rules.logs}</li>
+                    <li>${exportLanguage === 'en' ? 'Material Stewardship: The Supervisor/Engineer must update the Material Inventory in real-time to prevent quality fraud.' : exportLanguage === 'sn' ? 'ද්‍රව්‍ය භාරකාරත්වය: ගුණාත්මකභාවය වංචාව වැළැක්වීමට ද්‍රව්‍ය ඉන්වෙන්ටරිය යාවත්කාලීන කළ යුතුය.' : 'பொருள் மேலாண்மை: தர மோசடியை தடுக்க பொருள் சரக்கை நிகழ்நேரத்தில் புதுப்பிக்க வேண்டும்.'}</li>
+                    ${(selectedRuleSet === 'Strict' || selectedRuleSet === 'Comprehensive') ? `<li>${l.rules.safety}</li>` : ''}
+                    ${selectedRuleSet === 'Comprehensive' ? `<li>${l.rules.arbitration}</li><li>${l.rules.confidentiality}</li>` : ''}
+                </ul>
+                <h2>5. ${exportLanguage === 'sn' ? 'ඉලක්ක සහ KPI' : exportLanguage === 'ta' ? 'இலக்குகள் மற்றும் KPI' : 'Goals & KPI Tracking'}</h2>
+                <p>${exportLanguage === 'en' ? 'Monthly goals are linked to Labour Efficiency Variance KPIs (budgeted vs biometric-verified actual hours).' : exportLanguage === 'sn' ? 'මාසික ඉලක්ක Labour Efficiency Variance KPI සමඟ සම්බන්ධ කෙරේ.' : 'மாதாந்திர இலக்குகள் Labour Efficiency Variance KPI யுடன் இணைக்கப்படுகின்றன.'}</p>
+                <h2>6. ${l.probation}</h2>
+                <p>${exportLanguage === 'en' ? '3–6 months probation. Notice: 1 week (probation), 1–2 months (permanent).' : exportLanguage === 'sn' ? 'මාස 3–6 පරිවාස. දැනුම්දීම: සතිය 1 (පරිවාස), මාස 1-2 (ස්ථිර).' : 'ஆய்வுக் காலம் 3–6 மாதம். அறிவிப்பு: 1 வாரம் (ஆய்வு), 1–2 மாதம் (நிரந்தரம்).'}</p>
             `;
         }
         else if (type === 'Accountant') {
             const worker = workers.find(w => String(w.id) === String(entityId));
+            const accTitle = exportLanguage === 'sn' ? 'මූල්‍ය අනුකූලතාවය සහ ගණකාධිකරණ ගිවිසුම' : exportLanguage === 'ta' ? 'நிதி இணக்கம் மற்றும் கணக்கியல் ஒப்பந்தம்' : 'FINANCIAL COMPLIANCE & ACCOUNTING AGREEMENT';
+            const scope1 = exportLanguage === 'sn' ? '1. මූල්‍ය වගකීම් පරාසය' : exportLanguage === 'ta' ? '1. நிதியியல் பொறுப்பின் நோக்கம்' : '1. Scope of Financial Responsibility';
+            const scope1body = exportLanguage === 'sn' ? 'ගණකාධිකාරීවරයා Audit Rail, CIGFL (15M+), සහ DSO කළමනාකරණය කිරීමට වගකිව යුතුය.' : exportLanguage === 'ta' ? 'Audit Rail, CIGFL (15M+), DSO ஆகியவற்றை நிர்வகிக்க கணக்காளர் பொறுப்பு.' : 'The Accountant shall maintain the <strong>Audit Rail</strong>, verify <strong>CIGFL</strong> compliance (projects >Rs.15M), manage <strong>DSO</strong>, and reconcile biometric attendance against payroll.';
+            const scope2 = exportLanguage === 'sn' ? '2. රහස්‍යභාවය සහ ත්‍ාටකත්වය' : exportLanguage === 'ta' ? '2. இரகசியத்தன்மை மற்றும் நேர்மை' : '2. Confidentiality & Integrity (NDA)';
+            const scope2body = exportLanguage === 'sn' ? 'ලාභ ආන්තික, BOQ ලකුණු සහ බැංකු තොරතුරු NDA ගරු කළ යුතුය.' : exportLanguage === 'ta' ? 'இலாப வரம்புகள், BOQ குறிப்புகள், வங்கி விவரங்கள் NDA படி ரகசியமாக வைக்கப்பட வேண்டும்.' : 'Strict adherence to NDA regarding profit margins, BOQ markups, and banking details. Any breach constitutes grounds for immediate dismissal.';
+            const scope3 = exportLanguage === 'sn' ? '3. ගෙවීම් කළමනාකරණය' : exportLanguage === 'ta' ? '3. கட்டண நிர்வாகம்' : '3. Payment & Reporting';
+            const scope3body = exportLanguage === 'sn' ? 'LankaPay JustPay/SLIPS හරහා ගෙවීම්. APIT (Rs.150,000+ ඉක්මවූ) සහ EPF/ETF නිවැරදිව ගෙවිය යුතුය.' : exportLanguage === 'ta' ? 'LankaPay JustPay/SLIPS மூலம் கொடுப்பனவுகள். APIT (Rs.150,000+) மற்றும் EPF/ETF சரியாக செலுத்தப்பட வேண்டும்.' : 'Payments via LankaPay JustPay/SLIPS. Manage APIT for employees earning >Rs.150,000/month. Weekly budget vs actual reports required.';
             content = `
-                <h1>FINANCIAL COMPLIANCE & ACCOUNTING AGREEMENT</h1>
+                <h1>${accTitle}</h1>
                 <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
                 <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS & ${worker.fullName || worker.name}</p>
-                
-                <h2>1. Scope of Financial Responsibility</h2>
-                <p>The Accountant shall be responsible for maintaining the <strong>Audit Rail</strong>, verifying <strong>CIGFL</strong> compliance for projects exceeding 15M, and managing the <strong>Debt Settlement Orders (DSO)</strong>.</p>
-                
-                <h2>2. Confidentiality & Integrity</h2>
-                <p>Strict adherence to the <strong>Non-Disclosure Agreement (NDA)</strong> regarding profit margins, BOQ markups, and banking details is mandatory.</p>
-                
-                <h2>3. Reporting</h2>
-                <p>The Accountant must provide weekly budget vs. actual reports and verify all material supplier invoices before payment release.</p>
-                
-                <h2>4. Statutory Compliance</h2>
-                <p>Ensuring timely payment of PAYE tax, EPF/ETF, and VAT returns (if applicable) is a core requirement of this role.</p>
+                <h2>${scope1}</h2><p>${scope1body}</p>
+                <h2>${scope2}</h2><p>${scope2body}</p>
+                <h2>${scope3}</h2><p>${scope3body}</p>
+                ${(selectedRuleSet === 'Strict' || selectedRuleSet === 'Comprehensive') ? `
+                <h2>${exportLanguage === 'sn' ? '4. DSO නිරීක්ෂණය' : exportLanguage === 'ta' ? '4. DSO கண்காணிப்பு' : '4. DSO & Liquidity Monitoring'}</h2>
+                <p>${exportLanguage === 'en' ? 'Monitor Days Sales Outstanding (DSO) to ensure certified work is collected within 30 days. Alert management if receivable balance exceeds 90 days.' : exportLanguage === 'sn' ? 'DSO (Days Sales Outstanding) සතිය 30 ඇතුළත එකතු කළ යුතු අතර, ගෙවිය යුතු ශේෂය දින 90 ඉක්මවුණු විට කළමනාකාරිත්වය දැනුම්දිය යුතුය.' : 'DSO 30 நாட்களுக்குள் வசூலிக்கப்பட வேண்டும். 90 நாட்களுக்கும் மேல் நிலுவையிருந்தால் நிர்வாகத்தை எச்சரிக்க வேண்டும்.'}</p>` : ''}
+                ${selectedRuleSet === 'Comprehensive' ? `
+                <h2>${exportLanguage === 'sn' ? '5. ද්‍රවශීලතා අනුපාත' : exportLanguage === 'ta' ? '5. திரவ விகிதங்கள்' : '5. Liquidity Ratio Compliance'}</h2>
+                <p>${exportLanguage === 'en' ? 'Monthly reports on Current Ratio (>1.1) and Quick Ratio (>1.0). Prevent insolvency despite economic volatility.' : exportLanguage === 'sn' ? 'Current Ratio (>1.1) සහ Quick Ratio (>1.0) මාසික වාර්තා ඉදිරිපත් කිරීම.' : 'Current Ratio (>1.1) மற்றும் Quick Ratio (>1.0) மாதாந்திர அறிக்கைகள் தயாரிக்க வேண்டும்.'}
+                </p>
+                <h2>${exportLanguage === 'sn' ? '6. ආරවුල් නිරාකරණය' : exportLanguage === 'ta' ? '6. சர்ச்சை தீர்வு' : '6. Dispute Resolution'}</h2>
+                <p>${l.rules.arbitration}</p>` : ''}
             `;
-            // Localize accountant content if not English
-            if (exportLanguage === 'sn') {
-                content = `
-                    <h1>මූල්‍ය අනුකූලතාවය සහ ගණකාධිකරණ ගිවිසුම</h1>
-                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS සහ ${worker.fullName || worker.name}</p>
-                    <h2>1. මූල්‍ය වගකීම් පරාසය</h2>
-                    <p>ගණකාධිකාරීවරයා විගණන කටයුතු (Audit Rail), රුපියල් මිලියන 15 ඉක්මවන ව්‍යාපෘති සඳහා CIGFL අනුකූලතාවය සහ ණය පියවීමේ නියෝග (DSO) කළමනාකරණය කිරීම සඳහා වගකිව යුතුය.</p>
-                    <h2>2. රහස්‍යභාවය සහ අඛණ්ඩතාව</h2>
-                    <p>ලාභ ආන්තික, BOQ ලකුණු කිරීම් සහ බැංකු තොරතුරු සම්බන්ධයෙන් රහස්‍යභාවය පිළිබඳ ගිවිසුම (NDA) දැඩි ලෙස අනුගමනය කිරීම අනිවාර්ය වේ.</p>
-                    <h2>3. වාර්තා කිරීම</h2>
-                    <p>ගණකාධිකාරීවරයා සතිපතා අයවැය වාර්තා සැපයිය යුතු අතර ගෙවීමට පෙර සියලුම සැපයුම්කරු ඉන්වොයිසි සත්‍යාපනය කළ යුතුය.</p>
-                `;
-            } else if (exportLanguage === 'ta') {
-                content = `
-                    <h1>நிதி இணக்கம் மற்றும் கணக்கியல் ஒப்பந்தம்</h1>
-                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS மற்றும் ${worker.fullName || worker.name}</p>
-                    <h2>1. நிதியியல் பொறுப்பின் நோக்கம்</h2>
-                    <p>தணிக்கை பாதை (Audit Rail), 15 மில்லியனுக்கும் அதிகமான திட்டங்களுக்கான CIGFL இணக்கம் மற்றும் கடன் தீர்வு உத்தரவுகளை (DSO) நிர்வகிப்பதற்கு கணக்காளர் பொறுப்பாவார்.</p>
-                    <h2>2. இரகசியத்தன்மை மற்றும் நேர்மை</h2>
-                    <p>இலாப வரம்புகள், BOQ குறிப்புகள் மற்றும் வங்கி விவரங்கள் தொடர்பான இரகசிய ஒப்பந்தத்தை (NDA) கண்டிப்பாக பின்பற்றுவது கட்டாயமாகும்.</p>
-                    <h2>3. அறிக்கை செய்தல்</h2>
-                    <p>கணக்காளர் வாராந்திர பட்ஜெட் அறிக்கைகளை வழங்க வேண்டும் மற்றும் பணம் செலுத்துவதற்கு முன் அனைத்து விநியோகஸ்தர் விலைப்பட்டியல்களையும் சரிபார்க்க வேண்டும்.</p>
-                `;
-            }
         }
-        else if (type === 'Supplier' || type === 'Subcontractor') {
+        else if (type === 'Supplier') {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
+            const supplierTitle = exportLanguage === 'sn' ? 'සැපයුම්කරු ගිවිසුම' : exportLanguage === 'ta' ? 'வழங்குநர் ஒப்பந்தம்' : 'SUPPLIER AGREEMENT';
+            const s1 = exportLanguage === 'sn' ? '1. නිෂ්පාදන ගුණාත්මකභාවය' : exportLanguage === 'ta' ? '1. பொருள் தரம்' : '1. Material Quality Standards';
+            const s1b = exportLanguage === 'sn' ? 'සිමෙන්ති: SLS 107, වානේ: SLS 375 ප්‍රමිතීන්ට සියලු ද්‍රව්‍ය සම්පූර්ණ කළ යුතුය. SSD ඕනෑම ප්‍රමාණ-නොගැලපෙන ද්‍රව්‍ය සැපයුම්කරුගේ වැය ද සහිතව ප්‍රතික්ෂේප කිරීමට අයිතිය ඇත.' : exportLanguage === 'ta' ? 'சிமென்ட்: SLS 107, எஃகு: SLS 375. தரமற்ற பொருட்களை SSD நிராகரிக்கும் உரிமை கொண்டது.' : 'All materials must meet Sri Lankan Standards: Cement (SLS 107), Steel (SLS 375). SSD has the right to reject substandard materials at the Supplier\'s expense, including removal costs.';
+            const s2 = exportLanguage === 'sn' ? '2. ගෙවීම් ක්‍රමය' : exportLanguage === 'ta' ? '2. கட்டண முறை' : '2. Payment Terms';
+            const s2b = exportLanguage === 'sn' ? 'ගෙවීම් LankaPay JustPay හෝ SLIPS හරහා ඩිජිටල් ලෙස සිදු කෙරේ. ඩිජිටල් ගිණුම් සෛලය ලෙස ආරාව ලේඛනයෙහි සටහන් වේ.' : exportLanguage === 'ta' ? 'கொடுப்பனவுகள் LankaPay JustPay அல்லது SLIPS மூலம் மட்டுமே செய்யப்படும்.' : 'Payments exclusively via LankaPay JustPay or SLIPS for digital audit trail. No cash payments.';
+            const s3 = exportLanguage === 'sn' ? '3. ගිවිසුම් කොන්දේසි' : exportLanguage === 'ta' ? '3. ஒப்பந்த நிபந்தனைகள்' : '3. General Conditions';
             content = `
-                <h1>${title.toUpperCase()}</h1>
+                <h1>${supplierTitle}</h1>
                 <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>${clean(`SSD CONSTRUCTIONS (${l.client}) ${exportLanguage === 'en' ? 'and' : exportLanguage === 'sn' ? 'සහ' : 'மற்றும்'} ${supplier.name} (${type === 'Supplier' ? l.supplier : l.subcontractor}).`)}</p>
-                <h2>Conditions</h2>
-                <p>${l.rules.arbitration}</p>
-                <p>${l.rules.confidentiality}</p>
+                <p><strong>${exportLanguage === 'sn' ? 'SSD CONSTRUCTIONS සහ' : exportLanguage === 'ta' ? 'SSD CONSTRUCTIONS மற்றும்' : 'Between SSD CONSTRUCTIONS and'} ${supplier.name}</strong></p>
+                <h2>${s1}</h2><p>${s1b}</p>
+                <h2>${s2}</h2><p>${s2b}</p>
+                <h2>${s3}</h2>
+                <ul><li>${l.rules.arbitration}</li><li>${l.rules.confidentiality}</li></ul>
             `;
-            if (exportLanguage === 'sn') {
-                content = `
-                    <h1>${title.toUpperCase()}</h1>
-                    <p><strong>දිනය:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>පාර්ශවයන්:</strong> SSD CONSTRUCTIONS සහ ${supplier.name} (${type === 'Supplier' ? 'සැපයුම්කරු' : 'අනුකොන්ත්‍රාත්කරු'})</p>
-                    <h2>කොන්දේසි</h2>
-                    <p>${l.rules.arbitration}</p>
-                    <p>${l.rules.confidentiality}</p>
-                    <p>අනුමත මිල ගණන් සහ ප්‍රමිතීන්ට අනුව සැපයුම් සිදු කිරීමට සැපයුම්කරු එකඟ වේ.</p>
-                `;
-            } else if (exportLanguage === 'ta') {
-                content = `
-                    <h1>${title.toUpperCase()}</h1>
-                    <p><strong>தேதி:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>தரப்பினர்:</strong> SSD CONSTRUCTIONS மற்றும் ${supplier.name} (${type === 'Supplier' ? 'வழங்குநர்' : 'உள் ஒப்பந்ததாரர்'})</p>
-                    <h2>நிபந்தனைகள்</h2>
-                    <p>${l.rules.arbitration}</p>
-                    <p>${l.rules.confidentiality}</p>
-                    <p>அங்கீகரிக்கப்பட்ட விலை மற்றும் தரத்தின்படி பொருட்களை வழங்க வழங்குநர் ஒப்புக்கொள்கிறார்.</p>
-                `;
-            }
+        }
+        else if (type === 'Subcontractor') {
+            const supplier = suppliers.find(s => String(s.id) === String(entityId));
+            const subTitle = exportLanguage === 'sn' ? 'අනු-කොන්ත්‍රාත් ගිවිසුම (CIDA SBD-03)' : exportLanguage === 'ta' ? 'உட்ஒப்பந்த ஒப்பந்தம் (CIDA SBD-03)' : 'SUBCONTRACT AGREEMENT (CIDA SBD-03)';
+            const sub1 = exportLanguage === 'sn' ? '1. කාර්ය පරාසය' : exportLanguage === 'ta' ? '1. பணி நோக்கம்' : '1. Scope of Externalized Work';
+            const sub1b = exportLanguage === 'sn' ? 'BOQ හි සඳහන් කරන ලද කාර්යයන් (උදා: ජල සැපයුම, විදුලි) SSD ව්‍යාපෘති BOQ ට අනුව සිදු කළ යුතුය.' : exportLanguage === 'ta' ? 'BOQ இல் குறிப்பிட்ட பணிகள் (உ.தா: மின்சாரம், குழாய் வேலை) SSD BOQ படி செய்யப்பட வேண்டும்.' : 'Work items externalized under this contract are defined in the annexed BOQ scope. No work outside this scope will be paid without a written Variation Order.';
+            const sub2 = exportLanguage === 'sn' ? '2. මිනුම් ගෙවීම් ක්‍රමය' : exportLanguage === 'ta' ? '2. அளவீட்டு கட்டண முறை' : '2. Measure & Pay Clause';
+            const sub2b = exportLanguage === 'sn' ? 'ගෙවීම් SSD ඉංජිනේරු දිනපතා සත්‍යාපිත ක්ෂේත්‍ර ප්‍රමාණ ඇසුරෙනි. BOQ ප්‍රශ්නාර්ථ ප්‍රමාණ ඇස්තමේන්තු වේ.' : exportLanguage === 'ta' ? 'கொடுப்பனவுகள் SSD பொறியாளரால் நாளாந்தம் சரிபார்க்கப்பட்ட அளவீடுகளை அடிப்படையாக கொண்டது.' : 'Payment is based on actual on-site measurements verified daily by an SSD Engineer. BOQ quantities are estimates only.';
+            const sub3 = exportLanguage === 'sn' ? '3. EPF/ETF ඒකාකාර වගකීම' : exportLanguage === 'ta' ? '3. EPF/ETF கூட்டு பொறுப்பு' : '3. Joint Liability – EPF/ETF';
+            const sub3b = exportLanguage === 'sn' ? 'Subcontractor සිය කාර්ය මණ්ඩලයේ EPF/ETF සඳහා සම්පූර්ණ වගකීම දරනු ලැබේ. ව්‍යාර්ථ නම් SSD ඒකාකාරව වගකිවිය හැකි බැවින් ගිවිසුම කඩ කරනු ලැබේ.' : exportLanguage === 'ta' ? 'உட்ஒப்பந்ததாரர் தம் தொழிலாளர்களின் EPF/ETF க்கு பொறுப்பு. தவறினால் SSD கூட்டு பொறுப்பாகலாம்.' : 'The Subcontractor is solely responsible for their workers\' EPF (12%+8%) and ETF (3%). Failure constitutes a contract breach; SSD may be held jointly liable under Sri Lankan law.';
+            const sub4 = exportLanguage === 'sn' ? '4. CIGFL අනුකූලතාව' : exportLanguage === 'ta' ? '4. CIGFL இணக்கம்' : '4. CIGFL Compliance';
+            const sub4b = exportLanguage === 'sn' ? 'ව්‍යාපෘති අගය Rs. 15 මිලියන ඉක්මවූ විට, නිශ්චිත Subcontract අගය CIGFL ගාස්තු (0.25%-1%) ලේඛනය කළ යුතුය.' : exportLanguage === 'ta' ? 'திட்ட மதிப்பு Rs. 15 மில்லியனுக்கும் மேல் இருந்தால், CIGFL கடமை (0.25%–1%) நீடிக்கும்.' : 'If the main project exceeds Rs. 15M, the Subcontractor is also liable for CIGFL levy (0.25%–1%) on their subcontract value.';
+            content = `
+                <h1>${subTitle}</h1>
+                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p><strong>${exportLanguage === 'sn' ? 'SSD CONSTRUCTIONS සහ' : exportLanguage === 'ta' ? 'SSD CONSTRUCTIONS மற்றும்' : 'Between SSD CONSTRUCTIONS and'} ${supplier.name}</strong></p>
+                <h2>${sub1}</h2><p>${sub1b}</p>
+                <h2>${sub2}</h2><p>${sub2b}</p>
+                <h2>${sub3}</h2><p>${sub3b}</p>
+                <h2>${sub4}</h2><p>${sub4b}</p>
+                <h2>${exportLanguage === 'sn' ? '5. ආරවුල් නිරාකරණය' : exportLanguage === 'ta' ? '5. சர்ச்சை தீர்வு' : '5. Dispute Resolution'}</h2>
+                <ul><li>${l.rules.arbitration}</li><li>${l.rules.confidentiality}</li></ul>
+            `;
         }
 
         const newDoc = {
