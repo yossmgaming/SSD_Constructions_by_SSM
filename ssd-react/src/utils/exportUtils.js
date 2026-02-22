@@ -240,10 +240,17 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
             for (const line of lines) {
                 if (y > pageHeight - 35) {
                     // Add Page Footer
+                    const pageWidth = doc.internal.pageSize.getWidth();
                     doc.setFontSize(8);
                     doc.setTextColor(100);
                     doc.setFont('helvetica', 'normal');
-                    doc.text(COMPANY.footerReg, marginX, pageHeight - 15);
+                    doc.text(COMPANY.footerReg, 15, pageHeight - 15);
+
+                    const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
+                    doc.text(`Page ${pageNumber} of {total_pages_count_tag}`, (pageWidth / 2) + 20, pageHeight - 15, { align: 'center' });
+
+                    const emailWidth = doc.getTextWidth(COMPANY.email);
+                    doc.text(COMPANY.email, pageWidth - emailWidth - 15, pageHeight - 15);
 
                     doc.addPage();
                     y = 25; // 25mm top margin on new page
@@ -283,9 +290,22 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
         }
 
         // Final footer
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const finalPageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text(COMPANY.footerReg, 15, doc.internal.pageSize.getHeight() - 15);
+        doc.setFont('helvetica', 'normal');
+        doc.text(COMPANY.footerReg, 15, finalPageHeight - 15);
+
+        const finalPageNumber = doc.internal.getCurrentPageInfo().pageNumber;
+        doc.text(`Page ${finalPageNumber} of {total_pages_count_tag}`, (pageWidth / 2) + 20, finalPageHeight - 15, { align: 'center' });
+
+        const finalEmailWidth = doc.getTextWidth(COMPANY.email);
+        doc.text(COMPANY.email, pageWidth - finalEmailWidth - 15, finalPageHeight - 15);
+
+        if (typeof doc.putTotalPages === 'function') {
+            doc.putTotalPages('{total_pages_count_tag}');
+        }
 
         doc.save(`${fileName}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e) {
@@ -402,7 +422,55 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
             footers: {
                 default: new Footer({
                     children: [
-                        new Paragraph({ children: [new TextRun({ text: COMPANY.footerReg, color: "888888", size: 14, font: "Times New Roman" })], alignment: AlignmentType.LEFT }),
+                        new Paragraph({ text: "" }), // Space to footer
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: {
+                                top: { style: BorderStyle.SINGLE, size: 1, color: 'BBBBBB' },
+                                bottom: { style: BorderStyle.NONE },
+                                left: { style: BorderStyle.NONE },
+                                right: { style: BorderStyle.NONE },
+                                insideHorizontal: { style: BorderStyle.NONE },
+                                insideVertical: { style: BorderStyle.NONE }
+                            },
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            width: { size: 33, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({
+                                                    children: [new TextRun({ text: COMPANY.footerReg, size: 14, font: "Times New Roman" })],
+                                                }),
+                                            ],
+                                        }),
+                                        new TableCell({
+                                            width: { size: 34, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({
+                                                    alignment: AlignmentType.CENTER,
+                                                    children: [
+                                                        new TextRun({ text: "Page ", size: 14, font: "Times New Roman" }),
+                                                        new TextRun({ children: [PageNumber.CURRENT], size: 14, font: "Times New Roman" }),
+                                                        new TextRun({ text: " of ", size: 14, font: "Times New Roman" }),
+                                                        new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, font: "Times New Roman" }),
+                                                    ],
+                                                }),
+                                            ],
+                                        }),
+                                        new TableCell({
+                                            width: { size: 33, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({
+                                                    alignment: AlignmentType.RIGHT,
+                                                    children: [new TextRun({ text: COMPANY.email, size: 14, font: "Times New Roman" })],
+                                                }),
+                                            ],
+                                        }),
+                                    ],
+                                }),
+                            ],
+                        }),
                     ],
                 }),
             },
