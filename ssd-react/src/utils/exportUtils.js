@@ -293,7 +293,7 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
     const decodedContent = decodeHTML(htmlContent);
     // Parse HTML into docx Paragraphs with native formatting
     const blocks = decodedContent
-        .split(/(<\/?h[1-2]>|<\/?p>|<\/?ul>|<\/?li>)/gi)
+        .split(/(<\/?h[1-2]>|<\/?p>|<\/?ul>|<\/?ol>|<\/?li>|<\/?div>|<br\s*\/?>)/gi)
         .filter(b => b && b.trim() !== '');
 
     const paragraphs = [];
@@ -304,12 +304,13 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
         const tag = block.toLowerCase();
         if (tag === '<h1>') { currentBlockType = 'h1'; continue; }
         if (tag === '<h2>') { currentBlockType = 'h2'; continue; }
-        if (tag === '<ul>') { isInsideList = true; continue; }
+        if (tag === '<ul>' || tag === '<ol>') { isInsideList = true; continue; }
         if (tag === '<li>') { currentBlockType = 'li'; continue; }
-        if (tag === '<p>') { currentBlockType = 'p'; continue; }
+        if (tag === '<p>' || tag === '<div>') { currentBlockType = 'p'; continue; }
+        if (tag.startsWith('<br')) { currentBlockType = 'p'; continue; }
 
         if (tag.startsWith('</')) {
-            if (tag === '</ul>') isInsideList = false;
+            if (tag === '</ul>' || tag === '</ol>') isInsideList = false;
             currentBlockType = 'p';
             continue;
         }
@@ -326,7 +327,7 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
             if (seg.match(/<strong/i)) { isStrong = true; continue; }
             if (seg.match(/<\/strong/i)) { isStrong = false; continue; }
 
-            const text = seg.replace(/<[^>]+>/g, '').trim();
+            const text = seg.replace(/<[^>]+>/g, '');
             if (text) {
                 children.push(new TextRun({
                     text: isInsideList && currentBlockType === 'li' && children.length === 0 ? `• ${text}` : text,
@@ -459,14 +460,14 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
                                 new TableCell({
                                     children: [
                                         new Paragraph({ children: [new TextRun({ text: "For SSD CONSTRUCTIONS", bold: true, size: 20, font: "Times New Roman" })] }),
-                                        new Paragraph({ text: "___________________________", spacing: { before: 400 } }),
+                                        new Paragraph({ text: "___________________________", spacing: { before: 2880 } }),
                                         new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18, font: "Times New Roman" })] }),
                                     ]
                                 }),
                                 new TableCell({
                                     children: [
                                         new Paragraph({ children: [new TextRun({ text: `For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
-                                        new Paragraph({ text: "___________________________", spacing: { before: 400 }, alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ text: "___________________________", spacing: { before: 2880 }, alignment: AlignmentType.RIGHT }),
                                         new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
                                     ]
                                 }),

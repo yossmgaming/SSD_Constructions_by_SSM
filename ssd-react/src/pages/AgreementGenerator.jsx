@@ -532,7 +532,7 @@ export default function AgreementGenerator() {
             const accTitle = exportLanguage === 'sn' ? 'මූල්‍ය අනුකූලතාවය සහ ගණකාධිකරණ ගිවිසුම' : exportLanguage === 'ta' ? 'நிதி இணக்கம் மற்றும் கணக்கியல் ஒப்பந்தம்' : 'FINANCIAL COMPLIANCE & ACCOUNTING AGREEMENT';
             const scope1 = exportLanguage === 'sn' ? '1. මූල්‍ය වගකීම් පරාසය' : exportLanguage === 'ta' ? '1. நிதியியல் பொறுப்பின் நோக்கம்' : '1. Scope of Financial Responsibility';
             const scope1body = exportLanguage === 'sn' ? 'ගණකාධිකාරීවරයා Audit Rail, CIGFL (15M+), සහ DSO කළමනාකරණය කිරීමට වගකිව යුතුය.' : exportLanguage === 'ta' ? 'Audit Rail, CIGFL (15M+), DSO ஆகியவற்றை நிர்வகிக்க கணக்காளர் பொறுப்பு.' : 'The Accountant shall maintain the <strong>Audit Rail</strong>, verify <strong>CIGFL</strong> compliance (projects >Rs.15M), manage <strong>DSO</strong>, and reconcile biometric attendance against payroll.';
-            const scope2 = exportLanguage === 'sn' ? '2. රහස්‍යභාවය සහ ත්‍ාටකත්වය' : exportLanguage === 'ta' ? '2. இரகசியத்தன்மை மற்றும் நேர்மை' : '2. Confidentiality & Integrity (NDA)';
+            const scope2 = exportLanguage === 'sn' ? '2. රහස්‍යභාවය සහ අඛණ්ඩතාව' : exportLanguage === 'ta' ? '2. இரகசியத்தன்மை மற்றும் நேர்மை' : '2. Confidentiality & Integrity (NDA)';
             const scope2body = exportLanguage === 'sn' ? 'ලාභ ආන්තික, BOQ ලකුණු සහ බැංකු තොරතුරු NDA ගරු කළ යුතුය.' : exportLanguage === 'ta' ? 'இலாப வரம்புகள், BOQ குறிப்புகள், வங்கி விவரங்கள் NDA படி ரகசியமாக வைக்கப்பட வேண்டும்.' : 'Strict adherence to NDA regarding profit margins, BOQ markups, and banking details. Any breach constitutes grounds for immediate dismissal.';
             const scope3 = exportLanguage === 'sn' ? '3. ගෙවීම් කළමනාකරණය' : exportLanguage === 'ta' ? '3. கட்டண நிர்வாகம்' : '3. Payment & Reporting';
             const scope3body = exportLanguage === 'sn' ? 'LankaPay JustPay/SLIPS හරහා ගෙවීම්. APIT (Rs.150,000+ ඉක්මවූ) සහ EPF/ETF නිවැරදිව ගෙවිය යුතුය.' : exportLanguage === 'ta' ? 'LankaPay JustPay/SLIPS மூலம் கொடுப்பனவுகள். APIT (Rs.150,000+) மற்றும் EPF/ETF சரியாக செலுத்தப்பட வேண்டும்.' : 'Payments via LankaPay JustPay/SLIPS. Manage APIT for employees earning >Rs.150,000/month. Weekly budget vs actual reports required.';
@@ -691,7 +691,7 @@ export default function AgreementGenerator() {
             await exportAgreementData({
                 format,
                 agreement: docToExport,
-                htmlContent: previewRef.current?.innerHTML || docToExport.content,
+                htmlContent: docToExport.content,
                 fileName: docToExport.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
             });
         } catch (error) {
@@ -719,7 +719,7 @@ export default function AgreementGenerator() {
                     {currentAgreement && currentAgreement.status === 'Signed' && (
                         <div className="badge badge-success"><CheckCircle2Icon size={16} /> Legally Signed</div>
                     )}
-                    <ExportDropdown onExport={handleExport} isLoading={exportLoading} />
+                    <ExportDropdown onExport={handleExport} isLoading={exportLoading} exclude={['pdf', 'excel', 'csv']} />
                 </div>
             </div>
 

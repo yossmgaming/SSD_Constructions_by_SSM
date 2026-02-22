@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import './ExportDropdown.css';
 
-const ExportDropdown = ({ onExport, isLoading, title, label }) => {
+const ExportDropdown = ({ onExport, isLoading, title, label, exclude = [] }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const displayTitle = title || label;
@@ -53,41 +53,49 @@ const ExportDropdown = ({ onExport, isLoading, title, label }) => {
                                 <span>{displayTitle || t('common.format') || 'FORMAT'}</span>
                             </div>
 
-                            <motion.button
-                                whileHover={{ x: 4 }}
-                                onClick={() => handleExport('pdf')}
-                                className="export-option-btn pdf"
-                            >
-                                <i><FileText size={18} /></i>
-                                <span>PDF Document</span>
-                            </motion.button>
+                            {!exclude.includes('pdf') && (
+                                <motion.button
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => handleExport('pdf')}
+                                    className="export-option-btn pdf"
+                                >
+                                    <i><FileText size={18} /></i>
+                                    <span>PDF Document</span>
+                                </motion.button>
+                            )}
 
-                            <motion.button
-                                whileHover={{ x: 4 }}
-                                onClick={() => handleExport('excel')}
-                                className="export-option-btn excel"
-                            >
-                                <i><FileSpreadsheet size={18} /></i>
-                                <span>Excel Spreadsheet</span>
-                            </motion.button>
+                            {!exclude.includes('excel') && (
+                                <motion.button
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => handleExport('excel')}
+                                    className="export-option-btn excel"
+                                >
+                                    <i><FileSpreadsheet size={18} /></i>
+                                    <span>Excel Spreadsheet</span>
+                                </motion.button>
+                            )}
 
-                            <motion.button
-                                whileHover={{ x: 4 }}
-                                onClick={() => handleExport('word')}
-                                className="export-option-btn word"
-                            >
-                                <i><FileBox size={18} /></i>
-                                <span>Word Document</span>
-                            </motion.button>
+                            {!exclude.includes('word') && (
+                                <motion.button
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => handleExport('word')}
+                                    className="export-option-btn word"
+                                >
+                                    <i><FileBox size={18} /></i>
+                                    <span>Word Document</span>
+                                </motion.button>
+                            )}
 
-                            <motion.button
-                                whileHover={{ x: 4 }}
-                                onClick={() => handleExport('csv')}
-                                className="export-option-btn csv"
-                            >
-                                <i><FileCode size={18} /></i>
-                                <span>CSV Text File</span>
-                            </motion.button>
+                            {!exclude.includes('csv') && (
+                                <motion.button
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => handleExport('csv')}
+                                    className="export-option-btn csv"
+                                >
+                                    <i><FileCode size={18} /></i>
+                                    <span>CSV Text File</span>
+                                </motion.button>
+                            )}
                         </motion.div>
                     </>
                 )}
