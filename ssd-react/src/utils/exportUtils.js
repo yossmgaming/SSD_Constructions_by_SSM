@@ -183,21 +183,21 @@ function drawLetterhead(doc, logoBase64) {
     doc.line(15, 42, 195, 42);
 }
 
-/**
- * EXPORT AGREEMENT TO PDF
- */
 export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
     const lang = agreement.exportLanguage || 'en';
+    const fontUrl = lang === 'sn'
+        ? 'https://fonts.googleapis.com/css2?family=Noto+Serif+Sinhala:wght@400;700&display=swap'
+        : lang === 'ta'
+            ? 'https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;700&display=swap'
+            : 'https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap';
 
-    // --- UNICODE PATH: html2pdf.js for Sinhala/Tamil (jsPDF cannot render Unicode) ---
-    if (lang === 'sn' || lang === 'ta') {
-        const fontUrl = lang === 'sn'
-            ? 'https://fonts.googleapis.com/css2?family=Noto+Serif+Sinhala:wght@400;700&display=swap'
-            : 'https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;700&display=swap';
-        const fontFamily = lang === 'sn' ? "'Noto Serif Sinhala', serif" : "'Noto Serif Tamil', serif";
-        const secondParty = agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : agreement.type === 'Supplier' ? 'Supplier' : agreement.type === 'Subcontractor' ? 'Subcontractor' : 'Party';
+    const fontFamily = lang === 'sn' ? "'Noto Serif Sinhala', serif" : lang === 'ta' ? "'Noto Serif Tamil', serif" : "'Times New Roman', serif";
+    const secondParty = agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : agreement.type === 'Supplier' ? 'Supplier' : agreement.type === 'Subcontractor' ? 'Subcontractor' : 'Party';
 
-        // Load font into page if not already there
+    try {
+        const logoBase64 = await getBase64Image(LOGO_PATH);
+
+        // Preload font in current document to ensure it's cached by the browser
         if (!document.getElementById('ssd-unicode-font')) {
             const link = document.createElement('link');
             link.id = 'ssd-unicode-font';
@@ -205,219 +205,78 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
             link.href = fontUrl;
             document.head.appendChild(link);
             await document.fonts.ready;
-            await new Promise(r => setTimeout(r, 800)); // Extra wait for font load
         }
 
+        // Create a standalone HTML element to pass to html2pdf
         const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;background:#fff;';
+        // Setting specific styling ensures html2canvas parses it correctly. No fixed/hidden needed since from(element) manages it.
+        container.style.cssText = 'width: 170mm; background: #fff; box-sizing: border-box;';
+
         container.innerHTML = `
-            <div style="font-family:${fontFamily};font-size:11pt;color:#000;padding:20mm;min-height:297mm;box-sizing:border-box;">
-                <div style="display:flex;justify-content:space-between;border-bottom:1px solid #ccc;padding-bottom:8px;margin-bottom:14px;">
-                    <div style="font-size:13pt;font-weight:bold;font-family:Arial,sans-serif;">${COMPANY.name}</div>
-                    <div style="text-align:right;font-size:9pt;font-family:Arial,sans-serif;">
-                        <div style="font-size:13pt;font-weight:bold;">${COMPANY.name}</div>
-                        <div>${COMPANY.proprietor}</div><div>${COMPANY.address}</div>
-                        <div>Phone: ${COMPANY.phones}</div><div>Reg: ${COMPANY.registration}</div>
-                    </div>
+            <style>
+                @import url("${fontUrl}");
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: ${fontFamily}; font-size: 11pt; color: #000; }
+                h1 { font-size: 14pt; font-weight: bold; text-align: center; margin: 12px 0 12px 0; }
+                h2 { font-size: 11pt; font-weight: bold; margin: 12px 0 6px 0; }
+                p { margin: 6px 0 10px 0; line-height: 1.5; }
+                ul, ol { margin: 6px 0 10px 24px; }
+                li { margin-bottom: 4px; line-height: 1.5; }
+                strong { font-weight: bold; }
+                .watermark { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80pt; color: rgba(16,185,129,0.1); font-weight: bold; font-family: Arial; pointer-events: none; z-index: -1; }
+                .signatures { margin-top: 50px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+                .sig-block { text-align: center; width: 45%; }
+                .sig-line { border-top: 1px solid #000; margin-top: 50px; margin-bottom: 6px; }
+            </style>
+            ${agreement.status === 'Signed' ? '<div class="watermark">SIGNED</div>' : ''}
+            <div>${htmlContent}</div>
+            <div class="signatures">
+                <div class="sig-block">
+                    <div class="sig-line"></div>
+                    <div style="font-family:Arial;font-weight:bold;">For SSD CONSTRUCTIONS</div>
+                    <div style="font-family:Arial;font-size:9pt;">Authorized Signatory</div>
                 </div>
-                <style>
-                    h1{font-size:15pt;font-weight:bold;text-align:center;margin:12px 0 8px}
-                    h2{font-size:11pt;font-weight:bold;margin:12px 0 4px}
-                    p{margin:4px 0 8px;line-height:1.5}
-                    ul,ol{margin:4px 0 8px 20px}
-                    li{margin-bottom:4px;line-height:1.5}
-                </style>
-                ${agreement.status === 'Signed' ? '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:80pt;color:rgba(16,185,129,0.12);font-weight:bold;font-family:Arial;pointer-events:none;z-index:0;">SIGNED</div>' : ''}
-                <div>${htmlContent}</div>
-                <div style="margin-top:40px;display:flex;justify-content:space-between;">
-                    <div style="text-align:center;width:45%;">
-                        <div style="border-top:1px solid #000;margin-top:40px;margin-bottom:6px;"></div>
-                        <div style="font-family:Arial;font-weight:bold;">For SSD CONSTRUCTIONS</div>
-                        <div style="font-family:Arial;font-size:9pt;">Authorized Signatory</div>
-                    </div>
-                    <div style="text-align:center;width:45%;">
-                        <div style="border-top:1px solid #000;margin-top:40px;margin-bottom:6px;"></div>
-                        <div style="font-family:Arial;font-weight:bold;">For the ${secondParty}</div>
-                        <div style="font-family:Arial;font-size:9pt;">Authorized Signatory</div>
-                    </div>
-                </div>
-                <div style="margin-top:20px;border-top:1px solid #ccc;padding-top:4px;font-size:8pt;color:#666;font-family:Arial;display:flex;justify-content:space-between;">
-                    <span>${COMPANY.footerReg}</span><span>${COMPANY.email}</span>
+                <div class="sig-block">
+                    <div class="sig-line"></div>
+                    <div style="font-family:Arial;font-weight:bold;">For the ${secondParty}</div>
+                    <div style="font-family:Arial;font-size:9pt;">Authorized Signatory</div>
                 </div>
             </div>`;
-        document.body.appendChild(container);
 
+        // Configure html2pdf to use margins to leave space for our custom jsPDF headers/footers
         const opt = {
-            margin: 0,
+            margin: [45, 20, 30, 20], // top, right, bottom, left margins in mm
             filename: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        try {
-            await html2pdf().set(opt).from(container).save();
-        } catch (e) {
-            console.error('html2pdf error:', e);
-            alert('Failed to generate PDF. Please try again.');
-        } finally {
-            document.body.removeChild(container);
-        }
-        return;
-    }
+        // Generate PDF, then manually add repeating headers and footers to every sliced page
+        await html2pdf().set(opt).from(container).toPdf().get('pdf').then((pdf) => {
+            const totalPages = pdf.internal.getNumberOfPages();
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // --- ENGLISH PATH: jsPDF as before ---
-    try {
-        const doc = new jsPDF();
-        const logoBase64 = await getBase64Image(LOGO_PATH);
+            for (let i = 1; i <= totalPages; i++) {
+                pdf.setPage(i);
 
-        drawLetterhead(doc, logoBase64);
+                // Draw Global Header (Letterhead)
+                drawLetterhead(pdf, logoBase64);
 
-        // High-Fidelity HTML to PDF Parser
-        doc.setFont('times', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(0);
+                // Draw Global Footer
+                pdf.setFontSize(8);
+                pdf.setTextColor(100);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(COMPANY.footerReg, 15, pageHeight - 15);
 
-        const decodedContent = decodeHTML(htmlContent);
-        const contentPieces = decodedContent
-            .split(/(<\/?h[1-2]>|<\/?strong>|<\/?p>|<\/?ul>|<\/?li>|<br\s*\/?>)/gi)
-            .filter(p => p && p.trim() !== '');
+                const emailWidth = pdf.getTextWidth(COMPANY.email);
+                pdf.text(COMPANY.email, pageWidth - emailWidth - 15, pageHeight - 15);
 
-        let y = 52;
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const marginX = 20; // 20mm left margin
-        const maxWidth = 170; // 210 - 20 - 20
-
-        let isList = false;
-
-        for (const piece of contentPieces) {
-            const tag = piece.toLowerCase();
-
-            if (tag === '<h1>') {
-                doc.setFont('times', 'bold');
-                doc.setFontSize(14);
-                continue;
-            } else if (tag === '<h2>') {
-                doc.setFont('times', 'bold');
-                doc.setFontSize(11);
-                y += 4;
-                continue;
-            } else if (tag === '<strong>') {
-                doc.setFont('times', 'bold');
-                continue;
-            } else if (tag === '<ul>') {
-                isList = true;
-                continue;
-            } else if (tag === '<li>') {
-                doc.setFont('times', 'normal');
-                doc.setFontSize(10);
-                continue;
-            } else if (tag === '<p>') {
-                doc.setFont('times', 'normal');
-                doc.setFontSize(10);
-                continue;
-            } else if (tag.startsWith('</')) {
-                const closingTag = tag.substring(2, tag.length - 1);
-                if (closingTag === 'h1' || closingTag === 'h2' || closingTag === 'p') y += 6;
-                if (closingTag === 'ul') { isList = false; y += 4; }
-                if (closingTag === 'li') y += 2;
-
-                doc.setFont('times', 'normal');
-                doc.setFontSize(10);
-                continue;
-            } else if (tag.startsWith('<br')) {
-                y += 6;
-                continue;
+                pdf.text(`Page ${i} of ${totalPages}`, (pageWidth / 2), pageHeight - 15, { align: 'center' });
             }
+        }).save();
 
-            // Text Content
-            const cleanText = piece.replace(/<[^>]+>/g, '').trim();
-            if (!cleanText) continue;
-
-            // List Indentation
-            const isListItemContent = isList && !piece.match(/<li/i);
-            const currentX = isListItemContent ? marginX + 5 : marginX;
-            const prefix = isListItemContent ? '• ' : '';
-            const wrapWidth = isListItemContent ? maxWidth - 10 : maxWidth;
-
-            const lines = doc.splitTextToSize(prefix + cleanText, wrapWidth);
-            for (const line of lines) {
-                if (y > pageHeight - 35) {
-                    // Add Page Footer
-                    const pageWidth = doc.internal.pageSize.getWidth();
-                    doc.setFontSize(8);
-                    doc.setTextColor(100);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(COMPANY.footerReg, 15, pageHeight - 15);
-
-                    const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-                    doc.text(`Page ${pageNumber} of {total_pages_count_tag}`, (pageWidth / 2) + 20, pageHeight - 15, { align: 'center' });
-
-                    const emailWidth = doc.getTextWidth(COMPANY.email);
-                    doc.text(COMPANY.email, pageWidth - emailWidth - 15, pageHeight - 15);
-
-                    doc.addPage();
-                    drawLetterhead(doc, logoBase64); // Repeat header on every page
-
-                    y = 52; // Reset height to start after letterhead
-                    doc.setFont('times', 'normal');
-                    doc.setFontSize(10);
-                    doc.setTextColor(0);
-                }
-                doc.text(line, currentX, y);
-                y += 5;
-            }
-        }
-
-        y += 20;
-        if (y > pageHeight - 40) {
-            doc.addPage();
-            drawLetterhead(doc, logoBase64);
-            y = 52;
-        }
-
-        // Signatures
-        doc.setFont('helvetica', 'bold');
-        doc.text('For SSD CONSTRUCTIONS', 15, y);
-        doc.text(`For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, 120, y);
-
-        y += 20;
-        doc.line(15, y, 75, y);
-        doc.line(120, y, 180, y);
-
-        y += 6;
-        doc.setFont('helvetica', 'normal');
-        doc.text('Authorized Signatory', 15, y);
-        doc.text('Authorized Signatory', 120, y);
-
-        if (agreement.status === 'Signed') {
-            doc.setFontSize(40);
-            doc.setTextColor(16, 185, 129);
-            // Rotated watermark approximation by just printing across
-            doc.text('SIGNED', 105, pageHeight / 2, { align: 'center', angle: 45 });
-            doc.setFontSize(12);
-            doc.text(new Date(agreement.signedAt.replace(' ', 'T')).toLocaleDateString(), 105, (pageHeight / 2) + 15, { align: 'center', angle: 45 });
-        }
-
-        // Final footer
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const finalPageHeight = doc.internal.pageSize.getHeight();
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.setFont('helvetica', 'normal');
-        doc.text(COMPANY.footerReg, 15, finalPageHeight - 15);
-
-        const finalPageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-        doc.text(`Page ${finalPageNumber} of {total_pages_count_tag}`, (pageWidth / 2) + 20, finalPageHeight - 15, { align: 'center' });
-
-        const finalEmailWidth = doc.getTextWidth(COMPANY.email);
-        doc.text(COMPANY.email, pageWidth - finalEmailWidth - 15, finalPageHeight - 15);
-
-        if (typeof doc.putTotalPages === 'function') {
-            doc.putTotalPages('{total_pages_count_tag}');
-        }
-
-        doc.save(`${fileName}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e) {
         console.error("Agreement PDF Export Error:", e);
         alert("Failed to generate Agreement PDF.");

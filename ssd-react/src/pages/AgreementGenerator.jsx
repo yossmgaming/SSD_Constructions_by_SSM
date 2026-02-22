@@ -619,7 +619,6 @@ export default function AgreementGenerator() {
                 entityId,
                 title: currentAgreement.title,
                 content: currentAgreement.content,
-                exportLanguage: exportLanguage,
                 status: 'Draft'
             };
 
