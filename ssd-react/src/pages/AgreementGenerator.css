@@ -90,7 +90,7 @@
     background: white;
     width: 210mm;
     min-height: 297mm;
-    padding: 20mm;
+    padding: 25mm 20mm;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     color: #1e293b;
     font-family: "Times New Roman", Times, serif;
@@ -107,6 +107,7 @@
     font-weight: bold;
     border-bottom: 2px solid #cbd5e1;
     padding-bottom: 8px;
+    font-family: serif;
 }
 
 .document-preview h2 {
@@ -121,9 +122,10 @@
 .document-preview p,
 .document-preview li {
     font-size: 13px;
-    line-height: 1.6;
-    margin-bottom: 10px;
+    line-height: 1.5;
+    margin-bottom: 8px;
     text-align: justify;
+    font-family: serif;
 }
 
 .document-preview ul {

@@ -170,7 +170,11 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
         doc.setDrawColor(200);
         doc.line(15, 42, 195, 42);
 
-        // Print text with better formatting (Hand-parsed HTML for PDF)
+        // High-Fidelity HTML to PDF Parser
+        doc.setFont('times', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+
         const contentPieces = htmlContent
             .replace(/&nbsp;/g, ' ')
             .split(/(<\/?h[1-2]>|<\/?strong>|<\/?p>|<\/?ul>|<\/?li>|<br\s*\/?>)/gi)
@@ -178,53 +182,77 @@ export async function exportAgreementPDF({ agreement, htmlContent, fileName }) {
 
         let y = 52;
         const pageHeight = doc.internal.pageSize.getHeight();
-        const marginX = 15;
-        const maxWidth = 180;
+        const marginX = 20; // 20mm left margin
+        const maxWidth = 170; // 210 - 20 - 20
+
+        let isList = false;
 
         for (const piece of contentPieces) {
-            if (piece.match(/<h1/i)) {
+            const tag = piece.toLowerCase();
+
+            if (tag === '<h1>') {
+                doc.setFont('times', 'bold');
                 doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
                 continue;
-            } else if (piece.match(/<h2/i)) {
+            } else if (tag === '<h2>') {
+                doc.setFont('times', 'bold');
                 doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                y += 2;
+                y += 4;
                 continue;
-            } else if (piece.match(/<strong/i)) {
-                doc.setFont('helvetica', 'bold');
+            } else if (tag === '<strong>') {
+                doc.setFont('times', 'bold');
                 continue;
-            } else if (piece.match(/<(p|li)/i)) {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
+            } else if (tag === '<ul>') {
+                isList = true;
                 continue;
-            } else if (piece.match(/<\/(h1|h2|p|strong|li|ul)/i)) {
-                if (piece.match(/<\/(h1|h2|p|ul)/i)) y += 4;
-                doc.setFont('helvetica', 'normal');
+            } else if (tag === '<li>') {
+                doc.setFont('times', 'normal');
                 doc.setFontSize(10);
                 continue;
-            } else if (piece.match(/<br/i)) {
+            } else if (tag === '<p>') {
+                doc.setFont('times', 'normal');
+                doc.setFontSize(10);
+                continue;
+            } else if (tag.startsWith('</')) {
+                const closingTag = tag.substring(2, tag.length - 1);
+                if (closingTag === 'h1' || closingTag === 'h2' || closingTag === 'p') y += 6;
+                if (closingTag === 'ul') { isList = false; y += 4; }
+                if (closingTag === 'li') y += 2;
+
+                doc.setFont('times', 'normal');
+                doc.setFontSize(10);
+                continue;
+            } else if (tag.startsWith('<br')) {
                 y += 6;
                 continue;
             }
 
-            // Normal text content
+            // Text Content
             const cleanText = piece.replace(/<[^>]+>/g, '').trim();
             if (!cleanText) continue;
 
-            const lines = doc.splitTextToSize(cleanText, maxWidth);
+            // List Indentation
+            const currentX = isList ? marginX + 5 : marginX;
+            const prefix = isList ? '• ' : '';
+            const wrapWidth = isList ? maxWidth - 10 : maxWidth;
+
+            const lines = doc.splitTextToSize(prefix + cleanText, wrapWidth);
             for (const line of lines) {
                 if (y > pageHeight - 35) {
+                    // Add Page Footer
                     doc.setFontSize(8);
                     doc.setTextColor(100);
-                    doc.text(COMPANY.footerReg, 15, pageHeight - 15);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(COMPANY.footerReg, marginX, pageHeight - 15);
+
                     doc.addPage();
-                    y = 20;
+                    y = 25; // 25mm top margin on new page
+                    doc.setFont('times', 'normal');
                     doc.setFontSize(10);
                     doc.setTextColor(0);
                 }
-                doc.text(line, marginX, y);
-                y += 5.5;
+                doc.text(line, currentX, y);
+                y += 5;
             }
         }
 
@@ -273,7 +301,7 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
     const logoBase64 = await getBase64Image(LOGO_PATH);
     const logoUint8 = logoBase64 ? Uint8Array.from(atob(logoBase64.split(',')[1]), c => c.charCodeAt(0)) : null;
 
-    // Parse HTML into docx Paragraphs
+    // Parse HTML into docx Paragraphs with native formatting
     const blocks = htmlContent
         .replace(/&nbsp;/g, ' ')
         .split(/(<\/?h[1-2]>|<\/?p>|<\/?ul>|<\/?li>)/gi)
@@ -281,17 +309,26 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
 
     const paragraphs = [];
     let currentBlockType = 'p';
+    let isInsideList = false;
 
     for (const block of blocks) {
-        if (block.match(/<h1/i)) { currentBlockType = 'h1'; continue; }
-        if (block.match(/<h2/i)) { currentBlockType = 'h2'; continue; }
-        if (block.match(/<(p|li)/i)) { currentBlockType = 'p'; continue; }
-        if (block.match(/<\/(h1|h2|p|li|ul)/i)) { currentBlockType = 'p'; continue; }
+        const tag = block.toLowerCase();
+        if (tag === '<h1>') { currentBlockType = 'h1'; continue; }
+        if (tag === '<h2>') { currentBlockType = 'h2'; continue; }
+        if (tag === '<ul>') { isInsideList = true; continue; }
+        if (tag === '<li>') { currentBlockType = 'li'; continue; }
+        if (tag === '<p>') { currentBlockType = 'p'; continue; }
+
+        if (tag.startsWith('</')) {
+            if (tag === '</ul>') isInsideList = false;
+            currentBlockType = 'p';
+            continue;
+        }
 
         const cleanText = block.replace(/<[^>]+>/g, '').trim();
         if (!cleanText) continue;
 
-        // Handle inline strong tags within the block
+        // Parse inline bolding
         const segments = block.split(/(<\/?strong>)/gi);
         const children = [];
         let isStrong = false;
@@ -303,9 +340,10 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
             const text = seg.replace(/<[^>]+>/g, '').trim();
             if (text) {
                 children.push(new TextRun({
-                    text: text,
+                    text: isInsideList && currentBlockType === 'li' && children.length === 0 ? `• ${text}` : text,
                     bold: isStrong || currentBlockType === 'h1' || currentBlockType === 'h2',
-                    size: currentBlockType === 'h1' ? 28 : currentBlockType === 'h2' ? 22 : 20
+                    size: currentBlockType === 'h1' ? 28 : currentBlockType === 'h2' ? 22 : 20,
+                    font: "Times New Roman"
                 }));
             }
         }
@@ -313,15 +351,19 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
         if (children.length > 0) {
             paragraphs.push(new Paragraph({
                 children,
-                spacing: { after: 120, before: currentBlockType.startsWith('h') ? 240 : 0 },
-                alignment: currentBlockType === 'h1' ? AlignmentType.CENTER : AlignmentType.LEFT
+                spacing: {
+                    after: currentBlockType === 'li' ? 80 : 160,
+                    before: currentBlockType.startsWith('h') ? 240 : 0
+                },
+                alignment: currentBlockType === 'h1' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                indent: isInsideList ? { left: 720 } : undefined // Indent list items
             }));
         }
     }
 
     const doc = new Document({
         sections: [{
-            properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
+            properties: { page: { margin: { top: 1440, bottom: 1440, left: 1134, right: 1134 } } }, // ~25mm top/bottom, 20mm sides
             headers: {
                 default: new Header({
                     children: [
@@ -337,16 +379,16 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
                                     children: [
                                         new TableCell({
                                             width: { size: 30, type: WidthType.PERCENTAGE },
-                                            children: [logoUint8 ? new Paragraph({ children: [new ImageRun({ data: logoUint8, transformation: { width: 140, height: 45 } })] }) : new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true })] })],
+                                            children: [logoUint8 ? new Paragraph({ children: [new ImageRun({ data: logoUint8, transformation: { width: 140, height: 45 } })] }) : new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true, font: "Times New Roman" })] })],
                                         }),
                                         new TableCell({
                                             width: { size: 70, type: WidthType.PERCENTAGE },
                                             children: [
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true, size: 24 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.proprietor, size: 16 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.address, size: 16 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.phones, size: 16 })], alignment: AlignmentType.RIGHT }),
-                                                new Paragraph({ children: [new TextRun({ text: COMPANY.registration, size: 16 })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.name, bold: true, size: 24, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.proprietor, size: 16, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.address, size: 16, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.phones, size: 16, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
+                                                new Paragraph({ children: [new TextRun({ text: COMPANY.registration, size: 16, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
                                             ],
                                         }),
                                     ],
@@ -360,7 +402,7 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
             footers: {
                 default: new Footer({
                     children: [
-                        new Paragraph({ children: [new TextRun({ text: COMPANY.footerReg, color: "888888", size: 14 })], alignment: AlignmentType.LEFT }),
+                        new Paragraph({ children: [new TextRun({ text: COMPANY.footerReg, color: "888888", size: 14, font: "Times New Roman" })], alignment: AlignmentType.LEFT }),
                     ],
                 }),
             },
@@ -379,16 +421,16 @@ export async function exportAgreementWord({ agreement, htmlContent, fileName }) 
                             children: [
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: "For SSD CONSTRUCTIONS", bold: true, size: 20 })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "For SSD CONSTRUCTIONS", bold: true, size: 20, font: "Times New Roman" })] }),
                                         new Paragraph({ text: "___________________________", spacing: { before: 400 } }),
-                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18 })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18, font: "Times New Roman" })] }),
                                     ]
                                 }),
                                 new TableCell({
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: `For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, bold: true, size: 20 })], alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ children: [new TextRun({ text: `For the ${agreement.type === 'Client' ? 'Employer' : agreement.type === 'Worker' ? 'Employee' : 'Supplier'}`, bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
                                         new Paragraph({ text: "___________________________", spacing: { before: 400 }, alignment: AlignmentType.RIGHT }),
-                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18 })], alignment: AlignmentType.RIGHT }),
+                                        new Paragraph({ children: [new TextRun({ text: "Authorized Signatory", size: 18, font: "Times New Roman" })], alignment: AlignmentType.RIGHT }),
                                     ]
                                 }),
                             ]
