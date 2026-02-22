@@ -101,6 +101,16 @@ export default function AgreementGenerator() {
                 statutory: 'Statutory Contributions',
                 remuneration: 'Remuneration',
                 position: 'Position and Grade',
+                roles: {
+                    mason: 'Mason',
+                    carpenter: 'Carpenter',
+                    helper: 'Helper',
+                    supervisor: 'Supervisor',
+                    engineer: 'Engineer',
+                    driver: 'Driver',
+                    accountant: 'Accountant',
+                    manager: 'Manager'
+                },
                 rules: {
                     biometric: 'Attendance Tracking: The Employee is explicitly responsible for verifying all subordinate worker attendance using the biometric/system verification to eliminate time theft and "buddy punching."',
                     logs: 'Daily Digital Logs: The Employee mandates the submission of daily digital logs through the application, verifying weather, headcount, and work progress summaries.',
@@ -131,6 +141,16 @@ export default function AgreementGenerator() {
                 statutory: 'ව්‍යවස්ථාපිත දායකත්වයන්',
                 remuneration: 'ප්‍රතිලාභ',
                 position: 'තනතුර සහ ශ්‍රේණිය',
+                roles: {
+                    mason: 'මේසන්',
+                    carpenter: 'වඩුවා',
+                    helper: 'සහායක',
+                    supervisor: 'සුපරීක්ෂක',
+                    engineer: 'ඉංජිනේරු',
+                    driver: 'රියදුරු',
+                    accountant: 'ගණකාධිකාරී',
+                    manager: 'කළමනාකරු'
+                },
                 rules: {
                     biometric: 'පැමිණීම ලුහුබැඳීම: ජෛවමිතික/පද්ධති සත්‍යාපනය භාවිතා කරමින් සියලුම යටත් සේවකයින්ගේ පැමිණීම තහවුරු කිරීම සඳහා සේවකයා පැහැදිලිවම වගකිව යුතුය.',
                     logs: 'දෛනික ඩිජිටල් සටහන්: යෙදුම හරහා දෛනික ඩිජිටල් සටහන් ඉදිරිපත් කිරීම සේවකයා විසින් අනිවාර්ය කරනු ලැබේ.',
@@ -161,6 +181,16 @@ export default function AgreementGenerator() {
                 statutory: 'சட்டரீதியான பங்களிப்புகள்',
                 remuneration: 'ஊதியம்',
                 position: 'பதவி மற்றும் தரம்',
+                roles: {
+                    mason: 'மேசன்',
+                    carpenter: 'தச்சர்',
+                    helper: 'உதவியாளர்',
+                    supervisor: 'மேற்பார்வையாளர்',
+                    engineer: 'பொறியாளர்',
+                    driver: 'ஓட்டுநர்',
+                    accountant: 'கணக்காளர்',
+                    manager: 'மேலாளர்'
+                },
                 rules: {
                     biometric: 'வருகை கண்காணிப்பு: பயோமெட்ரிக் முறையைப் பயன்படுத்தி அனைத்து தொழிலாளர்களின் வருகையையும் சரிபார்க்க ஊழியர் பொறுப்பு.',
                     logs: 'டிஜிட்டல் பதிவுகள்: விண்ணப்பம் மூலம் தினசரி டிஜிட்டல் பதிவுகளை சமர்ப்பிப்பதை ஊழியர் கட்டாயமாக்குகிறார்.',
@@ -204,10 +234,6 @@ export default function AgreementGenerator() {
 
         // Check if an agreement already exists
         const existing = agreements.find(a => a.type === type && String(a.entityId) === String(entityId) && a.title.includes(expectedTitlePart) && (a.exportLanguage || 'en') === exportLanguage);
-        if (existing) {
-            setCurrentAgreement(existing);
-            return;
-        }
 
         // Whitespace scrubbing helper for templates
         const clean = (str) => str.replace(/\s+/g, ' ').trim();
@@ -303,11 +329,74 @@ export default function AgreementGenerator() {
                     <p>${l.rules.arbitration}</p>
                     <p>${l.rules.confidentiality}</p>
                 `;
+            } else if (clientSubType === 'ConditionsOfContract') {
+                content = `
+                    <h1>${exportLanguage === 'en' ? 'CONDITIONS OF CONTRACT' : exportLanguage === 'sn' ? 'කොන්ත්‍රාත් කොන්දේසි' : 'ஒப்பந்த நிபந்தனைகள்'}</h1>
+                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Project:</strong> ${project.name}</p>
+                    <h2>1. ${l.rules.arbitration.split(':')[0]}</h2>
+                    <p>${l.rules.arbitration}</p>
+                    <h2>2. ${l.rules.confidentiality.split(':')[0]}</h2>
+                    <p>${l.rules.confidentiality}</p>
+                    <h2>3. Payment Retentions</h2>
+                    <p>${exportLanguage === 'en' ? 'A 5% retention will be held from each interim payment, released upon successful completion of the defects liability period.' : exportLanguage === 'sn' ? 'සෑම අතුරු ගෙවීමකින්ම 5% ක රඳවා තබා ගැනීමක් සිදු කරනු ලබන අතර, දෝෂ වගකීම් කාලය අවසන් වූ පසු එය නිදහස් කරනු ලැබේ.' : 'ஒவ்வொரு இடைக்கால கொடுப்பனவிலிருந்தும் 5% நிறுத்திவைப்பு வைக்கப்படும்.'}</p>
+                `;
+            } else if (clientSubType === 'VariationOrder') {
+                content = `
+                    <h1>VARIATION ORDER (VO) FORM</h1>
+                    <p><strong>VO No:</strong> VO-${Math.floor(Math.random() * 1000)}</p>
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Project:</strong> ${project.name}</p>
+                    <div style="border: 2px solid #000; padding: 15px; margin-top: 20px;">
+                        <h3>Description of Change:</h3>
+                        <p>${voDescription || '________________________________________________'}</p>
+                        <h3>Reason for Variation:</h3>
+                        <p>${voReason}</p>
+                        <div style="display: flex; gap: 50px; margin-top: 20px;">
+                            <p><strong>Cost Impact:</strong> LKR ${Number(voCost || 0).toLocaleString()}</p>
+                            <p><strong>Time Impact:</strong> ${voTime || '0'} Days</p>
+                        </div>
+                    </div>
+                `;
+                // Localize VO if needed
+                if (exportLanguage === 'sn') {
+                    content = `
+                        <h1>වෙනස් කිරීමේ නියෝගය (VO)</h1>
+                        <p><strong>දිනය:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>ව්‍යාපෘතිය:</strong> ${project.name}</p>
+                        <div style="border: 2px solid #000; padding: 15px; margin-top: 20px;">
+                            <h3>වෙනස් කිරීම් පිළිබඳ විස්තරය:</h3>
+                            <p>${voDescription || '________________________________________________'}</p>
+                            <h3>වෙනස් කිරීමට හේතුව:</h3>
+                            <p>${voReason}</p>
+                            <div style="display: flex; gap: 50px; margin-top: 20px;">
+                                <p><strong>වියදම කෙරෙහි බලපෑම:</strong> LKR ${Number(voCost || 0).toLocaleString()}</p>
+                                <p><strong>කාලය කෙරෙහි බලපෑම:</strong> දින ${voTime || '0'}</p>
+                            </div>
+                        </div>
+                    `;
+                } else if (exportLanguage === 'ta') {
+                    content = `
+                        <h1>மாறுபாட்டு உத்தரவு (VO) படிவம்</h1>
+                        <p><strong>தேதி:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>திட்டம்:</strong> ${project.name}</p>
+                        <div style="border: 2px solid #000; padding: 15px; margin-top: 20px;">
+                            <h3>மாற்றத்தின் விளக்கம்:</h3>
+                            <p>${voDescription || '________________________________________________'}</p>
+                            <h3>மாறுபாட்டிற்கான காரணம்:</h3>
+                            <p>${voReason}</p>
+                            <div style="display: flex; gap: 50px; margin-top: 20px;">
+                                <p><strong>செலவு தாக்கம்:</strong> LKR ${Number(voCost || 0).toLocaleString()}</p>
+                                <p><strong>நேர தாக்கம்:</strong> ${voTime || '0'} நாட்கள்</p>
+                            </div>
+                        </div>
+                    `;
+                }
             } else {
                 content = `<h1>${title}</h1><p>${l.date}: ${new Date().toLocaleDateString()}</p><p>Content generation for this subtype is in progress for ${exportLanguage}.</p>`;
             }
         }
-        else if (type === 'Worker' || type === 'Management' || type === 'Accountant') {
+        else if (type === 'Worker' || type === 'Management') {
             const worker = workers.find(w => String(w.id) === String(entityId));
             const dailyRate = Number(worker.dailyRate || 0);
             const monthlyEst = dailyRate * 26;
@@ -315,16 +404,20 @@ export default function AgreementGenerator() {
 
             if (isBelowMin) blockReason = "Statutory Wage Violation (<30,000 LKR)";
 
+            // Role translation
+            const roleKey = (worker.role || '').toLowerCase();
+            const translatedRole = l.roles[roleKey] || worker.role || l.worker;
+
             content = `
                 <h1>${title.toUpperCase()}</h1>
                 <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>${clean(`This Agreement is made between SSD CONSTRUCTIONS (${l.employer}) and ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '_______'} (${l.employee}).`)}</p>
+                <p>${clean(`${exportLanguage === 'en' ? 'Agreement made between' : exportLanguage === 'sn' ? 'මෙම ගිවිසුම' : 'இந்த ஒப்பந்தம்'} SSD CONSTRUCTIONS (${l.employer}) ${exportLanguage === 'en' ? 'and' : exportLanguage === 'sn' ? 'සහ' : 'மற்றும்'} ${worker.fullName || worker.name}, ${l.nic}: ${worker.nic || '_______'} (${l.employee}).`)}</p>
                 
                 <h2>1. ${l.position}</h2>
-                <p>${clean(`The Employee is hired for the position of ${worker.role || (type === 'Accountant' ? 'Accountant' : 'Worker')}.`)}</p>
+                <p>${clean(`${exportLanguage === 'en' ? 'The Employee is hired for the position of' : exportLanguage === 'sn' ? 'සේවකයා බඳවා ගනු ලබන්නේ' : 'ஊழியர் இந்த பதவிக்கு பணியமர்த்தப்படுகிறார்:'} <strong>${translatedRole}</strong>.`)}</p>
 
                 <h2>2. ${l.remuneration}</h2>
-                <p>LKR ${dailyRate.toLocaleString()} per day.</p>
+                <p>LKR ${dailyRate.toLocaleString()} ${exportLanguage === 'en' ? 'per day' : exportLanguage === 'sn' ? 'දිනකට' : 'ஒரு நாளைக்கு'}.</p>
                 <p>${l.rules.insurance}</p>
 
                 <h2>3. ${l.statutory}</h2>
@@ -341,25 +434,94 @@ export default function AgreementGenerator() {
                 <p>${exportLanguage === 'en' ? '3 Months probation apply.' : exportLanguage === 'sn' ? 'මාස 3 ක පරිවාස කාලයක් අදාළ වේ.' : '3 மாத ஆய்வுக் காலம் பொருந்தும்.'}</p>
             `;
         }
-        else {
+        else if (type === 'Accountant') {
+            const worker = workers.find(w => String(w.id) === String(entityId));
+            content = `
+                <h1>FINANCIAL COMPLIANCE & ACCOUNTING AGREEMENT</h1>
+                <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS & ${worker.fullName || worker.name}</p>
+                
+                <h2>1. Scope of Financial Responsibility</h2>
+                <p>The Accountant shall be responsible for maintaining the <strong>Audit Rail</strong>, verifying <strong>CIGFL</strong> compliance for projects exceeding 15M, and managing the <strong>Debt Settlement Orders (DSO)</strong>.</p>
+                
+                <h2>2. Confidentiality & Integrity</h2>
+                <p>Strict adherence to the <strong>Non-Disclosure Agreement (NDA)</strong> regarding profit margins, BOQ markups, and banking details is mandatory.</p>
+                
+                <h2>3. Reporting</h2>
+                <p>The Accountant must provide weekly budget vs. actual reports and verify all material supplier invoices before payment release.</p>
+                
+                <h2>4. Statutory Compliance</h2>
+                <p>Ensuring timely payment of PAYE tax, EPF/ETF, and VAT returns (if applicable) is a core requirement of this role.</p>
+            `;
+            // Localize accountant content if not English
+            if (exportLanguage === 'sn') {
+                content = `
+                    <h1>මූල්‍ය අනුකූලතාවය සහ ගණකාධිකරණ ගිවිසුම</h1>
+                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS සහ ${worker.fullName || worker.name}</p>
+                    <h2>1. මූල්‍ය වගකීම් පරාසය</h2>
+                    <p>ගණකාධිකාරීවරයා විගණන කටයුතු (Audit Rail), රුපියල් මිලියන 15 ඉක්මවන ව්‍යාපෘති සඳහා CIGFL අනුකූලතාවය සහ ණය පියවීමේ නියෝග (DSO) කළමනාකරණය කිරීම සඳහා වගකිව යුතුය.</p>
+                    <h2>2. රහස්‍යභාවය සහ අඛණ්ඩතාව</h2>
+                    <p>ලාභ ආන්තික, BOQ ලකුණු කිරීම් සහ බැංකු තොරතුරු සම්බන්ධයෙන් රහස්‍යභාවය පිළිබඳ ගිවිසුම (NDA) දැඩි ලෙස අනුගමනය කිරීම අනිවාර්ය වේ.</p>
+                    <h2>3. වාර්තා කිරීම</h2>
+                    <p>ගණකාධිකාරීවරයා සතිපතා අයවැය වාර්තා සැපයිය යුතු අතර ගෙවීමට පෙර සියලුම සැපයුම්කරු ඉන්වොයිසි සත්‍යාපනය කළ යුතුය.</p>
+                `;
+            } else if (exportLanguage === 'ta') {
+                content = `
+                    <h1>நிதி இணக்கம் மற்றும் கணக்கியல் ஒப்பந்தம்</h1>
+                    <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>${l.parties}:</strong> SSD CONSTRUCTIONS மற்றும் ${worker.fullName || worker.name}</p>
+                    <h2>1. நிதியியல் பொறுப்பின் நோக்கம்</h2>
+                    <p>தணிக்கை பாதை (Audit Rail), 15 மில்லியனுக்கும் அதிகமான திட்டங்களுக்கான CIGFL இணக்கம் மற்றும் கடன் தீர்வு உத்தரவுகளை (DSO) நிர்வகிப்பதற்கு கணக்காளர் பொறுப்பாவார்.</p>
+                    <h2>2. இரகசியத்தன்மை மற்றும் நேர்மை</h2>
+                    <p>இலாப வரம்புகள், BOQ குறிப்புகள் மற்றும் வங்கி விவரங்கள் தொடர்பான இரகசிய ஒப்பந்தத்தை (NDA) கண்டிப்பாக பின்பற்றுவது கட்டாயமாகும்.</p>
+                    <h2>3. அறிக்கை செய்தல்</h2>
+                    <p>கணக்காளர் வாராந்திர பட்ஜெட் அறிக்கைகளை வழங்க வேண்டும் மற்றும் பணம் செலுத்துவதற்கு முன் அனைத்து விநியோகஸ்தர் விலைப்பட்டியல்களையும் சரிபார்க்க வேண்டும்.</p>
+                `;
+            }
+        }
+        else if (type === 'Supplier' || type === 'Subcontractor') {
             const supplier = suppliers.find(s => String(s.id) === String(entityId));
             content = `
                 <h1>${title.toUpperCase()}</h1>
                 <p><strong>${l.date}:</strong> ${new Date().toLocaleDateString()}</p>
-                <p>${clean(`SSD CONSTRUCTIONS (${l.client}) and ${supplier.name} (${type === 'Supplier' ? l.supplier : l.subcontractor}).`)}</p>
+                <p>${clean(`SSD CONSTRUCTIONS (${l.client}) ${exportLanguage === 'en' ? 'and' : exportLanguage === 'sn' ? 'සහ' : 'மற்றும்'} ${supplier.name} (${type === 'Supplier' ? l.supplier : l.subcontractor}).`)}</p>
                 <h2>Conditions</h2>
                 <p>${l.rules.arbitration}</p>
                 <p>${l.rules.confidentiality}</p>
             `;
+            if (exportLanguage === 'sn') {
+                content = `
+                    <h1>${title.toUpperCase()}</h1>
+                    <p><strong>දිනය:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>පාර්ශවයන්:</strong> SSD CONSTRUCTIONS සහ ${supplier.name} (${type === 'Supplier' ? 'සැපයුම්කරු' : 'අනුකොන්ත්‍රාත්කරු'})</p>
+                    <h2>කොන්දේසි</h2>
+                    <p>${l.rules.arbitration}</p>
+                    <p>${l.rules.confidentiality}</p>
+                    <p>අනුමත මිල ගණන් සහ ප්‍රමිතීන්ට අනුව සැපයුම් සිදු කිරීමට සැපයුම්කරු එකඟ වේ.</p>
+                `;
+            } else if (exportLanguage === 'ta') {
+                content = `
+                    <h1>${title.toUpperCase()}</h1>
+                    <p><strong>தேதி:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>தரப்பினர்:</strong> SSD CONSTRUCTIONS மற்றும் ${supplier.name} (${type === 'Supplier' ? 'வழங்குநர்' : 'உள் ஒப்பந்ததாரர்'})</p>
+                    <h2>நிபந்தனைகள்</h2>
+                    <p>${l.rules.arbitration}</p>
+                    <p>${l.rules.confidentiality}</p>
+                    <p>அங்கீகரிக்கப்பட்ட விலை மற்றும் தரத்தின்படி பொருட்களை வழங்க வழங்குநர் ஒப்புக்கொள்கிறார்.</p>
+                `;
+            }
         }
 
         const newDoc = {
+            id: existing ? existing.id : 'temp_new',
             title,
             content,
-            status: 'Draft',
-            signedAt: null,
-            signedBy: null,
-            blockReason
+            status: existing ? existing.status : 'Draft',
+            signedAt: existing ? existing.signedAt : null,
+            signedBy: existing ? existing.signedBy : null,
+            blockReason,
+            exportLanguage
         };
 
         setCurrentAgreement(newDoc);
@@ -370,10 +532,11 @@ export default function AgreementGenerator() {
         setIsSaving(true);
         try {
             const payload = {
-                type: currentAgreement.type,
-                entityId: currentAgreement.entityId,
+                type,
+                entityId,
                 title: currentAgreement.title,
                 content: currentAgreement.content,
+                exportLanguage: exportLanguage,
                 status: 'Draft'
             };
 
@@ -557,7 +720,7 @@ export default function AgreementGenerator() {
                         </div>
                     )}
 
-                    {type === 'Client' && clientSubType === 'MOU' && currentAgreement && currentAgreement.status === 'Draft' && currentAgreement.id === 'temp_new' && (
+                    {type === 'Client' && clientSubType === 'MOU' && currentAgreement && currentAgreement.status === 'Draft' && (
                         <div className="form-group" style={{ marginTop: '20px' }}>
                             <label>Custom MOU Clauses</label>
                             <textarea
@@ -570,7 +733,7 @@ export default function AgreementGenerator() {
                         </div>
                     )}
 
-                    {type === 'Client' && clientSubType === 'VariationOrder' && currentAgreement && currentAgreement.status === 'Draft' && currentAgreement.id === 'temp_new' && (
+                    {type === 'Client' && clientSubType === 'VariationOrder' && currentAgreement && currentAgreement.status === 'Draft' && (
                         <div className="variation-form" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <div className="form-group">
                                 <label>Variation Description</label>
