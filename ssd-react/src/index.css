@@ -9,6 +9,9 @@
   --sidebar-text: #94a3b8;
   --sidebar-text-active: #ffffff;
   --sidebar-accent: #e6631b;
+  --accent-primary: #e6631b;
+  --accent-primary-rgb: 230, 99, 27;
+  --accent-primary-alpha: rgba(230, 99, 27, 0.4);
   /* Brand orange */
 
   --bg-primary: #f1f5f9;
@@ -24,13 +27,13 @@
   --border-focus: #e6631b;
 
   --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-bg: #f0fdf4;
   --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-bg: #fffbeb;
   --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-bg: #fef2f2;
   --info: #3b82f6;
-  --info-bg: rgba(59, 130, 246, 0.1);
+  --info-bg: #eff6ff;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -378,13 +381,19 @@ select {
   border-radius: 4px;
 }
 
-.modal-actions {
+.modal-actions,
+.modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 32px;
   padding-top: 20px;
   border-top: 1px solid var(--border-color);
+}
+
+.modal-footer-btns {
+  display: flex;
+  gap: 12px;
 }
 
 /* ==========================================================================
@@ -458,4 +467,164 @@ select {
   .attendance-container .card {
     overflow-x: auto;
   }
+}
+
+/* ==========================================================================
+   Global Performance Optimizations & Additive Mobile Fixes
+   ========================================================================== */
+
+.btn,
+.modal-overlay {
+  will-change: transform, opacity;
+}
+
+.card {
+  contain: layout style;
+}
+
+@media (max-width: 768px) {
+
+  /* Prevent cards from overflowing screen width */
+  .card {
+    max-width: calc(100vw - 32px);
+    /* Account for body padding */
+    box-sizing: border-box;
+    overflow-x: auto;
+    /* Allow internal tables to scroll instead of breaking layout */
+  }
+
+  /* Ensure inputs and buttons don't break flex layouts */
+  .btn-group {
+    flex-wrap: wrap;
+  }
+
+  /* Modal responsive sizing */
+  .modal-content {
+    max-width: 95vw;
+    padding: 20px;
+    margin: 10px;
+  }
+
+  /* Fix header actions overflowing */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Shared Identity Badges */
+.pid-badge {
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  text-transform: uppercase;
+}
+
+/* Utilities */
+.relative {
+  position: relative !important;
+}
+
+.pl-9 {
+  padding-left: 2.25rem !important;
+}
+
+.pl-10 {
+  padding-left: 2.5rem !important;
+}
+
+.space-y-4>*+* {
+  margin-top: 1rem !important;
+}
+
+.absolute {
+  position: absolute !important;
+}
+
+.top-1\/2 {
+  top: 50% !important;
+}
+
+.top-3 {
+  top: 0.75rem !important;
+}
+
+.left-3 {
+  left: 0.75rem !important;
+}
+
+.-translate-y-1\/2 {
+  transform: translateY(-50%) !important;
+}
+
+.grid {
+  display: grid !important;
+}
+
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+.gap-3 {
+  gap: 0.75rem !important;
+}
+
+.gap-4 {
+  gap: 1rem !important;
+}
+
+.m-0 {
+  margin: 0 !important;
+}
+
+.mt-0\.5 {
+  margin-top: 0.125rem !important;
+}
+
+.mt-3 {
+  margin-top: 0.75rem !important;
+}
+
+.mt-6 {
+  margin-top: 1.5rem !important;
+}
+
+.w-full {
+  width: 100% !important;
+}
+
+.items-center {
+  align-items: center !important;
+}
+
+.gap-2 {
+  gap: 0.5rem !important;
 }

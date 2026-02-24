@@ -1,0 +1,425 @@
+/* Personnel Command Center & Forensic Intelligence Styles */
+
+.personnel-command-page {
+    padding-bottom: 40px;
+}
+
+/* Tab Navigation */
+.pc-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background: #f1f5f9;
+    border-radius: 1rem;
+    width: fit-content;
+    margin-bottom: 2rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pc-tab-btn {
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.pc-tab-btn:hover {
+    color: #0f172a;
+}
+
+.pc-tab-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Forensic Report Header */
+.report-frame {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: var(--shadow-lg);
+    max-width: 100%;
+}
+
+.report-access-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 1rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.report-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.report-badge svg {
+    color: #94a3b8;
+}
+
+.report-badge-text {
+    font-size: 0.625rem;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.back-hub-btn {
+    font-size: 0.625rem;
+    font-weight: 800;
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.2s;
+}
+
+.back-hub-btn:hover {
+    color: #0f172a;
+}
+
+/* Intelligence Matrix */
+.intel-matrix {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+    .intel-matrix {
+        grid-template-columns: 300px 1fr;
+    }
+}
+
+.matrix-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.search-matrix-tip {
+    padding: 1rem;
+    background: #f0f9ff;
+    border: 1px solid #e0f2fe;
+    border-radius: 0.75rem;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.search-matrix-tip svg {
+    color: #3b82f6;
+    margin-top: 2px;
+}
+
+.search-matrix-tip p {
+    font-size: 0.6875rem;
+    color: #0369a1;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+/* User Detail Report Grid */
+.forensic-dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.forensic-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .forensic-grid {
+        grid-template-columns: 340px 1fr;
+        gap: 2.5rem;
+    }
+}
+
+/* Forensic Components */
+.forensic-section {
+    margin-bottom: 2.5rem;
+    max-width: 100%;
+}
+
+@media (min-width: 768px) {
+    .forensic-section {
+        max-width: 600px;
+        /* Keep it compact even in single column mode */
+    }
+}
+
+.forensic-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.forensic-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.875rem 0;
+    border-bottom: 1px dashed #e2e8f0;
+    gap: 1rem;
+}
+
+.forensic-label {
+    font-size: 0.8125rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.forensic-value {
+    font-size: 0.8125rem;
+    color: #0f172a;
+    font-weight: 600;
+    word-break: break-word;
+    /* Better than break-all for readability */
+    overflow-wrap: break-word;
+    text-align: right;
+    max-width: 180px;
+}
+
+.forensic-status-active {
+    background: #ecfdf5;
+    color: #059669;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+}
+
+/* Operational Intelligence Cards */
+.op-intel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.op-card {
+    padding: 1.25rem;
+    border-radius: 1.25rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 100px;
+}
+
+.op-card-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.op-card-value {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.op-card-sub {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* Liquidity Badge */
+.liquidity-spent {
+    padding: 1.5rem;
+    background: #0f172a;
+    border-radius: 1.25rem;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+    max-width: 500px;
+}
+
+.liquidity-spent::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.liquidity-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.liquidity-amount {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: #ffffff;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.liquidity-meta {
+    font-size: 0.6875rem;
+    color: #64748b;
+}
+
+/* Activity Audit Table */
+.audit-table-mini {
+    width: 100%;
+    font-size: 0.75rem;
+    border-collapse: collapse;
+}
+
+.audit-table-mini th {
+    text-align: left;
+    padding: 8px;
+    color: #94a3b8;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.audit-table-mini td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #f8fafc;
+    color: #334155;
+}
+
+/* Global utility fix for Personnel Intelligence */
+.no-header-invite .page-header {
+    display: none !important;
+}
+
+.forensic-ops {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.audit-table-mini {
+    min-width: 500px;
+}
+
+/* Personnel Expansion Grid */
+.personnel-expansion-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    background: #ffffff;
+    border-radius: 0.75rem;
+}
+
+.personnel-expansion-grid h4 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 0.75rem;
+}
+
+.intel-mini-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.intel-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.intel-item label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    color: #94a3b8;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+}
+
+.intel-item span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.expansion-actions {
+    margin-top: 1rem;
+}
+
+.expansion-actions .btn-sm {
+    padding: 0.625rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* Forensic Loading State Fix */
+.forensic-loading-container {
+    padding: 3rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.forensic-loading-text {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    /* user requested 20px right shift due to border overlap */
+    margin-left: 20px;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -213,3 +213,35 @@
     color: var(--primary-color);
     box-shadow: var(--shadow-sm);
 }
+
+.agreements-list-card {
+    margin-top: auto;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 20px;
+}
+
+.agreement-list-item:hover {
+    background: var(--bg-secondary) !important;
+    border-color: var(--primary-color) !important;
+}
+
+.agreement-list-item.active {
+    border-left: 4px solid var(--primary-color) !important;
+}
+
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge.draft {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.signed {
+    background: #d1fae5;
+    color: #065f46;
+}

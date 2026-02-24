@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import BounceButton from './BounceButton';
 
-export default function Modal({ isOpen, onClose, title, subtitle, children, onSave, saveText = "Save Details" }) {
+export default function Modal({ isOpen, onClose, title, subtitle, children, onSave, saveText = "Save Details", footer }) {
     if (!isOpen) return null;
 
     return (
@@ -28,16 +28,22 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, onSa
                         {children}
                     </div>
 
-                    <div className="modal-actions">
-                        <BounceButton className="btn btn-ghost" onClick={onClose}>
-                            Cancel
-                        </BounceButton>
-                        {onSave && (
-                            <BounceButton className="btn btn-primary" onClick={onSave}>
-                                {saveText}
+                    {footer ? (
+                        <div className="modal-footer">
+                            {footer}
+                        </div>
+                    ) : (
+                        <div className="modal-actions">
+                            <BounceButton className="btn btn-ghost" onClick={onClose}>
+                                Cancel
                             </BounceButton>
-                        )}
-                    </div>
+                            {onSave && (
+                                <BounceButton className="btn btn-primary" onClick={onSave}>
+                                    {saveText}
+                                </BounceButton>
+                            )}
+                        </div>
+                    )}
                 </motion.div>
             </motion.div>
         </AnimatePresence>

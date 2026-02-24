@@ -1,6 +1,7 @@
+import React from 'react';
 import { motion } from 'motion/react';
 
-export default function BounceButton({ children, className = '', ...props }) {
+const BounceButton = React.memo(({ children, className = '', ...props }) => {
     // Pass through all props (like onClick, disabled, type, style) and append the className
     return (
         <motion.button
@@ -13,4 +14,6 @@ export default function BounceButton({ children, className = '', ...props }) {
             {children}
         </motion.button>
     );
-}
+});
+
+export default BounceButton;

@@ -1,6 +1,7 @@
+import React from 'react';
 import './DataTable.css';
 
-export default function DataTable({ columns, data, selectedId, onRowClick, emptyMessage = 'No data found' }) {
+const DataTable = React.memo(({ columns, data, selectedId, onRowClick, emptyMessage = 'No data found', renderExpansion }) => {
     return (
         <div className="data-table-wrapper">
             <table className="data-table">
@@ -22,21 +23,33 @@ export default function DataTable({ columns, data, selectedId, onRowClick, empty
                         </tr>
                     ) : (
                         data.map((row, rowIndex) => (
-                            <tr
-                                key={row.id}
-                                className={selectedId === row.id ? 'selected' : ''}
-                                onClick={() => onRowClick && onRowClick(row)}
-                            >
-                                {columns.map((col) => (
-                                    <td key={col.key}>
-                                        {col.render ? col.render(row[col.key], row, rowIndex) : row[col.key]}
-                                    </td>
-                                ))}
-                            </tr>
+                            <React.Fragment key={row.id}>
+                                <tr
+                                    className={selectedId === row.id ? 'selected' : ''}
+                                    onClick={() => onRowClick && onRowClick(row)}
+                                >
+                                    {columns.map((col) => (
+                                        <td key={col.key}>
+                                            {col.render ? col.render(row[col.key], row, rowIndex) : row[col.key]}
+                                        </td>
+                                    ))}
+                                </tr>
+                                {selectedId === row.id && renderExpansion && (
+                                    <tr className="expansion-row">
+                                        <td colSpan={columns.length}>
+                                            <div className="expansion-content">
+                                                {renderExpansion(row)}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
                         ))
                     )}
                 </tbody>
             </table>
         </div>
     );
-}
+});
+
+export default DataTable;

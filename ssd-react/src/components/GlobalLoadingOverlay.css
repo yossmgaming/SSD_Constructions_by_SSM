@@ -1,0 +1,70 @@
+.global-loading-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 200px;
+    /* Ensure there's always some height even if content is empty */
+}
+
+/* When loading, blur the background content gently */
+.global-loading-wrapper.is-loading .global-loading-content {
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+    transition: opacity 0.3s ease;
+}
+
+.global-loading-content {
+    transition: opacity 0.3s ease;
+}
+
+.global-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    /* Highest level overlay */
+    pointer-events: none;
+    /* Allow interaction with background if needed? No, usually loading blocks */
+}
+
+/* Ensure the wrapper allows the fixed overlay to appear correctly */
+.global-loading-wrapper.is-loading {
+    pointer-events: none;
+}
+
+.global-loading-scanner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 14px 28px;
+    border-radius: 99px;
+    font-size: 0.9rem;
+    color: #0f172a;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.animate-spin-fast {
+    animation: spin 0.8s linear infinite;
+    color: var(--accent-primary, #e6631b);
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

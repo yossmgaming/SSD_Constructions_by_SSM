@@ -4,9 +4,12 @@ import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import ExportDropdown from '../components/ExportDropdown';
-import { getAll, create, update, remove, query, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 export default function ProjectExpense() {
     const [headers, setHeaders] = useState([]);
@@ -18,6 +21,7 @@ export default function ProjectExpense() {
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingExport, setIsLoadingExport] = useState(false);
     const { t } = useTranslation();
+    const { hasRole } = useAuth();
 
     useEffect(() => {
         loadData();
@@ -63,10 +67,10 @@ export default function ProjectExpense() {
         setIsLoading(true);
         try {
             const [allHeaders, allProjects] = await Promise.all([
-                getAll(KEYS.obligationHeaders),
+                queryEq(KEYS.obligationHeaders, 'type', 'ProjectExpense'),
                 getAll(KEYS.projects)
             ]);
-            setHeaders(allHeaders.filter((h) => h.type === 'ProjectExpense'));
+            setHeaders(allHeaders);
             setProjects(allProjects);
         } catch (error) {
             console.error(error);
@@ -81,7 +85,7 @@ export default function ProjectExpense() {
 
         setIsLoading(true);
         try {
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === h.id));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', h.id));
         } catch (error) {
             console.error(error);
         } finally {
@@ -127,7 +131,7 @@ export default function ProjectExpense() {
         try {
             await create(KEYS.cashSettlements, { obligationHeaderId: selectedId, date: new Date().toISOString().split('T')[0], amount: parseFloat(settlementAmt) || 0, direction: 'Outgoing', method: 'Cash' });
             setSettlementAmt('');
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === selectedId));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', selectedId));
         } catch (error) {
             console.error(error);
         } finally {
@@ -151,40 +155,56 @@ export default function ProjectExpense() {
         { key: 'status', label: 'Status', render: (v) => <span className={`badge ${v === 'Settled' ? 'badge-success' : v === 'Partial' ? 'badge-warning' : 'badge-default'}`}>{v}</span> },
     ];
 
-    return (
-        <div className="crud-page finance-page">
-            <div className="page-header">
-                <h1>Project Expenses</h1>
-                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
-                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Expense</BounceButton>
-                </div>
-            </div>
-
-            <div className="finance-detail">
-                <Card title="Expense Records">
-                    <DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No records" />
-                </Card>
-                <Card title={selectedId ? 'Edit Expense' : 'New Expense'} className="animate-slideIn">
-                    <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-                    <div className="form-group"><label>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-                    <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
-                    <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option></select></div>
-                    <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-                    {selectedId && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
-                            <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
-                            <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
-                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
-                        </div>
-                    )}
-                    <div className="form-actions">
-                        <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
-                        {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
-                        <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
+    if (!hasRole(['Super Admin', 'Finance'])) {
+        return (
+            <div className="crud-page finance-page flex items-center justify-center" style={{ minHeight: '80vh' }}>
+                <Card>
+                    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+                        <Shield size={48} className="mx-auto mb-4" style={{ color: '#ef4444' }} />
+                        <h2 style={{ color: 'var(--text-color)', marginBottom: 8 }}>Access Denied</h2>
+                        <p>This module contains sensitive financial data restricted to Finance and Super Admin roles.</p>
                     </div>
                 </Card>
             </div>
-        </div>
+        );
+    }
+
+    return (
+        <GlobalLoadingOverlay loading={isLoading} message="Auditing Project Operational Costs...">
+            <div className="crud-page finance-page">
+                <div className="page-header">
+                    <h1>Project Expenses</h1>
+                    <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                        <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                        <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Expense</BounceButton>
+                    </div>
+                </div>
+
+                <div className="finance-detail">
+                    <Card title="Expense Records">
+                        <DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No records" />
+                    </Card>
+                    <Card title={selectedId ? 'Edit Expense' : 'New Expense'} className="animate-slideIn">
+                        <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                        <div className="form-group"><label>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+                        <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
+                        <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option></select></div>
+                        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                        {selectedId && (
+                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
+                                <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
+                            </div>
+                        )}
+                        <div className="form-actions">
+                            <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
+                            {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
+                            <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+        </GlobalLoadingOverlay>
     );
 }

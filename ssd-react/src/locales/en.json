@@ -18,10 +18,14 @@
         "accountant": "Accountant",
         "finance": "Finance",
         "tools": "Tools",
-        "system": "System"
+        "system": "System",
+        "invite_codes": "Invitation Gatekeeper",
+        "personnel_command": "Personnel Command",
+        "clients": "Clients"
     },
     "common": {
         "add_new": "Add New",
+        "to_date": "To Date",
         "save": "Save",
         "update": "Update",
         "delete": "Delete",
@@ -31,6 +35,8 @@
         "loading": "Loading...",
         "cancel": "Cancel",
         "confirm": "Confirm",
+        "confirm_action": "Confirm Action",
+        "confirm_delete": "Confirm Delete",
         "actions": "Actions",
         "status": "Status",
         "type": "Type",
@@ -59,8 +65,11 @@
         "filtered": "Filtered",
         "email": "Email",
         "address": "Address",
+        "details": "Details",
+        "phone_2": "Phone 2",
         "export": "Export",
-        "format": "Format"
+        "format": "Format",
+        "nic_passport": "NIC / Passport"
     },
     "dashboard": {
         "title": "Dashboard",
@@ -110,18 +119,26 @@
         "pending_obligations": "Pending obligations",
         "delete_confirm": "Delete this project?",
         "delete_warning": "Warning: Deleting this project will affect related records.",
-        "search_placeholder": "Search by name or client..."
+        "search_placeholder": "Search by name or client...",
+        "no_projects": "No projects found"
     },
     "workers": {
         "title": "Workers",
         "new_worker": "New Worker",
         "edit_worker": "Edit Worker",
+        "project_assignment": "Project Assignment",
         "worker_list": "Worker List",
         "nic_number": "NIC Number",
         "base_salary": "Base Salary",
         "daily_rate": "Daily Rate",
+        "overtime_rate": "Overtime Rate",
         "contact_number": "Contact Number",
         "bank_details": "Bank Details",
+        "confirm_remove_assignment": "Confirm Assignment Removal",
+        "remove_assignment_warning": "Are you sure you want to remove this project assignment? This may affect attendance records.",
+        "assign_to_project": "Assign to Project",
+        "assignment_history": "Assignment History",
+        "error_overlap": "Error: Worker is already assigned to a project during this period.",
         "no_workers": "No workers found"
     },
     "attendance": {
@@ -131,7 +148,7 @@
         "present": "Present",
         "absent": "Absent",
         "half_day": "Half Day",
-        "overtime": "Overtime",
+        "overtime": "Custom Hours",
         "hours": "Hours",
         "no_attendance": "No attendance records found for this date",
         "days": "days",
@@ -159,7 +176,8 @@
         "min_stock": "Min Stock",
         "project_assignment": "Project Assignment",
         "no_materials": "No materials found",
-        "assign_to_project": "Assign to Project"
+        "assign_to_project": "Assign to Project",
+        "assignment_hint_new": "This assignment will be applied upon saving the material."
     },
     "suppliers": {
         "title": "Suppliers",
@@ -169,6 +187,16 @@
         "supplier_name": "Supplier Name",
         "no_suppliers": "No suppliers found"
     },
+    "clients": {
+        "title": "Clients",
+        "new_client": "New Client",
+        "edit_client": "Edit Client",
+        "client_list": "Client List",
+        "client_name": "Client Name",
+        "no_clients": "No clients found",
+        "client_pid": "Client PID",
+        "nic_passport": "NIC / Passport Number"
+    },
     "rates": {
         "title": "Rate Management",
         "worker_rates": "Worker Hourly Rates",
@@ -176,7 +204,7 @@
         "new_worker_rate": "New Worker Rate",
         "new_work_rate": "New Work Rate",
         "hourly_rate": "Hourly Rate",
-        "overtime_rate": "Overtime Rate",
+        "overtime_rate": "Overtime Hourly Rate",
         "per_unit": "Per Unit",
         "work_name": "Work Name",
         "categories": {
@@ -221,6 +249,15 @@
         "pay_outstanding": "Pay Outstanding",
         "pay_full": "Pay Full Earned"
     },
+    "advances": {
+        "title": "Worker Advances",
+        "new_advance": "New Advance",
+        "edit_advance": "Edit Advance",
+        "active_advances": "Active Advances",
+        "settled_advances": "Settled Advances",
+        "records": "Advance Records",
+        "select_project_first": "Please select a project first"
+    },
     "settings": {
         "title": "Settings & Data",
         "language_selection": "Language Selection",
@@ -228,7 +265,46 @@
         "app_info": "Application Info",
         "app_description": "Our intelligent construction management suite for professional builders.",
         "data_storage": "Your data is saved securely to your local device database and is always persistent.",
-        "version": "Version"
+        "version": "Version",
+        "user_identity": "User Identity",
+        "governance_audit": "Governance & Audit",
+        "system_security": "System Security Environment",
+        "rbac_guard": "RBAC Guard",
+        "truth_engine": "Truth Engine (Auditing)",
+        "onboarding": "Validated Onboarding",
+        "terminate_session": "Terminate Session",
+        "authorized_user": "Authorized User",
+        "restricted_access": "Restricted Access",
+        "active": "ACTIVE",
+        "logging": "LOGGING",
+        "enforced": "ENFORCED",
+        "enterprise_shield": "Enterprise Shield",
+        "governance_footer": "Governance-first management platform for SSD Constructions.",
+        "audit_disclaimer": "All actions are cryptographically linked to your identity for audit purposes."
+    },
+    "invite_codes": {
+        "title": "Validated Onboarding Gatekeeper",
+        "subtitle": "Manage registration invite codes to prevent identity fraud.",
+        "generate_title": "Generate New Invite",
+        "target_role": "Target Role",
+        "target_id": "Target ID",
+        "target_id_hint": "Pre-links the new account to a specific database entity.",
+        "target_id_placeholder": "e.g. Worker UUID or Project ID",
+        "generate_button": "Generate Unique Code",
+        "generating": "Generating...",
+        "table_code": "Invite Code",
+        "table_role": "Role",
+        "table_status": "Status",
+        "table_actions": "Actions",
+        "status_redeemed": "Redeemed",
+        "status_expired": "Expired",
+        "status_pending": "Pending Use",
+        "copy_code": "Copy Code",
+        "revoke_invite": "Revoke Invite",
+        "revoke_confirm": "Are you sure you want to revoke this unused invite code?",
+        "no_records": "No invite codes generated yet.",
+        "loading": "Loading records...",
+        "failed_generate": "Failed to generate code."
     },
     "days": {
         "sun": "Sun",

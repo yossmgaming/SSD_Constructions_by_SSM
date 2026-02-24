@@ -1,7 +1,8 @@
+import React from 'react';
 import StarBorder from './StarBorder';
 import './Card.css';
 
-export default function Card({ title, children, className = '', color, speed, ...props }) {
+const Card = React.memo(({ title, children, className = '', color, speed, ...props }) => {
     return (
         <StarBorder
             as="div"
@@ -14,4 +15,6 @@ export default function Card({ title, children, className = '', color, speed, ..
             {children}
         </StarBorder>
     );
-}
+});
+
+export default Card;

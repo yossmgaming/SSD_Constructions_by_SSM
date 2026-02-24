@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS "public"."projectMaterials" CASCADE;
 DROP TABLE IF EXISTS "public"."projectWorkers" CASCADE;
 DROP TABLE IF EXISTS "public"."materials" CASCADE;
 DROP TABLE IF EXISTS "public"."workers" CASCADE;
+DROP TABLE IF EXISTS "public"."clients" CASCADE;
 DROP TABLE IF EXISTS "public"."projects" CASCADE;
 
 -- Create Projects Table
@@ -62,6 +63,20 @@ CREATE TABLE public.workers (
     "status" TEXT DEFAULT 'Active',
     "notes" TEXT,
     "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create Clients Table
+CREATE TABLE public.clients (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "pid" TEXT UNIQUE NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "phone" TEXT,
+    "phone2" TEXT,
+    "email" TEXT,
+    "address" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create Materials Table
@@ -318,6 +333,7 @@ ALTER TABLE "bankAccounts" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "workRates" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "workerRates" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "suppliers" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "clients" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "advances" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "advanceApplications" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "cashSettlements" DISABLE ROW LEVEL SECURITY;

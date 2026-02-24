@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
-import { getAll, create, update, remove, query, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 export default function ClientInvoice() {
     const [headers, setHeaders] = useState([]);
@@ -21,10 +22,10 @@ export default function ClientInvoice() {
         setIsLoading(true);
         try {
             const [allHeaders, allProjects] = await Promise.all([
-                getAll(KEYS.obligationHeaders),
+                queryEq(KEYS.obligationHeaders, 'type', 'ClientInvoice'),
                 getAll(KEYS.projects)
             ]);
-            setHeaders(allHeaders.filter((h) => h.type === 'ClientInvoice'));
+            setHeaders(allHeaders);
             setProjects(allProjects);
         } catch (error) {
             console.error(error);
@@ -38,7 +39,7 @@ export default function ClientInvoice() {
         setForm({ clientName: h.clientName || '', projectId: h.projectId || '', totalAmount: h.totalAmountSnapshot || '', dueDate: h.dueDate || '', status: h.status, notes: h.notes || '' });
         setIsLoading(true);
         try {
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === h.id));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', h.id));
         } catch (error) {
             console.error(error);
         } finally {
@@ -88,7 +89,7 @@ export default function ClientInvoice() {
                 amount: parseFloat(settlementAmt) || 0, direction: 'Incoming', method: 'Bank Transfer',
             });
             setSettlementAmt('');
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === selectedId));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', selectedId));
         } catch (error) {
             console.error(error);
         } finally {
@@ -118,35 +119,37 @@ export default function ClientInvoice() {
     ];
 
     return (
-        <div className="crud-page finance-page">
-            <div className="page-header">
-                <h1>Client Invoice</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Invoice</BounceButton>
-            </div>
+        <GlobalLoadingOverlay loading={isLoading} message="Generating Client Obligation Ledger...">
+            <div className="crud-page finance-page">
+                <div className="page-header">
+                    <h1>Client Invoice</h1>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Invoice</BounceButton>
+                </div>
 
-            <div className="finance-detail">
-                <Card title="Invoices"><DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No invoices" /></Card>
-                <Card title={selectedId ? 'Edit Invoice' : 'New Invoice'} className="animate-slideIn">
-                    <div className="form-group"><label>Client Name</label><input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} /></div>
-                    <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-                    <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
-                    <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></div>
-                    <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Sent</option><option>Partial</option><option>Settled</option><option>Overdue</option></select></div>
-                    <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-                    {selectedId && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
-                            <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} received)</label>
-                            <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
-                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
+                <div className="finance-detail">
+                    <Card title="Invoices"><DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No invoices" /></Card>
+                    <Card title={selectedId ? 'Edit Invoice' : 'New Invoice'} className="animate-slideIn">
+                        <div className="form-group"><label>Client Name</label><input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} /></div>
+                        <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                        <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
+                        <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></div>
+                        <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Sent</option><option>Partial</option><option>Settled</option><option>Overdue</option></select></div>
+                        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                        {selectedId && (
+                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} received)</label>
+                                <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
+                            </div>
+                        )}
+                        <div className="form-actions">
+                            <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
+                            {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
+                            <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
                         </div>
-                    )}
-                    <div className="form-actions">
-                        <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
-                        {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
-                        <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
-                    </div>
-                </Card>
+                    </Card>
+                </div>
             </div>
-        </div>
+        </GlobalLoadingOverlay>
     );
 }

@@ -1,15 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './Sidebar';
 import Iridescence from './Iridescence';
 import BounceButton from './BounceButton';
+import GlobalLoadingOverlay from './GlobalLoadingOverlay';
 import './Layout.css';
+
+const IRIDESCENCE_COLOR = [0.9, 1, 1];
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
     const location = useLocation();
+
+    useEffect(() => {
+        const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     return (
         <div className="layout">
@@ -29,23 +39,27 @@ export default function Layout() {
             )}
 
             <main className="layout-content">
-                <Iridescence
-                    color={[0.9, 1, 1]}
-                    mouseReact={true}
-                    amplitude={0.1}
-                    speed={1}
-                />
+                {isDesktop && (
+                    <Iridescence
+                        color={IRIDESCENCE_COLOR}
+                        mouseReact={true}
+                        amplitude={0.1}
+                        speed={1}
+                    />
+                )}
                 <div className="layout-inner-content">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence>
                         <motion.div
                             key={location.pathname}
-                            initial={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
                             style={{ height: '100%' }}
                         >
-                            <Outlet />
+                            <Suspense fallback={<GlobalLoadingOverlay loading={true} message="Synthesizing Module..." />}>
+                                <Outlet />
+                            </Suspense>
                         </motion.div>
                     </AnimatePresence>
                 </div>

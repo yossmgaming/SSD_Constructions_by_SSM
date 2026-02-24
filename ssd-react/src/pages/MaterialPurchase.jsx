@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
-import { getAll, create, update, remove, query, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 export default function MaterialPurchase() {
     const [headers, setHeaders] = useState([]);
@@ -47,7 +48,7 @@ export default function MaterialPurchase() {
 
         setIsLoading(true);
         try {
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === h.id));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', h.id));
         } catch (error) {
             console.error(error);
         } finally {
@@ -98,7 +99,7 @@ export default function MaterialPurchase() {
                 amount: parseFloat(settlementAmt) || 0, direction: 'Outgoing', method: 'Cash',
             });
             setSettlementAmt('');
-            setSettlements(await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === selectedId));
+            setSettlements(await queryEq(KEYS.cashSettlements, 'obligationHeaderId', selectedId));
         } catch (error) {
             console.error(error);
         } finally {
@@ -127,37 +128,39 @@ export default function MaterialPurchase() {
     ];
 
     return (
-        <div className="crud-page finance-page">
-            <div className="page-header">
-                <h1>Material Purchase</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Purchase</BounceButton>
-            </div>
+        <GlobalLoadingOverlay loading={isLoading} message="Synchronizing Material Procurement Logs...">
+            <div className="crud-page finance-page">
+                <div className="page-header">
+                    <h1>Material Purchase</h1>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Purchase</BounceButton>
+                </div>
 
-            <div className="finance-detail">
-                <Card title="Purchase Records">
-                    <DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No records" />
-                </Card>
-                <Card title={selectedId ? 'Edit Purchase' : 'New Purchase'} className="animate-slideIn">
-                    <div className="form-group"><label>Material</label><select value={form.materialId} onChange={(e) => setForm({ ...form, materialId: e.target.value })}><option value="">Select...</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
-                    <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-                    <div className="form-group"><label>Supplier</label><select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}><option value="">Select...</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                    <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
-                    <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option></select></div>
-                    <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-                    {selectedId && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
-                            <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
-                            <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
-                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
+                <div className="finance-detail">
+                    <Card title="Purchase Records">
+                        <DataTable columns={columns} data={headers} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No records" />
+                    </Card>
+                    <Card title={selectedId ? 'Edit Purchase' : 'New Purchase'} className="animate-slideIn">
+                        <div className="form-group"><label>Material</label><select value={form.materialId} onChange={(e) => setForm({ ...form, materialId: e.target.value })}><option value="">Select...</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+                        <div className="form-group"><label>Project</label><select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                        <div className="form-group"><label>Supplier</label><select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}><option value="">Select...</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                        <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
+                        <div className="form-group"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option></select></div>
+                        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                        {selectedId && (
+                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
+                                <div className="settlement-list">{settlements.map((s) => <div className="settlement-item" key={s.id}><span>{new Date(s.date).toLocaleDateString()}</span><strong>{fmt(s.amount)}</strong></div>)}</div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} /><BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton></div>
+                            </div>
+                        )}
+                        <div className="form-actions">
+                            <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
+                            {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
+                            <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
                         </div>
-                    )}
-                    <div className="form-actions">
-                        <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
-                        {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
-                        <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
-                    </div>
-                </Card>
+                    </Card>
+                </div>
             </div>
-        </div>
+        </GlobalLoadingOverlay>
     );
 }

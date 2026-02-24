@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Folder } from 'lucide-react';
+import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Folder, Pencil } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
@@ -7,10 +7,13 @@ import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import ExportDropdown from '../components/ExportDropdown';
-import { getAll, create, update, remove, query, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import { MaterialCategories, MeasurementUnits } from '../models/enums';
 import './Materials.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 const emptyForm = { name: '', category: '', customCategory: '', unit: '', customUnit: '', quantity: '', cost: '', minStock: '', supplierId: '', notes: '' };
 
@@ -23,6 +26,10 @@ export default function Materials() {
     const [catFilter, setCatFilter] = useState('All');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+
+    const { profile, hasRole } = useAuth();
+    const isClient = profile?.role === 'Client';
+    const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
 
     // Project assignment state
     const [assignProject, setAssignProject] = useState('');
@@ -38,7 +45,7 @@ export default function Materials() {
 
     const [isLoadingExport, setIsLoadingExport] = useState(false);
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); }, [profile]);
 
     const handleExport = async (format) => {
         const exportData = materials.map(m => ({
@@ -82,10 +89,13 @@ export default function Materials() {
     async function loadData() {
         setIsLoading(true);
         try {
+            const isClient = profile?.role === 'Client';
             const [mats, sups, projs, wrkRts, pm] = await Promise.all([
                 getAll(KEYS.materials),
                 getAll(KEYS.suppliers),
-                getAll(KEYS.projects),
+                isClient && profile?.target_id
+                    ? queryEq(KEYS.projects, 'id', profile.target_id)
+                    : getAll(KEYS.projects),
                 getAll(KEYS.workRates),
                 getAll(KEYS.projectMaterials)
             ]);
@@ -168,15 +178,23 @@ export default function Materials() {
     }, [materials, workRates]);
 
     function selectMaterial(m) {
-        setSelectedId(m.id);
-        const isCatPreset = allCategories.includes(m.category); // Use dynamic list
-        const isUnitPreset = MeasurementUnits.includes(m.unit);
-        setForm({
-            name: m.name, category: isCatPreset ? m.category : 'Other', customCategory: isCatPreset ? '' : (m.category || ''),
-            unit: isUnitPreset ? m.unit : 'Other', customUnit: isUnitPreset ? '' : (m.unit || ''),
-            quantity: m.quantity || '', cost: m.cost || '', minStock: m.minStock || '',
-            supplierId: m.supplierId || '', notes: m.notes || '',
-        });
+        if (selectedId === m.id) {
+            setSelectedId(null);
+        } else {
+            setSelectedId(m.id);
+            const isCatPreset = allCategories.includes(m.category);
+            const isUnitPreset = MeasurementUnits.includes(m.unit);
+            setForm({
+                name: m.name, category: isCatPreset ? m.category : 'Other', customCategory: isCatPreset ? '' : (m.category || ''),
+                unit: isUnitPreset ? m.unit : 'Other', customUnit: isUnitPreset ? '' : (m.unit || ''),
+                quantity: m.quantity || '', cost: m.cost || '', minStock: m.minStock || '',
+                supplierId: m.supplierId || '', notes: m.notes || '',
+            });
+        }
+    }
+
+    function openEditModal(m) {
+        selectMaterial(m);
         setIsModalOpen(true);
     }
 
@@ -196,8 +214,25 @@ export default function Materials() {
             supplierId: form.supplierId, notes: form.notes,
         };
         try {
-            if (selectedId) { await update(KEYS.materials, selectedId, data); }
-            else { await create(KEYS.materials, data); }
+            let matId = selectedId;
+            if (selectedId) {
+                await update(KEYS.materials, selectedId, data);
+            } else {
+                const res = await create(KEYS.materials, data);
+                if (res) matId = res.id;
+            }
+
+            // Handle immediate project assignment if fields are filled
+            if (matId && assignProject && assignQty) {
+                await create(KEYS.projectMaterials, {
+                    materialId: matId,
+                    projectId: parseInt(assignProject),
+                    quantity: parseFloat(assignQty),
+                    date: assignDate,
+                    notes: assignNotes,
+                });
+            }
+
             handleClear();
             setIsModalOpen(false);
             await loadData();
@@ -213,8 +248,8 @@ export default function Materials() {
 
         setIsLoading(true);
         try {
-            const pmCount = (await query(KEYS.projectMaterials, (pm) => pm.materialId === selectedId)).length;
-            const boqCount = (await query(KEYS.boqItems, (b) => b.materialId === selectedId)).length;
+            const pmCount = (await queryEq(KEYS.projectMaterials, 'materialId', selectedId)).length;
+            const boqCount = (await queryEq(KEYS.boqItems, 'materialId', selectedId)).length;
 
             const deps = [];
             if (pmCount > 0) deps.push(`${pmCount} project material record${pmCount > 1 ? 's' : ''}`);
@@ -238,9 +273,63 @@ export default function Materials() {
         }
     }
 
-    function handleClear() { setForm(emptyForm); setSelectedId(null); }
+    function handleClear() {
+        setForm(emptyForm);
+        setSelectedId(null);
+        setAssignProject('');
+        setAssignQty('');
+        setAssignNotes('');
+        setAssignDate(new Date().toISOString().split('T')[0]);
+    }
 
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+    function renderMaterialExpansion(material) {
+        const materialAssignments = projectMaterials.filter(pm => pm.materialId === material.id);
+        return (
+            <div className="material-expansion-grid">
+                <div className="expansion-col">
+                    <h4>{t('materials.project_assignment')} {t('common.history')}</h4>
+                    <div className="assignment-list-inline">
+                        {materialAssignments.length === 0 ? (
+                            <div className="no-data-small">No project assignments recorded</div>
+                        ) : (
+                            materialAssignments.map((a) => (
+                                <div className="assignment-item-inline" key={a.id}>
+                                    <div className="assign-p-name">{getProjectName(a.projectId)}</div>
+                                    <div className="assign-p-details">
+                                        <span className="qty">{a.quantity} {material.unit}</span>
+                                        <span className="date">{a.date ? new Date(a.date).toLocaleDateString() : ''}</span>
+                                    </div>
+                                    {a.notes && <div className="assign-note">{a.notes}</div>}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+                <div className="expansion-col">
+                    <h4>{t('common.details')} & {t('common.notes')}</h4>
+                    <div className="details-mini-grid">
+                        <div className="detail-item">
+                            <label>{t('nav.suppliers')}</label>
+                            <span>{suppliers.find(s => s.id === material.supplierId)?.name || '-'}</span>
+                        </div>
+                        <div className="detail-item">
+                            <label>{t('common.notes')}</label>
+                            <span className="notes-text">{material.notes || 'No specific notes recorded for this material.'}</span>
+                        </div>
+                    </div>
+                    {isSuperAdminOrFinance && (
+                        <div className="expansion-actions">
+                            <BounceButton className="btn btn-secondary btn-sm" onClick={() => openEditModal(material)}>
+                                <Pencil size={14} /> {t('materials.edit_material')}
+                            </BounceButton>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     const columns = [
         { key: 'name', label: t('common.name') },
@@ -265,209 +354,261 @@ export default function Materials() {
                 return <span className="total-value">{fmt(total)}</span>;
             }
         },
+        {
+            key: 'actions', label: '', render: (_, row) => (
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <BounceButton
+                        className="icon-btn edit-btn"
+                        title="Edit Material"
+                        onClick={(e) => { e.stopPropagation(); openEditModal(row); }}
+                    >
+                        <Pencil size={14} />
+                    </BounceButton>
+                </div>
+            )
+        }
     ];
 
-    return (
-        <div className="crud-page materials-page">
-            <div className="page-header">
-                <h1>{t('materials.title')}</h1>
-                <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
-                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('materials.new_material')}</BounceButton>
-                </div>
-            </div>
-
-            {/* ✅ Stock summary cards */}
-            <div className="stock-summary">
-                <div className="stock-card">
-                    <div className="stock-card-label">{t('materials.total_items')}</div>
-                    <div className="stock-card-value"><CountUp to={stockSummary.totalItems} /></div>
-                </div>
-                <div className="stock-card">
-                    <div className="stock-card-label">{t('materials.total_stock_value')}</div>
-                    <div className="stock-card-value value-green"><span className="currency-prefix">LKR</span> <CountUp to={stockSummary.totalValue} separator="," /></div>
-                </div>
-                <div className={`stock-card ${stockSummary.lowStockCount > 0 ? 'stock-card-alert' : ''}`}>
-                    <div className="stock-card-label">{stockSummary.lowStockCount > 0 && <AlertTriangle size={13} />} {t('materials.low_stock_items')}</div>
-                    <div className={`stock-card-value ${stockSummary.lowStockCount > 0 ? 'value-red' : ''}`}><CountUp to={stockSummary.lowStockCount} /></div>
-                </div>
-            </div>
-
-            <div className="filter-bar">
-                <div className="filter-group" style={{ flex: 2 }}>
-                    <label>{t('common.search')}</label>
-                    <input placeholder={t('projects.search_placeholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                {/* ✅ Category filter */}
-                <div className="filter-group" style={{ flex: 1 }}>
-                    <label>{t('common.category')}</label>
-                    <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-                        <option value="All">{t('common.all')}</option>
-                        {allCategories.map((c) => <option key={c}>{c}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            {/* ✅ Material count */}
-            <div className="result-count">
-                {t('common.showing')} <strong>{filtered.length}</strong> {t('common.of')} <strong>{materials.length}</strong> {t('nav.materials')}
-                {(search || catFilter !== 'All') && <span className="filter-active-tag">{t('common.filtered')}</span>}
-            </div>
-
-            <div className="crud-layout" style={{ gridTemplateColumns: '1fr' }}>
-                <Card title={t('materials.material_list')}>
-                    <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectMaterial} emptyMessage={t('materials.no_materials')} />
-                </Card>
-
-                <Modal
-                    isOpen={isModalOpen}
-                    onClose={() => { setIsModalOpen(false); handleClear(); }}
-                    title={selectedId ? t('materials.edit_material') : t('materials.new_material')}
-                    onSave={handleSave}
-                    onDelete={selectedId ? handleDelete : undefined}
-                >
-                    <div className="form-group">
-                        <label>{t('materials.material_name')}</label>
-                        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={isNameDuplicate(form.name) ? 'input-error' : ''} />
-                        {/* ✅ Duplicate warning */}
-                        {isNameDuplicate(form.name) && <span className="field-error">⚠ A material with this name already exists</span>}
+    if (isClient) {
+        return (
+            <div className="crud-page materials-page flex items-center justify-center" style={{ minHeight: '80vh' }}>
+                <Card>
+                    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+                        <Shield size={48} className="mx-auto mb-4" style={{ color: '#ef4444' }} />
+                        <h2 style={{ color: 'var(--text-color)', marginBottom: 8 }}>Access Denied</h2>
+                        <p>This module contains internal inventory data not accessible to Clients.</p>
                     </div>
+                </Card>
+            </div>
+        );
+    }
 
-                    {/* ✅ Category dropdown */}
-                    <div className="form-group">
+    return (
+        <GlobalLoadingOverlay loading={isLoading} message="Synchronizing Material Inventory...">
+            <div className="crud-page materials-page">
+                <div className="page-header">
+                    <h1>{t('materials.title')}</h1>
+                    <div className="page-header-actions" style={{ display: 'flex', gap: '12px' }}>
+                        <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                        {isSuperAdminOrFinance && (
+                            <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('materials.new_material')}</BounceButton>
+                        )}
+                    </div>
+                </div>
+
+                {/* ✅ Stock summary cards */}
+                <div className="stock-summary">
+                    <div className="stock-card">
+                        <div className="stock-card-label">{t('materials.total_items')}</div>
+                        <div className="stock-card-value"><CountUp to={stockSummary.totalItems} /></div>
+                    </div>
+                    <div className="stock-card">
+                        <div className="stock-card-label">{t('materials.total_stock_value')}</div>
+                        <div className="stock-card-value value-green"><span className="currency-prefix">LKR</span> <CountUp to={stockSummary.totalValue} separator="," /></div>
+                    </div>
+                    <div className={`stock-card ${stockSummary.lowStockCount > 0 ? 'stock-card-alert' : ''}`}>
+                        <div className="stock-card-label">{stockSummary.lowStockCount > 0 && <AlertTriangle size={13} />} {t('materials.low_stock_items')}</div>
+                        <div className={`stock-card-value ${stockSummary.lowStockCount > 0 ? 'value-red' : ''}`}><CountUp to={stockSummary.lowStockCount} /></div>
+                    </div>
+                </div>
+
+                <div className="filter-bar">
+                    <div className="filter-group" style={{ flex: 2 }}>
+                        <label>{t('common.search')}</label>
+                        <input placeholder={t('projects.search_placeholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                    </div>
+                    {/* ✅ Category filter */}
+                    <div className="filter-group" style={{ flex: 1 }}>
                         <label>{t('common.category')}</label>
-                        <select value={allCategories.includes(form.category) ? form.category : 'Other'} onChange={(e) => {
-                            if (e.target.value === 'Other') setForm({ ...form, category: 'Other', customCategory: '' });
-                            else setForm({ ...form, category: e.target.value, customCategory: '' });
-                        }}>
+                        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+                            <option value="All">{t('common.all')}</option>
                             {allCategories.map((c) => <option key={c}>{c}</option>)}
-                            <option value="Other">{t('payments.categories.other')}</option>
                         </select>
                     </div>
-                    {(form.category === 'Other') && (
-                        <div className="form-group">
-                            <label>{t('projects.custom_type')}</label>
-                            <input placeholder="..." value={form.customCategory} onChange={(e) => setForm({ ...form, customCategory: e.target.value })} />
-                        </div>
-                    )}
+                </div>
 
-                    <div className="form-grid">
+                {/* ✅ Material count */}
+                <div className="result-count">
+                    {t('common.showing')} <strong>{filtered.length}</strong> {t('common.of')} <strong>{materials.length}</strong> {t('nav.materials')}
+                    {(search || catFilter !== 'All') && <span className="filter-active-tag">{t('common.filtered')}</span>}
+                </div>
+
+                <div className="crud-layout" style={{ gridTemplateColumns: '1fr' }}>
+                    <Card title={t('materials.material_list')}>
+                        <DataTable
+                            columns={columns}
+                            data={filtered}
+                            selectedId={selectedId}
+                            onRowClick={selectMaterial}
+                            emptyMessage={t('materials.no_materials')}
+                            renderExpansion={renderMaterialExpansion}
+                        />
+                    </Card>
+
+                    <Modal
+                        isOpen={isModalOpen}
+                        onClose={() => { setIsModalOpen(false); handleClear(); }}
+                        title={selectedId ? (isSuperAdminOrFinance ? t('materials.edit_material') : t('materials.project_assignment')) : t('materials.new_material')}
+                        onSave={isSuperAdminOrFinance ? handleSave : undefined}
+                        onDelete={selectedId && isSuperAdminOrFinance ? handleDelete : undefined}
+                    >
                         <div className="form-group">
-                            <label>{t('materials.stock_qty')}</label>
-                            <input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+                            <label>{t('materials.material_name')}</label>
+                            <input disabled={!isSuperAdminOrFinance} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={isNameDuplicate(form.name) ? 'input-error' : ''} />
+                            {/* ✅ Duplicate warning */}
+                            {isNameDuplicate(form.name) && <span className="field-error">⚠ A material with this name already exists</span>}
                         </div>
-                        {/* ✅ Unit dropdown from shared enums */}
+
+                        {/* ✅ Category dropdown */}
                         <div className="form-group">
-                            <label>{t('nav.tools')}</label>
-                            <select value={MeasurementUnits.includes(form.unit) ? form.unit : 'Other'} onChange={(e) => {
-                                if (e.target.value === 'Other') setForm({ ...form, unit: 'Other', customUnit: '' });
-                                else setForm({ ...form, unit: e.target.value, customUnit: '' });
+                            <label>{t('common.category')}</label>
+                            <select disabled={!isSuperAdminOrFinance} value={allCategories.includes(form.category) ? form.category : 'Other'} onChange={(e) => {
+                                if (e.target.value === 'Other') setForm({ ...form, category: 'Other', customCategory: '' });
+                                else setForm({ ...form, category: e.target.value, customCategory: '' });
                             }}>
-                                {MeasurementUnits.map((u) => <option key={u}>{u}</option>)}
+                                {allCategories.map((c) => <option key={c}>{c}</option>)}
                                 <option value="Other">{t('payments.categories.other')}</option>
                             </select>
                         </div>
-                    </div>
-                    {(form.unit === 'Other') && (
-                        <div className="form-group">
-                            <label>{t('projects.custom_type')}</label>
-                            <input placeholder="..." value={form.customUnit} onChange={(e) => setForm({ ...form, customUnit: e.target.value })} />
-                        </div>
-                    )}
-
-                    <div className="form-grid">
-                        <div className="form-group">
-                            {/* ✅ Cost preview */}
-                            <label>{t('materials.unit_cost')} (LKR) {form.cost && <span className="rate-preview">{fmt(form.cost)}</span>}</label>
-                            <input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
-                        </div>
-                        {/* ✅ Minimum stock level */}
-                        <div className="form-group">
-                            <label>{t('materials.min_stock')}</label>
-                            <input type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
-                        </div>
-                    </div>
-
-                    {/* Total value preview */}
-                    {form.quantity && form.cost && (
-                        <div className="total-preview" style={{ marginBottom: 16, padding: '8px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
-                            {t('dashboard.total')}: <strong style={{ color: 'var(--text-primary)' }}>{fmt(form.quantity * form.cost)}</strong>
-                        </div>
-                    )}
-
-                    {/* ✅ Supplier dropdown */}
-                    <div className="form-group">
-                        <label>{t('nav.suppliers')}</label>
-                        <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-                            <option value="">— {t('common.all')} —</option>
-                            {suppliers.filter((s) => s.isActive !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                    </div>
-
-                    {/* ✅ Notes */}
-                    <div className="form-group">
-                        <label>{t('common.notes')}</label>
-                        <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                    </div>
-
-                    {/* Project Assignment Section */}
-                    <div className="assignment-section" style={{ borderTop: '1px solid var(--border-color)', marginTop: 16, paddingTop: 16 }}>
-                        <h4 style={{ fontSize: '0.875rem', marginBottom: 12, display: 'flex', alignItems: 'center' }}><Folder size={16} style={{ marginRight: 6, opacity: 0.7 }} /> {t('materials.project_assignment')}</h4>
-                        {!selectedId ? (
-                            <p className="text-muted-hint" style={{ fontSize: '0.8125rem' }}>{t('dashboard.no_projects')}</p>
-                        ) : (
-                            <>
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>{t('common.project')}</label>
-                                        <select value={assignProject} onChange={(e) => setAssignProject(e.target.value)}>
-                                            <option value="">— {t('common.all')} —</option>
-                                            {projects.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name} {p.status !== 'Ongoing' ? `[${p.status}]` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('materials.stock_qty')}</label>
-                                        <input type="number" placeholder="0" value={assignQty} onChange={(e) => setAssignQty(e.target.value)} />
-                                    </div>
-                                </div>
-
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>{t('common.date')}</label>
-                                        <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('common.notes')}</label>
-                                        <input value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} />
-                                    </div>
-                                </div>
-                                <BounceButton className="btn btn-primary btn-sm mt-2" onClick={assignToProject}><Plus size={14} /> {t('materials.assign_to_project')}</BounceButton>
-
-                                {assignments.length > 0 && (
-                                    <div className="history-list mt-4" style={{ maxHeight: '120px', overflowY: 'auto', background: 'var(--bg-card)', padding: 8, borderRadius: 6, border: '1px solid var(--border-color)' }}>
-                                        <div className="history-header" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: 8 }}>{t('materials.project_assignment')} ({assignments.length})</div>
-                                        {assignments.map((a) => (
-                                            <div key={a.id} className="history-item" style={{ fontSize: '0.8125rem', padding: '4px 0', borderBottom: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div className="history-item-info">
-                                                    <strong>{getProjectName(a.projectId)}</strong>
-                                                    <span style={{ margin: '0 8px' }}>{a.quantity} {form.unit !== 'Other' ? form.unit : form.customUnit}</span>
-                                                    <span className="text-muted">{a.date ? new Date(a.date).toLocaleDateString() : ''}</span>
-                                                    {a.notes && <div className="history-note text-muted" style={{ marginTop: 2 }}>{a.notes}</div>}
-                                                </div>
-                                                <BounceButton className="btn-icon delete" onClick={() => removeAssignment(a.id)}><Trash2 size={12} color="var(--text-danger)" /></BounceButton>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                        {(form.category === 'Other') && (
+                            <div className="form-group">
+                                <label>{t('projects.custom_type')}</label>
+                                <input placeholder="..." value={form.customCategory} onChange={(e) => setForm({ ...form, customCategory: e.target.value })} />
+                            </div>
                         )}
-                    </div>
-                </Modal>
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>{t('materials.stock_qty')}</label>
+                                <input disabled={!isSuperAdminOrFinance} type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+                            </div>
+                            {/* ✅ Unit dropdown from shared enums */}
+                            <div className="form-group">
+                                <label>{t('nav.tools')}</label>
+                                <select disabled={!isSuperAdminOrFinance} value={MeasurementUnits.includes(form.unit) ? form.unit : 'Other'} onChange={(e) => {
+                                    if (e.target.value === 'Other') setForm({ ...form, unit: 'Other', customUnit: '' });
+                                    else setForm({ ...form, unit: e.target.value, customUnit: '' });
+                                }}>
+                                    {MeasurementUnits.map((u) => <option key={u}>{u}</option>)}
+                                    <option value="Other">{t('payments.categories.other')}</option>
+                                </select>
+                            </div>
+                        </div>
+                        {(form.unit === 'Other') && (
+                            <div className="form-group">
+                                <label>{t('projects.custom_type')}</label>
+                                <input placeholder="..." value={form.customUnit} onChange={(e) => setForm({ ...form, customUnit: e.target.value })} />
+                            </div>
+                        )}
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                {/* ✅ Cost preview */}
+                                <label>{t('materials.unit_cost')} (LKR) {form.cost && <span className="rate-preview">{fmt(form.cost)}</span>}</label>
+                                <input disabled={!isSuperAdminOrFinance} type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+                            </div>
+                            {/* ✅ Minimum stock level */}
+                            <div className="form-group">
+                                <label>{t('materials.min_stock')}</label>
+                                <input disabled={!isSuperAdminOrFinance} type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
+                            </div>
+                        </div>
+
+                        {/* Total value preview */}
+                        {form.quantity && form.cost && (
+                            <div className="total-preview" style={{ marginBottom: 16, padding: '8px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+                                {t('dashboard.total')}: <strong style={{ color: 'var(--text-primary)' }}>{fmt(form.quantity * form.cost)}</strong>
+                            </div>
+                        )}
+
+                        {/* ✅ Supplier dropdown */}
+                        <div className="form-group">
+                            <label>{t('nav.suppliers')}</label>
+                            <select disabled={!isSuperAdminOrFinance} value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+                                <option value="">— {t('common.all')} —</option>
+                                {suppliers.filter((s) => s.isActive !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+
+                        {/* ✅ Notes */}
+                        <div className="form-group">
+                            <label>{t('common.notes')}</label>
+                            <textarea disabled={!isSuperAdminOrFinance} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                        </div>
+
+                        {/* Project Assignment Section */}
+                        <div className="assignment-section" style={{ borderTop: '1px solid var(--border-color)', marginTop: 16, paddingTop: 16 }}>
+                            <h4 style={{ fontSize: '0.875rem', marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+                                <Folder size={16} style={{ marginRight: 6, opacity: 0.7 }} />
+                                {t('materials.assign_to_project')}
+                            </h4>
+
+                            {projects.length === 0 ? (
+                                <p className="text-muted-hint" style={{ fontSize: '0.8125rem' }}>{t('dashboard.no_projects')}</p>
+                            ) : (
+                                <>
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>{t('common.project')}</label>
+                                            <select value={assignProject} onChange={(e) => setAssignProject(e.target.value)}>
+                                                <option value="">— {t('common.select')} —</option>
+                                                {projects.map((p) => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.name} {p.status !== 'Ongoing' ? `[${p.status}]` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t('materials.stock_qty')}</label>
+                                            <input type="number" placeholder="0" value={assignQty} onChange={(e) => setAssignQty(e.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>{t('common.date')}</label>
+                                            <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t('common.notes')}</label>
+                                            <input value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    {selectedId ? (
+                                        <BounceButton className="btn btn-primary btn-sm mt-2" onClick={assignToProject}>
+                                            <Plus size={14} /> {t('materials.assign_to_project')}
+                                        </BounceButton>
+                                    ) : (
+                                        <p className="text-muted-hint" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                                            {t('materials.assignment_hint_new' || 'This assignment will be applied upon saving the material.')}
+                                        </p>
+                                    )}
+
+                                    {assignments.length > 0 && (
+                                        <div className="history-list mt-4" style={{ maxHeight: '120px', overflowY: 'auto', background: 'var(--bg-card)', padding: 8, borderRadius: 6, border: '1px solid var(--border-color)' }}>
+                                            <div className="history-header" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: 8 }}>{t('materials.project_assignment')} ({assignments.length})</div>
+                                            {assignments.map((a) => (
+                                                <div key={a.id} className="history-item" style={{ fontSize: '0.8125rem', padding: '4px 0', borderBottom: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div className="history-item-info">
+                                                        <strong>{getProjectName(a.projectId)}</strong>
+                                                        <span style={{ margin: '0 8px' }}>{a.quantity} {form.unit !== 'Other' ? form.unit : form.customUnit}</span>
+                                                        <span className="text-muted">{a.date ? new Date(a.date).toLocaleDateString() : ''}</span>
+                                                        {a.notes && <div className="history-note text-muted" style={{ marginTop: 2 }}>{a.notes}</div>}
+                                                    </div>
+                                                    {isSuperAdminOrFinance && (
+                                                        <BounceButton className="btn-icon delete" onClick={() => removeAssignment(a.id)}><Trash2 size={12} color="var(--text-danger)" /></BounceButton>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </Modal>
+                </div>
             </div>
-        </div>
+        </GlobalLoadingOverlay>
     );
 }

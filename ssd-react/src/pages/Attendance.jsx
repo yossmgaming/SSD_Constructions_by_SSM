@@ -4,14 +4,19 @@ import { ChevronLeft, ChevronRight, Briefcase, CalendarDays, Clock, Download, Ch
 import ExportDropdown from '../components/ExportDropdown';
 import Card from '../components/Card';
 import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import './Attendance.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function Attendance() {
     const { t, i18n } = useTranslation();
+    const { hasRole } = useAuth();
     const [workers, setWorkers] = useState([]);
     const [projects, setProjects] = useState([]);
     const [attendances, setAttendances] = useState([]);
@@ -40,17 +45,13 @@ export default function Attendance() {
     async function loadBaseData() {
         setIsLoading(true);
         try {
-            const [wrks, projs, atts, pws] = await Promise.all([
+            // Only fetch active reference data. Attendances will be fetched per worker.
+            const [wrks, projs] = await Promise.all([
                 getAll(KEYS.workers),
-                getAll(KEYS.projects),
-                getAll(KEYS.attendances),
-                getAll(KEYS.projectWorkers)
+                getAll(KEYS.projects)
             ]);
             setWorkers(wrks);
             setProjects(projs);
-            // Sort attendances by date (ascending) to keep data organized
-            setAttendances([...atts].sort((a, b) => (a.date || '').localeCompare(b.date || '')));
-            setProjectWorkers(pws);
         } catch (error) {
             console.error(error);
         } finally {
@@ -60,19 +61,23 @@ export default function Attendance() {
 
     // Auto-detect worker's project assignments
     const detectWorkerProjects = useCallback(async (worker) => {
-        if (!worker) { setWorkerAssignments([]); return; }
+        if (!worker) {
+            setWorkerAssignments([]);
+            setAttendances([]);
+            setProjectWorkers([]);
+            return;
+        }
 
         setIsLoading(true);
         try {
-            // Need latest data for this detection
-            const [allAtt, allProjects, allPWs] = await Promise.all([
-                getAll(KEYS.attendances),
-                getAll(KEYS.projects),
-                getAll(KEYS.projectWorkers)
+            // Optimization: Only fetch data for this specific worker
+            const [workerAtt, workerPWs] = await Promise.all([
+                queryEq(KEYS.attendances, 'workerId', worker.id),
+                queryEq(KEYS.projectWorkers, 'workerId', worker.id)
             ]);
 
-            const workerAtt = allAtt.filter((a) => a.workerId === worker.id);
-            const workerPWs = allPWs.filter((pw) => pw.workerId === worker.id);
+            setAttendances(workerAtt.sort((a, b) => (a.date || '').localeCompare(b.date || '')));
+            setProjectWorkers(workerPWs);
 
             // Group attendance by project
             const projectMap = {};
@@ -89,15 +94,19 @@ export default function Attendance() {
             });
 
             const assignments = Object.values(projectMap).map((p) => {
-                const proj = allProjects.find((pr) => pr.id === p.projectId);
+                const proj = projects.find((pr) => pr.id === p.projectId);
                 const sortedDates = [...p.dates].sort();
+
+                // Detailed date range from projectWorkers table if available
+                const pwRecord = workerPWs.find(pw => pw.projectId === p.projectId);
+
                 return {
                     projectId: p.projectId,
                     projectName: proj?.name || 'Unknown Project',
                     projectStatus: proj?.status || '',
                     client: proj?.client || '',
-                    firstDate: sortedDates[0] || null,
-                    lastDate: sortedDates[sortedDates.length - 1] || null,
+                    firstDate: pwRecord?.assignedFrom || sortedDates[0] || null,
+                    lastDate: pwRecord?.assignedTo || sortedDates[sortedDates.length - 1] || null,
                     daysWorked: p.dates.length,
                     totalHours: p.hours,
                 };
@@ -109,18 +118,16 @@ export default function Attendance() {
 
             setWorkerAssignments(assignments);
 
-            // Auto-select the most recent project
-            if (assignments.length > 0) {
+            // Auto-select the most recent project if none selected
+            if (!selectedProject && assignments.length > 0) {
                 setSelectedProject(String(assignments[0].projectId));
-            } else {
-                setSelectedProject('');
             }
         } catch (error) {
             console.error(error);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [projects, selectedProject]);
 
     function handleSelectWorker(worker) {
         setSelectedWorker(worker);
@@ -202,7 +209,7 @@ export default function Attendance() {
     }, [selectedWorker, month, year, selectedProject, attendances]);
 
     function getDateStr(day) {
-        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        return `${year} -${String(month + 1).padStart(2, '0')} -${String(day).padStart(2, '0')} `;
     }
 
     function getAttendance(day) {
@@ -223,7 +230,7 @@ export default function Attendance() {
     }, [selectedWorker, selectedProject, projectWorkers]);
 
     function isDateInAssignment(day) {
-        if (assignmentRanges.length === 0) return true; // If no specific assignment record, allow default (or block? sticking to 'strict if exists')
+        if (assignmentRanges.length === 0) return false; // STRICT FIX: If no assignment record, BLOCK marking.
         // Actually, strictly speaking: if assignmentRanges is empty, it means "Not Assigned" to this project.
         // So we should probably return FALSE if we want to be strict.
         // But previously I said "if (!assignment) return null" -> "check if assignmentRange is null". 
@@ -260,21 +267,29 @@ export default function Attendance() {
     async function markAttendance(day, isPresent, isHalfDay, hoursWorked) {
         if (!selectedWorker) return;
 
+        const dateStr = getDateStr(day);
+        const projId = selectedProject ? parseInt(selectedProject) : null;
+
         // STABILITY FIX: Prevent marking if outside assignment
         if (!isDateInAssignment(day)) {
-            alert("Worker is not assigned to the project on this date.");
+            alert(t('attendance.error_no_assignment') || "Worker is not assigned to this project on this date.");
             return;
         }
 
-        const dateStr = getDateStr(day);
-        const projId = selectedProject ? parseInt(selectedProject) : null;
+        // DOUBLE ASSIGNMENT PREVENTION: Check if worker is assigned to ANOTHER project today
+        const otherProjectAtt = attendances.find(a => a.date === dateStr && a.projectId !== projId && a.isPresent);
+        if (otherProjectAtt) {
+            const otherProj = projects.find(p => p.id === otherProjectAtt.projectId);
+            alert(`${t('attendance.error_already_assigned') || "Worker is already marked present at"} ${otherProj?.name || 'another project'} ${t('attendance.on_this_date') || "on this date"}.`);
+            return;
+        }
 
         // Determine correct status string
         let statusStr = '';
         if (isPresent) {
             if (hoursWorked === 8 && !isHalfDay) statusStr = 'Present';
             else if (hoursWorked === 4 && isHalfDay) statusStr = 'Half Day';
-            else statusStr = `${hoursWorked}h`;
+            else statusStr = `${hoursWorked} h`;
         } else {
             statusStr = 'Absent';
         }
@@ -294,7 +309,7 @@ export default function Attendance() {
         const existing = getAttendance(day);
 
         // OPTIMISTIC UPDATE: Update state immediately
-        const tempId = existing ? existing.id : `temp-${Date.now()}`;
+        const tempId = existing ? existing.id : `temp - ${Date.now()} `;
         const previousAttendances = [...attendances];
 
         setAttendances(prev => {
@@ -473,202 +488,218 @@ export default function Attendance() {
     for (let i = 0; i < firstDayOfWeek; i++) calendarCells.push(null);
     for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
 
-    return (
-        <div className="attendance-page">
-            <div className="page-header">
-                <h1>{t('attendance.title')}</h1>
-                <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
-            </div>
-
-            <div className="attendance-layout">
-                <Card title={t('workers.title')}>
-                    <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 12 }} />
-                    <div className="worker-search-list" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                        {filteredWorkers.map((w) => {
-                            // Quick check if this worker has any project assigned
-                            const wAtt = attendances.filter((a) => a.workerId === w.id);
-                            const latestProjectId = wAtt.length > 0
-                                ? wAtt.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.projectId
-                                : null;
-                            const latestProject = latestProjectId ? projects.find((p) => p.id === latestProjectId) : null;
-                            return (
-                                <div key={w.id} className={`worker-item ${selectedWorker?.id === w.id ? 'active' : ''}`} onClick={() => handleSelectWorker(w)}>
-                                    <div className="worker-item-info">
-                                        <span>{w.fullName}</span>
-                                        {latestProject && (
-                                            <span className="worker-project-hint">{latestProject.name}</span>
-                                        )}
-                                    </div>
-                                    <span className="worker-role-tag">{w.role}</span>
-                                </div>
-                            );
-                        })}
+    if (!hasRole(['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'])) {
+        return (
+            <div className="attendance-page flex items-center justify-center" style={{ minHeight: '80vh' }}>
+                <Card>
+                    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+                        <Shield size={48} className="mx-auto mb-4" style={{ color: '#ef4444' }} />
+                        <h2 style={{ color: 'var(--text-color)', marginBottom: 8 }}>Access Denied</h2>
+                        <p>This module is for internal operational management and is not accessible to your role.</p>
                     </div>
                 </Card>
+            </div>
+        );
+    }
 
-                <Card>
-                    <div className="attendance-controls">
-                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
-                                <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}>
-                                    <option value="">{t('attendance.all_projects') || t('common.all')}</option>
-                                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="month-nav">
-                                <BounceButton onClick={prevMonth}><ChevronLeft size={18} /></BounceButton>
-                                <span className="month-label">{monthName}</span>
-                                <BounceButton onClick={nextMonth}><ChevronRight size={18} /></BounceButton>
-                            </div>
-                        </div>
+    return (
+        <GlobalLoadingOverlay loading={isLoading} message="Analysing Attendance Records...">
+            <div className="attendance-page">
+                <div className="page-header">
+                    <h1>{t('attendance.title')}</h1>
+                    <ExportDropdown onExport={handleExport} isLoading={isLoadingExport} />
+                </div>
 
-                        <div className="legend">
-                            <span><span className="legend-dot present" /> {t('attendance.present')}</span>
-                            <span><span className="legend-dot half" /> {t('attendance.half_day')}</span>
-                            <span><span className="legend-dot custom" /> {t('attendance.overtime')}</span>
-                            <span><span className="legend-dot absent" /> {t('attendance.absent')}</span>
-                        </div>
-                    </div>
-
-                    {/* Smart Project Assignment Card */}
-                    {selectedWorker && workerAssignments.length > 0 && (
-                        <div className="worker-assignments-card">
-                            <div className="assignments-header">
-                                <Briefcase size={16} />
-                                <span>{selectedWorker.fullName}{t('attendance.worker_assignments_suffix') || "'s Project Assignments"}</span>
-                            </div>
-                            <div className="assignments-list">
-                                {workerAssignments.map((a) => (
-                                    <div
-                                        key={a.projectId}
-                                        className={`assignment-item ${String(a.projectId) === selectedProject ? 'active' : ''}`}
-                                        onClick={() => setSelectedProject(String(a.projectId))}
-                                    >
-                                        <div className="assignment-main">
-                                            <div className="assignment-name">{a.projectName}</div>
-                                            <span className={`badge ${a.projectStatus === 'Ongoing' ? 'badge-info' : a.projectStatus === 'Completed' ? 'badge-success' : 'badge-warning'}`}>
-                                                {a.projectStatus}
-                                            </span>
-                                        </div>
-                                        <div className="assignment-details">
-                                            {a.client && <span className="assignment-detail"><Briefcase size={12} /> {a.client}</span>}
-                                            {a.firstDate && (
-                                                <span className="assignment-detail">
-                                                    <CalendarDays size={12} />
-                                                    {new Date(a.firstDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })}
-                                                    {a.lastDate && a.lastDate !== a.firstDate && ` → ${new Date(a.lastDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })}`}
-                                                </span>
-                                            )}
-                                            <span className="assignment-detail"><Clock size={12} /> {a.daysWorked} {t('attendance.days')} · {a.totalHours}{t('attendance.hours_short')}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedWorker && (
-                        <div className="attendance-summary-bar">
-                            <div className="summary-chip present">{t('attendance.present')}: <strong>{presentDays}</strong></div>
-                            <div className="summary-chip half">{t('attendance.half_day')}: <strong>{halfDays}</strong></div>
-                            <div className="summary-chip absent">{t('attendance.absent')}: <strong>{absentDays}</strong></div>
-                            <div className="summary-chip hours">{t('attendance.hours')}: <strong>{totalHours}</strong></div>
-                        </div>
-                    )}
-
-                    <div className="attendance-hint">
-                        {selectedWorker
-                            ? t('attendance.hint_active') || '💡 Left-click to quick toggle  •  Right-click for options'
-                            : t('attendance.hint_empty') || 'Select a worker to view / mark attendance'}
-                    </div>
-
-                    {selectedWorker && (
-                        <div className="calendar-grid">
-                            {TRANSLATED_DAYS.map((d) => <div key={d} className="calendar-header">{d}</div>)}
-                            {calendarCells.map((day, i) => {
-                                if (day === null) return <div key={`e${i}`} className="calendar-day empty" />;
-
-                                const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
-                                const att = getAttendance(day);
-                                const isAssigned = isDateInAssignment(day);
-
-                                let statusClass = 'calendar-day';
-                                if (isToday) statusClass += ' today';
-
-                                if (!isAssigned) statusClass += ' not-assigned';
-                                else if (att?.isPresent && !att.isHalfDay) statusClass += ' present';
-                                else if (att?.isHalfDay) statusClass += ' half-day';
-                                else if (att?.isPresent && att?.status?.endsWith('h')) statusClass += ' custom-hours';
-                                else if (att && !att.isPresent) statusClass += ' absent';
-
+                <div className="attendance-layout">
+                    <Card title={t('workers.title')}>
+                        <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 12 }} />
+                        <div className="worker-search-list" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            {filteredWorkers.map((w) => {
+                                // Quick check if this worker has any project assigned
+                                const wAtt = attendances.filter((a) => a.workerId === w.id);
+                                const latestProjectId = wAtt.length > 0
+                                    ? wAtt.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.projectId
+                                    : null;
+                                const latestProject = latestProjectId ? projects.find((p) => p.id === latestProjectId) : null;
                                 return (
-                                    <div
-                                        key={i}
-                                        className={statusClass}
-                                        onClick={() => handleLeftClick(day)}
-                                        onContextMenu={(e) => handleContextMenu(e, day)}
-                                    >
-                                        <span className="day-number">{day}</span>
-                                        {att && att.status && (
-                                            <span className="atten-status">
-                                                {att.status === 'Present' ? t('attendance.present_short') || 'P' :
-                                                    att.status === 'Half Day' ? t('attendance.half_day_short') || 'H' :
-                                                        att.status === 'Absent' ? t('attendance.absent_short') || 'A' :
-                                                            att.status}
-                                            </span>
-                                        )}
+                                    <div key={w.id} className={`worker - item ${selectedWorker?.id === w.id ? 'active' : ''} `} onClick={() => handleSelectWorker(w)}>
+                                        <div className="worker-item-info">
+                                            <span>{w.fullName}</span>
+                                            {latestProject && (
+                                                <span className="worker-project-hint">{latestProject.name}</span>
+                                            )}
+                                        </div>
+                                        <span className="worker-role-tag">{w.role}</span>
                                     </div>
                                 );
                             })}
                         </div>
-                    )}
-                </Card>
-            </div>
+                    </Card>
 
-            {/* Right-click context menu */}
-            {menu && (
-                <div
-                    ref={menuRef}
-                    className="attendance-context-menu"
-                    style={{ top: menu.y, left: menu.x }}
-                >
-                    <div className="ctx-menu-header">{t('common.date')} {menu.day} — {selectedWorker?.fullName}</div>
-                    <BounceButton className="ctx-menu-item present" onClick={() => handleMenuAction('full')}>
-                        <span className="ctx-dot present" /> {t('attendance.present')} (8h)
-                    </BounceButton>
-                    <BounceButton className="ctx-menu-item half" onClick={() => handleMenuAction('half')}>
-                        <span className="ctx-dot half" /> {t('attendance.half_day')} (4h)
-                    </BounceButton>
-                    <BounceButton className="ctx-menu-item absent" onClick={() => handleMenuAction('absent')}>
-                        <span className="ctx-dot absent" /> {t('attendance.absent')}
-                    </BounceButton>
-                    <div className="ctx-menu-divider" />
-                    {!showCustomInput ? (
-                        <BounceButton className="ctx-menu-item custom" onClick={() => handleMenuAction('custom')}>
-                            <span className="ctx-dot custom" /> {t('attendance.overtime')}...
-                        </BounceButton>
-                    ) : (
-                        <div className="ctx-custom-input">
-                            <input
-                                type="number"
-                                min="0.5"
-                                max="24"
-                                step="0.5"
-                                placeholder={t('attendance.hours') + " (e.g. 6)"}
-                                value={customHoursInput}
-                                onChange={(e) => setCustomHoursInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && submitCustomHours()}
-                                autoFocus
-                            />
-                            <BounceButton className="btn btn-primary btn-sm" onClick={submitCustomHours}>{t('common.save')}</BounceButton>
+                    <Card>
+                        <div className="attendance-controls">
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+                                    <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}>
+                                        <option value="">{t('attendance.all_projects') || t('common.all')}</option>
+                                        {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="month-nav">
+                                    <BounceButton onClick={prevMonth}><ChevronLeft size={18} /></BounceButton>
+                                    <span className="month-label">{monthName}</span>
+                                    <BounceButton onClick={nextMonth}><ChevronRight size={18} /></BounceButton>
+                                </div>
+                            </div>
+
+                            <div className="legend">
+                                <span><span className="legend-dot present" /> {t('attendance.present')}</span>
+                                <span><span className="legend-dot half" /> {t('attendance.half_day')}</span>
+                                <span><span className="legend-dot custom" /> {t('attendance.overtime')}</span>
+                                <span><span className="legend-dot absent" /> {t('attendance.absent')}</span>
+                            </div>
                         </div>
-                    )}
-                    <div className="ctx-menu-divider" />
-                    <BounceButton className="ctx-menu-item clear" onClick={() => handleMenuAction('clear')}>
-                        ✕ {t('common.clear')}
-                    </BounceButton>
+
+                        {/* Smart Project Assignment Card */}
+                        {selectedWorker && workerAssignments.length > 0 && (
+                            <div className="worker-assignments-card">
+                                <div className="assignments-header">
+                                    <Briefcase size={16} />
+                                    <span>{selectedWorker.fullName}{t('attendance.worker_assignments_suffix') || "'s Project Assignments"}</span>
+                                </div>
+                                <div className="assignments-list">
+                                    {workerAssignments.map((a) => (
+                                        <div
+                                            key={a.projectId}
+                                            className={`assignment - item ${String(a.projectId) === selectedProject ? 'active' : ''} `}
+                                            onClick={() => setSelectedProject(String(a.projectId))}
+                                        >
+                                            <div className="assignment-main">
+                                                <div className="assignment-name">{a.projectName}</div>
+                                                <span className={`badge ${a.projectStatus === 'Ongoing' ? 'badge-info' : a.projectStatus === 'Completed' ? 'badge-success' : 'badge-warning'} `}>
+                                                    {a.projectStatus}
+                                                </span>
+                                            </div>
+                                            <div className="assignment-details">
+                                                {a.client && <span className="assignment-detail"><Briefcase size={12} /> {a.client}</span>}
+                                                {a.firstDate && (
+                                                    <span className="assignment-detail">
+                                                        <CalendarDays size={12} />
+                                                        {new Date(a.firstDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })}
+                                                        {a.lastDate && a.lastDate !== a.firstDate && ` → ${new Date(a.lastDate).toLocaleDateString(i18n.language === 'sn' ? 'si-LK' : 'en-US', { month: 'short', day: 'numeric' })} `}
+                                                    </span>
+                                                )}
+                                                <span className="assignment-detail"><Clock size={12} /> {a.daysWorked} {t('attendance.days')} · {a.totalHours}{t('attendance.hours_short')}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedWorker && (
+                            <div className="attendance-summary-bar">
+                                <div className="summary-chip present">{t('attendance.present')}: <strong>{presentDays}</strong></div>
+                                <div className="summary-chip half">{t('attendance.half_day')}: <strong>{halfDays}</strong></div>
+                                <div className="summary-chip absent">{t('attendance.absent')}: <strong>{absentDays}</strong></div>
+                                <div className="summary-chip hours">{t('attendance.hours')}: <strong>{totalHours}</strong></div>
+                            </div>
+                        )}
+
+                        <div className="attendance-hint">
+                            {selectedWorker
+                                ? t('attendance.hint_active') || '💡 Left-click to quick toggle  •  Right-click for options'
+                                : t('attendance.hint_empty') || 'Select a worker to view / mark attendance'}
+                        </div>
+
+                        {selectedWorker && (
+                            <div className="calendar-grid">
+                                {TRANSLATED_DAYS.map((d) => <div key={d} className="calendar-header">{d}</div>)}
+                                {calendarCells.map((day, i) => {
+                                    if (day === null) return <div key={`e${i} `} className="calendar-day empty" />;
+
+                                    const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
+                                    const att = getAttendance(day);
+                                    const isAssigned = isDateInAssignment(day);
+
+                                    let statusClass = 'calendar-day';
+                                    if (isToday) statusClass += ' today';
+
+                                    if (!isAssigned) statusClass += ' not-assigned';
+                                    else if (att?.isPresent && !att.isHalfDay) statusClass += ' present';
+                                    else if (att?.isHalfDay) statusClass += ' half-day';
+                                    else if (att?.isPresent && att?.status?.endsWith('h')) statusClass += ' custom-hours';
+                                    else if (att && !att.isPresent) statusClass += ' absent';
+
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={statusClass}
+                                            onClick={() => handleLeftClick(day)}
+                                            onContextMenu={(e) => handleContextMenu(e, day)}
+                                        >
+                                            <span className="day-number">{day}</span>
+                                            {att && att.status && (
+                                                <span className="atten-status">
+                                                    {att.status === 'Present' ? t('attendance.present_short') || 'P' :
+                                                        att.status === 'Half Day' ? t('attendance.half_day_short') || 'H' :
+                                                            att.status === 'Absent' ? t('attendance.absent_short') || 'A' :
+                                                                att.status}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </Card>
                 </div>
-            )}
-        </div>
+
+                {/* Right-click context menu */}
+                {menu && (
+                    <div
+                        ref={menuRef}
+                        className="attendance-context-menu"
+                        style={{ top: menu.y, left: menu.x }}
+                    >
+                        <div className="ctx-menu-header">{t('common.date')} {menu.day} — {selectedWorker?.fullName}</div>
+                        <BounceButton className="ctx-menu-item present" onClick={() => handleMenuAction('full')}>
+                            <span className="ctx-dot present" /> {t('attendance.present')} (8h)
+                        </BounceButton>
+                        <BounceButton className="ctx-menu-item half" onClick={() => handleMenuAction('half')}>
+                            <span className="ctx-dot half" /> {t('attendance.half_day')} (4h)
+                        </BounceButton>
+                        <BounceButton className="ctx-menu-item absent" onClick={() => handleMenuAction('absent')}>
+                            <span className="ctx-dot absent" /> {t('attendance.absent')}
+                        </BounceButton>
+                        <div className="ctx-menu-divider" />
+                        {!showCustomInput ? (
+                            <BounceButton className="ctx-menu-item custom" onClick={() => handleMenuAction('custom')}>
+                                <span className="ctx-dot custom" /> {t('attendance.overtime')}...
+                            </BounceButton>
+                        ) : (
+                            <div className="ctx-custom-input">
+                                <input
+                                    type="number"
+                                    min="0.5"
+                                    max="24"
+                                    step="0.5"
+                                    placeholder={t('attendance.hours') + " (e.g. 6)"}
+                                    value={customHoursInput}
+                                    onChange={(e) => setCustomHoursInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && submitCustomHours()}
+                                    autoFocus
+                                />
+                                <BounceButton className="btn btn-primary btn-sm" onClick={submitCustomHours}>{t('common.save')}</BounceButton>
+                            </div>
+                        )}
+                        <div className="ctx-menu-divider" />
+                        <BounceButton className="ctx-menu-item clear" onClick={() => handleMenuAction('clear')}>
+                            ✕ {t('common.clear')}
+                        </BounceButton>
+                    </div>
+                )}
+            </div>
+        </GlobalLoadingOverlay>
     );
 }

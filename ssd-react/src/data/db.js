@@ -28,8 +28,8 @@ export const KEYS = {
 
 // --- Supabase Async CRUD Functions ---
 
-export async function getAll(table) {
-    const { data, error } = await supabase.from(table).select('*');
+export async function getAll(table, columns = '*') {
+    const { data, error } = await supabase.from(table).select(columns);
     if (error) {
         console.error(`Error fetching ${table}:`, error);
         return [];
@@ -94,8 +94,8 @@ export async function query(table, filterFn) {
 }
 
 // Efficient equality check using Supabase server-side filtering
-export async function queryEq(table, column, value) {
-    const { data, error } = await supabase.from(table).select('*').eq(column, value);
+export async function queryEq(table, column, value, select = '*') {
+    const { data, error } = await supabase.from(table).select(select).eq(column, value);
     if (error) {
         console.error(`Error querying ${table} by ${column}=${value}:`, error);
         return [];
@@ -106,10 +106,10 @@ export async function queryEq(table, column, value) {
 /**
  * Advanced server-side querying
  * @param {string} table 
- * @param {object} options { filters: { eq: {}, range: { column, from, to } }, orderBy: { column, ascending }, limit: number }
+ * @param {object} options { filters: { eq: {}, range: { column, from, to } }, orderBy: { column, ascending }, limit: number, select: string }
  */
-export async function queryAdvanced(table, { filters = {}, orderBy = {}, limit = null } = {}) {
-    let q = supabase.from(table).select('*');
+export async function queryAdvanced(table, { filters = {}, orderBy = {}, limit = null, select = '*' } = {}) {
+    let q = supabase.from(table).select(select);
 
     // Filtering
     if (filters.eq) {

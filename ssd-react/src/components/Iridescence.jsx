@@ -1,5 +1,5 @@
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import './Iridescence.css';
 
 const vertexShader = `
@@ -45,28 +45,34 @@ void main() {
 }
 `;
 
-export default function Iridescence({
+const Iridescence = memo(({
     color = [1, 1, 1],
     speed = 1.0,
     amplitude = 0.1,
     mouseReact = true,
+    renderScale = 0.5, // Downsample resolution for performance
+    targetFPS = 30,    // Limit frame rate to save GPU cycles
     ...rest
-}) {
+}) => {
     const ctnDom = useRef(null);
     const mousePos = useRef({ x: 0.5, y: 0.5 });
+    const isVisible = useRef(true);
+    const isFocused = useRef(true);
+
+    // Create a stable string key for the color array to prevent useEffect re-triggering
+    const colorKey = JSON.stringify(color);
 
     useEffect(() => {
         if (!ctnDom.current) return;
         const ctn = ctnDom.current;
         const renderer = new Renderer();
         const gl = renderer.gl;
-        gl.clearColor(1, 1, 1, 1);
+        gl.clearColor(0, 0, 0, 0); // Transparent clear color
 
         let program;
 
         function resize() {
-            const scale = 1;
-            renderer.setSize(ctn.offsetWidth * scale, ctn.offsetHeight * scale);
+            renderer.setSize(ctn.offsetWidth * renderScale, ctn.offsetHeight * renderScale, false);
             if (program) {
                 program.uniforms.uResolution.value = new Color(
                     gl.canvas.width,
@@ -84,7 +90,7 @@ export default function Iridescence({
             fragment: fragmentShader,
             uniforms: {
                 uTime: { value: 0 },
-                uColor: { value: new Color(...color) },
+                uColor: { value: new Color(...JSON.parse(colorKey)) },
                 uResolution: {
                     value: new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height)
                 },
@@ -96,14 +102,46 @@ export default function Iridescence({
 
         const mesh = new Mesh(gl, { geometry, program });
         let animateId;
+        let lastTime = 0;
+        const interval = 1000 / targetFPS;
 
         function update(t) {
             animateId = requestAnimationFrame(update);
+
+            // Skip frames if window is not focused or component is not visible
+            if (!isVisible.current || !isFocused.current) return;
+
+            const delta = t - lastTime;
+            if (delta < interval) return;
+
+            lastTime = t - (delta % interval);
+
             program.uniforms.uTime.value = t * 0.001;
             renderer.render({ scene: mesh });
         }
         animateId = requestAnimationFrame(update);
         ctn.appendChild(gl.canvas);
+
+        // Visibility Observer
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                isVisible.current = entry.isIntersecting;
+            },
+            { threshold: 0 }
+        );
+        observer.observe(ctn);
+
+        // Focus and Visibility Handlers
+        const handleFocus = () => { isFocused.current = true; };
+        const handleBlur = () => { isFocused.current = false; };
+        const handleVisibilityChange = () => {
+            if (document.hidden) isFocused.current = false;
+            else if (document.hasFocus()) isFocused.current = true;
+        };
+
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('blur', handleBlur);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         function handleMouseMove(e) {
             const rect = ctn.getBoundingClientRect();
@@ -120,13 +158,21 @@ export default function Iridescence({
         return () => {
             cancelAnimationFrame(animateId);
             window.removeEventListener('resize', resize);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('blur', handleBlur);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            observer.disconnect();
             if (mouseReact) {
                 ctn.removeEventListener('mousemove', handleMouseMove);
             }
-            ctn.removeChild(gl.canvas);
+            if (gl.canvas && ctn.contains(gl.canvas)) {
+                ctn.removeChild(gl.canvas);
+            }
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         };
-    }, [color, speed, amplitude, mouseReact]);
+    }, [colorKey, speed, amplitude, mouseReact, renderScale, targetFPS]);
 
     return <div ref={ctnDom} className="iridescence-container" {...rest} />;
-}
+});
+
+export default Iridescence;

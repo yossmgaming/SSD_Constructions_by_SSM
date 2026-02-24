@@ -1,3 +1,110 @@
 .suppliers-page {
     animation: fadeIn 0.3s ease-out;
 }
+
+/* Supplier Expansion Styles */
+.supplier-expansion-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 24px;
+}
+
+.expansion-col h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+}
+
+.material-list-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.material-item-inline {
+    background: #ffffff;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+}
+
+.mat-name {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+}
+
+.mat-stock {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.mat-value {
+    font-weight: 600;
+    color: #10b981;
+    font-size: 0.8125rem;
+}
+
+.total-row-inline {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border-color);
+    margin-top: 4px;
+    font-size: 0.8125rem;
+}
+
+.total-row-inline strong {
+    color: #10b981;
+}
+
+.details-mini-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.detail-item label {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.detail-item span {
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.address-text,
+.notes-text {
+    display: block;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 4px;
+    border: 1px dashed var(--border-color);
+    line-height: 1.5;
+    font-size: 0.8125rem;
+}
+
+.expansion-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.no-data-small {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px;
+}

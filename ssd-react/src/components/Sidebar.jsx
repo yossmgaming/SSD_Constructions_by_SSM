@@ -15,21 +15,27 @@ import { HandCoinsIcon } from './icons/HandCoinsIcon';
 import { CogIcon } from './icons/CogIcon';
 import { PackageIcon } from './icons/PackageIcon';
 import { LandmarkIcon } from './icons/LandmarkIcon';
-import { FileSignatureIcon } from './icons/FileSignatureIcon';
+import { UsersIcon } from './icons/UsersIcon';
+import { FileTextIcon } from './icons/FileTextIcon';
+import { KeyIcon } from 'lucide-react'; // Import KeyIcon from lucide-react
 import GradientText from './GradientText';
 import GlareHover from './GlareHover';
 import logoSrc from '../../Logo/Logo_16-9.png';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
+// Import useAuth
 import './Sidebar.css';
 
 const navItems = [
     { to: '/', label: 'nav.dashboard', icon: LayoutPanelTopIcon },
     { to: '/projects', label: 'nav.projects', icon: ConstructionIcon },
-    { to: '/workers', label: 'nav.workers', icon: SmileIcon },
-    { to: '/materials', label: 'nav.materials', icon: PackageIcon },
-    { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon },
-    { to: '/payments', label: 'nav.payments', icon: DollarSignIcon },
-    { to: '/attendance', label: 'nav.attendance', icon: CalendarCheckIcon },
-    { to: '/reports', label: 'nav.reports', icon: ChartSplineIcon },
+    { to: '/clients', label: 'nav.clients', icon: UsersIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/workers', label: 'nav.workers', icon: SmileIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/materials', label: 'nav.materials', icon: PackageIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/payments', label: 'nav.payments', icon: DollarSignIcon, roles: ['Super Admin', 'Finance'] },
+    { to: '/attendance', label: 'nav.attendance', icon: CalendarCheckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/reports', label: 'nav.reports', icon: ChartSplineIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
 ];
 
 const financeItems = [
@@ -38,10 +44,11 @@ const financeItems = [
 ];
 
 const toolItems = [
-    { to: '/boq-generator', label: 'nav.boq_generator', icon: CalculatorIcon },
-    { to: '/agreements', label: 'nav.agreements', icon: FileSignatureIcon },
-    { to: '/advances', label: 'nav.advances', icon: ClipboardIcon },
-    { to: '/rates', label: 'nav.rates', icon: HandCoinsIcon },
+    { to: '/boq-generator', label: 'nav.boq_generator', icon: CalculatorIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/agreements', label: 'nav.agreements', icon: FileTextIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/advances', label: 'nav.advances', icon: ClipboardIcon, roles: ['Super Admin', 'Finance'] },
+    { to: '/rates', label: 'nav.rates', icon: HandCoinsIcon, roles: ['Super Admin', 'Finance'] },
+    { to: '/personnel-command', label: 'nav.personnel_command', icon: Shield, roles: ['Super Admin', 'Finance'] }
 ];
 
 const settingsItem = { to: '/settings', label: 'nav.settings', icon: CogIcon };
@@ -77,12 +84,17 @@ const NavItem = ({ item, onClose, t }) => {
 export default function Sidebar({ isOpen, onClose }) {
     const location = useLocation();
     const { t, i18n } = useTranslation();
+    const { hasRole } = useAuth();
 
     const changeLanguage = (lng) => {
         i18n.changeLanguage(lng);
     };
 
-    const renderLink = (item) => <NavItem key={item.to} item={item} onClose={onClose} t={t} />;
+    const renderLink = (item) => {
+        if (item.roles && !hasRole(item.roles)) return null;
+        if (item.adminOnly && !hasRole(['Super Admin', 'Finance'])) return null;
+        return <NavItem key={item.to} item={item} onClose={onClose} t={t} />;
+    };
 
 
 
@@ -99,9 +111,13 @@ export default function Sidebar({ isOpen, onClose }) {
             <nav className="sidebar-nav">
                 {navItems.map(renderLink)}
 
-                <div className="sidebar-divider" />
-                <div className="sidebar-section-label">{t('nav.finance')}</div>
-                {financeItems.map(renderLink)}
+                {hasRole(['Super Admin', 'Finance']) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        <div className="sidebar-section-label">{t('nav.finance')}</div>
+                        {financeItems.map(renderLink)}
+                    </>
+                )}
 
                 <div className="sidebar-divider" />
                 <div className="sidebar-section-label">{t('nav.tools')}</div>

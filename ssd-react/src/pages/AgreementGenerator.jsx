@@ -6,7 +6,9 @@ import ExportDropdown from '../components/ExportDropdown';
 import { getAll, create, update, KEYS } from '../data/db';
 import { exportAgreementData } from '../utils/exportUtils';
 import './AgreementGenerator.css';
-import { CheckCircle2Icon, FileSignatureIcon, SaveIcon } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+import { CheckCircle2Icon, SaveIcon, Plus } from 'lucide-react';
+import { FileTextIcon } from '../components/icons/FileTextIcon';
 
 export default function AgreementGenerator() {
     const { t } = useTranslation();
@@ -37,6 +39,7 @@ export default function AgreementGenerator() {
     const [signName, setSignName] = useState('');
 
     const previewRef = useRef(null);
+    const signIconRef = useRef(null);
 
     useEffect(() => {
         loadData();
@@ -619,13 +622,24 @@ export default function AgreementGenerator() {
                 entityId,
                 title: currentAgreement.title,
                 content: currentAgreement.content,
-                status: 'Draft'
+                status: 'Draft',
+                // Metadata for full restoration
+                clientSubType: type === 'Client' ? clientSubType : null,
+                exportLanguage,
+                selectedRuleSet,
+                mouText: clientSubType === 'MOU' ? mouText : null,
+                voDetails: clientSubType === 'VariationOrder' ? {
+                    description: voDescription,
+                    reason: voReason,
+                    cost: voCost,
+                    time: voTime
+                } : null
             };
 
             if (currentAgreement.id === 'temp_new') {
                 const res = await create(KEYS.agreements, payload);
                 setCurrentAgreement(res);
-                setAgreements([...agreements, res]);
+                setAgreements([res, ...agreements]);
             } else {
                 const res = await update(KEYS.agreements, currentAgreement.id, payload);
                 setCurrentAgreement(res);
@@ -645,14 +659,24 @@ export default function AgreementGenerator() {
         try {
             let idToUpdate = currentAgreement.id;
 
-            // If it's not saved yet, save it first
+            // If it's not saved yet, save it first with full metadata
             if (idToUpdate === 'temp_new') {
                 const payload = {
-                    type: currentAgreement.type,
-                    entityId: currentAgreement.entityId,
+                    type,
+                    entityId,
                     title: currentAgreement.title,
                     content: currentAgreement.content,
-                    status: 'Draft'
+                    status: 'Draft',
+                    clientSubType: type === 'Client' ? clientSubType : null,
+                    exportLanguage,
+                    selectedRuleSet,
+                    mouText: clientSubType === 'MOU' ? mouText : null,
+                    voDetails: clientSubType === 'VariationOrder' ? {
+                        description: voDescription,
+                        reason: voReason,
+                        cost: voCost,
+                        time: voTime
+                    } : null
                 };
                 const res = await create(KEYS.agreements, payload);
                 idToUpdate = res.id;
@@ -675,6 +699,36 @@ export default function AgreementGenerator() {
         } finally {
             setIsSaving(false);
         }
+    }
+
+    function handleClear() {
+        setEntityId('');
+        setMouText('');
+        setVoDescription('');
+        setVoCost('');
+        setVoTime('');
+        setCurrentAgreement(null);
+    }
+
+    function selectAgreement(agr) {
+        setType(agr.type || 'Client');
+        setEntityId(agr.entityId || '');
+        setExportLanguage(agr.exportLanguage || 'en');
+        setSelectedRuleSet(agr.selectedRuleSet || 'Standard');
+
+        if (agr.type === 'Client' && agr.clientSubType) {
+            setClientSubType(agr.clientSubType);
+        }
+
+        if (agr.mouText) setMouText(agr.mouText);
+        if (agr.voDetails) {
+            setVoDescription(agr.voDetails.description || '');
+            setVoReason(agr.voDetails.reason || 'Client Request');
+            setVoCost(agr.voDetails.cost || '');
+            setVoTime(agr.voDetails.time || '');
+        }
+
+        setCurrentAgreement(agr);
     }
 
     async function handleExport(format) {
@@ -702,203 +756,242 @@ export default function AgreementGenerator() {
         }
     }
 
-    if (isLoading) return <div className="loading-screen">Loading Agreements...</div>;
+    // if (isLoading) return <div className="loading-screen">Loading Agreements...</div>;
 
     const entities = (type === 'Client') ? projects : (type === 'Worker' || type === 'Management' || type === 'Accountant') ? workers : suppliers;
 
     return (
-        <div className="agreement-container page-animate">
-            <div className="page-header">
-                <h1>{t('nav.agreements', { defaultValue: 'Agreement Generator' })}</h1>
-                <div className="page-header-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    {currentAgreement && currentAgreement.status !== 'Signed' && (
-                        <BounceButton className="btn btn-primary" onClick={handleSaveDraft} disabled={isSaving}>
-                            <SaveIcon size={18} /> {isSaving ? 'Saving...' : 'Save Draft'}
-                        </BounceButton>
-                    )}
-                    {currentAgreement && currentAgreement.status === 'Signed' && (
-                        <div className="badge badge-success"><CheckCircle2Icon size={16} /> Legally Signed</div>
-                    )}
-                    <ExportDropdown onExport={handleExport} isLoading={exportLoading} exclude={['pdf', 'excel', 'csv']} />
+        <GlobalLoadingOverlay loading={isLoading} message="Generating Legally Binding Instrument...">
+            <div className="agreement-container page-animate">
+                <div className="page-header">
+                    <h1>{t('nav.agreements', { defaultValue: 'Agreement Generator' })}</h1>
+                    <div className="page-header-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        {currentAgreement && currentAgreement.status !== 'Signed' && (
+                            <BounceButton className="btn btn-primary" onClick={handleSaveDraft} disabled={isSaving}>
+                                <SaveIcon size={18} /> {isSaving ? 'Saving...' : 'Save Draft'}
+                            </BounceButton>
+                        )}
+                        {currentAgreement && currentAgreement.status === 'Signed' && (
+                            <div className="badge badge-success"><CheckCircle2Icon size={16} /> Legally Signed</div>
+                        )}
+                        <ExportDropdown onExport={handleExport} isLoading={exportLoading} exclude={['pdf', 'excel', 'csv']} />
+                        <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}><Plus size={18} /> New Agreement</BounceButton>
+                    </div>
                 </div>
-            </div>
 
-            <div className="agreement-layout">
-                <Card className="agreement-sidebar">
-                    <div className="agreement-form">
-                        <div className="form-group">
-                            <label>Agreement Category</label>
-                            <select value={type} onChange={e => { setType(e.target.value); setEntityId(''); setClientSubType('LetterOfAcceptance'); }}>
-                                <option value="Client">Client Contracts (SBD-03)</option>
-                                <option value="Worker">Worker Employment</option>
-                                <option value="Management">Management (Supervisors/Engineers)</option>
-                                <option value="Accountant">Accountant (Financial Compliance)</option>
-                                <option value="Supplier">Supplier Agreement</option>
-                                <option value="Subcontractor">Subcontractor Agreement</option>
-                            </select>
+                <div className="agreement-layout">
+                    <Card className="agreement-sidebar">
+                        <div className="agreement-form">
+                            <div className="form-group">
+                                <label>Agreement Category</label>
+                                <select value={type} onChange={e => { setType(e.target.value); setEntityId(''); setClientSubType('LetterOfAcceptance'); }}>
+                                    <option value="Client">Client Contracts (SBD-03)</option>
+                                    <option value="Worker">Worker Employment</option>
+                                    <option value="Management">Management (Supervisors/Engineers)</option>
+                                    <option value="Accountant">Accountant (Financial Compliance)</option>
+                                    <option value="Supplier">Supplier Agreement</option>
+                                    <option value="Subcontractor">Subcontractor Agreement</option>
+                                </select>
+                            </div>
+
+                            {type === 'Client' && (
+                                <div className="form-group">
+                                    <label>SBD-03 Document Type</label>
+                                    <select value={clientSubType} onChange={e => { setClientSubType(e.target.value); setCurrentAgreement(null); setMouText(''); }}>
+                                        <option value="LetterOfAcceptance">Letter of Acceptance</option>
+                                        <option value="ContractAgreement">Contract Agreement</option>
+                                        <option value="MOU">Memorandum of Understanding</option>
+                                        <option value="AcceptedBOQ">Accepted BOQ</option>
+                                        <option value="ConditionsOfContract">Conditions of Contract</option>
+                                        <option value="VariationOrder">Variation Order Form</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label>Select {type}</label>
+                                <select value={entityId} onChange={e => setEntityId(e.target.value)}>
+                                    <option value="">-- Choose --</option>
+                                    {entities.map(e => (
+                                        <option key={e.id} value={e.id}>
+                                            {e.fullName || e.name || e.companyName} {(type === 'Client' && e.client) ? `(${e.client})` : ''}
+                                            {(type === 'Worker' && e.role) ? ` - ${e.role}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Export Language</label>
+                                <div className="language-toggle" style={{ display: 'flex', gap: '8px' }}>
+                                    <button className={`btn-toggle ${exportLanguage === 'en' ? 'active' : ''}`} onClick={() => setExportLanguage('en')}>English</button>
+                                    <button className={`btn-toggle ${exportLanguage === 'sn' ? 'active' : ''}`} onClick={() => setExportLanguage('sn')}>සිංහල</button>
+                                    <button className={`btn-toggle ${exportLanguage === 'ta' ? 'active' : ''}`} onClick={() => setExportLanguage('ta')}>தமிழ்</button>
+                                </div>
+                            </div>
+
+                            {(type === 'Worker' || type === 'Management' || type === 'Accountant' || type === 'Subcontractor') && (
+                                <div className="form-group">
+                                    <label>Agreement Rules</label>
+                                    <select value={selectedRuleSet} onChange={e => setSelectedRuleSet(e.target.value)}>
+                                        <option value="Standard">Standard (Basic Legal)</option>
+                                        <option value="Strict">Strict (High Monitoring + Biometrics)</option>
+                                        <option value="Comprehensive">Comprehensive (Corporate SSD Standards)</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
-                        {type === 'Client' && (
-                            <div className="form-group">
-                                <label>SBD-03 Document Type</label>
-                                <select value={clientSubType} onChange={e => { setClientSubType(e.target.value); setCurrentAgreement(null); setMouText(''); }}>
-                                    <option value="LetterOfAcceptance">Letter of Acceptance</option>
-                                    <option value="ContractAgreement">Contract Agreement</option>
-                                    <option value="MOU">Memorandum of Understanding</option>
-                                    <option value="AcceptedBOQ">Accepted BOQ</option>
-                                    <option value="ConditionsOfContract">Conditions of Contract</option>
-                                    <option value="VariationOrder">Variation Order Form</option>
-                                </select>
+                        {currentAgreement && currentAgreement.status === 'Draft' && (
+                            <div className="signature-box">
+                                <p>Digital Signature Required</p>
+                                {currentAgreement.blockReason ? (
+                                    <div className="text-danger" style={{ padding: '10px', background: '#fee2e2', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '10px', color: '#991b1b' }}>
+                                        <strong>Signing Blocked:</strong> {currentAgreement.blockReason}
+                                    </div>
+                                ) : (
+                                    <BounceButton
+                                        className="btn btn-secondary w-full"
+                                        onClick={() => setShowSignModal(true)}
+                                        onMouseEnter={() => signIconRef.current?.startAnimation?.()}
+                                        onMouseLeave={() => signIconRef.current?.stopAnimation?.()}
+                                    >
+                                        <FileTextIcon ref={signIconRef} size={18} /> Sign Document
+                                    </BounceButton>
+                                )}
+                                <small className="mt-2 text-muted">Serves as an electronic record under the Electronic Transactions Act</small>
                             </div>
                         )}
 
-                        <div className="form-group">
-                            <label>Select {type}</label>
-                            <select value={entityId} onChange={e => setEntityId(e.target.value)}>
-                                <option value="">-- Choose --</option>
-                                {entities.map(e => (
-                                    <option key={e.id} value={e.id}>
-                                        {e.fullName || e.name || e.companyName} {(type === 'Client' && e.client) ? `(${e.client})` : ''}
-                                        {(type === 'Worker' && e.role) ? ` - ${e.role}` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Export Language</label>
-                            <div className="language-toggle" style={{ display: 'flex', gap: '8px' }}>
-                                <button className={`btn-toggle ${exportLanguage === 'en' ? 'active' : ''}`} onClick={() => setExportLanguage('en')}>English</button>
-                                <button className={`btn-toggle ${exportLanguage === 'sn' ? 'active' : ''}`} onClick={() => setExportLanguage('sn')}>සිංහල</button>
-                                <button className={`btn-toggle ${exportLanguage === 'ta' ? 'active' : ''}`} onClick={() => setExportLanguage('ta')}>தமிழ்</button>
+                        {type === 'Client' && clientSubType === 'MOU' && currentAgreement && currentAgreement.status === 'Draft' && (
+                            <div className="form-group" style={{ marginTop: '20px' }}>
+                                <label>Custom MOU Clauses</label>
+                                <textarea
+                                    value={mouText}
+                                    onChange={e => setMouText(e.target.value)}
+                                    placeholder="Enter custom project clauses, access times, or side-deals here..."
+                                    rows={6}
+                                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', resize: 'vertical' }}
+                                />
                             </div>
-                        </div>
+                        )}
 
-                        {(type === 'Worker' || type === 'Management' || type === 'Accountant' || type === 'Subcontractor') && (
-                            <div className="form-group">
-                                <label>Agreement Rules</label>
-                                <select value={selectedRuleSet} onChange={e => setSelectedRuleSet(e.target.value)}>
-                                    <option value="Standard">Standard (Basic Legal)</option>
-                                    <option value="Strict">Strict (High Monitoring + Biometrics)</option>
-                                    <option value="Comprehensive">Comprehensive (Corporate SSD Standards)</option>
-                                </select>
+                        {type === 'Client' && clientSubType === 'VariationOrder' && currentAgreement && currentAgreement.status === 'Draft' && (
+                            <div className="variation-form" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div className="form-group">
+                                    <label>Variation Description</label>
+                                    <textarea value={voDescription} onChange={e => setVoDescription(e.target.value)} placeholder="Describe the change..." rows={3} style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reason</label>
+                                    <select value={voReason} onChange={e => setVoReason(e.target.value)} style={{ width: '100%' }}>
+                                        <option>Client Request</option>
+                                        <option>Design Change</option>
+                                        <option>Unforeseen Site Condition</option>
+                                        <option>Material Unavailability</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <div className="form-group">
+                                        <label>Cost Impact (LKR)</label>
+                                        <input type="number" value={voCost} onChange={e => setVoCost(e.target.value)} placeholder="e.g. 150000 or -50000" style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Time Impact (Days)</label>
+                                        <input type="number" value={voTime} onChange={e => setVoTime(e.target.value)} placeholder="e.g. 5" style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <Card title="Saved Agreements" className="agreements-list-card">
+                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                {agreements.length === 0 ? (
+                                    <div className="empty-state text-muted" style={{ textAlign: 'center', padding: 20 }}>No agreements saved yet</div>
+                                ) : (
+                                    agreements.map((a) => (
+                                        <div
+                                            key={a.id}
+                                            className={`agreement-list-item ${currentAgreement?.id === a.id ? 'active' : ''}`}
+                                            onClick={() => selectAgreement(a)}
+                                            style={{
+                                                padding: '10px',
+                                                borderBottom: '1px solid var(--border-color)',
+                                                cursor: 'pointer',
+                                                borderRadius: '6px',
+                                                marginBottom: '4px',
+                                                background: currentAgreement?.id === a.id ? 'var(--primary-light)' : 'transparent',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{a.title}</div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                                <span className={`status-badge ${a.status.toLowerCase()}`} style={{ fontSize: '0.7rem' }}>{a.status}</span>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{a.documentDate ? new Date(a.documentDate).toLocaleDateString() : new Date(a.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </Card>
+                    </Card>
+
+                    <div className="document-preview-container">
+                        {currentAgreement ? (
+                            <div className="document-preview" ref={previewRef}>
+                                <div dangerouslySetInnerHTML={{ __html: currentAgreement.content }} />
+
+                                <div className="signature-grid">
+                                    <div className="signature-line">
+                                        <strong>For SSD CONSTRUCTIONS</strong>
+                                        <span>Authorized Signatory</span>
+                                    </div>
+                                    <div className="signature-line">
+                                        <strong>For the {type === 'Client' ? 'Employer' : type === 'Worker' ? 'Employee' : 'Supplier'}</strong>
+                                        <span>Authorized Signatory</span>
+                                    </div>
+                                </div>
+
+                                {currentAgreement.status === 'Signed' && (
+                                    <div className="watermark-signed">SIGNED<br /><span style={{ fontSize: 24 }}>{new Date(currentAgreement.signedAt.replace(' ', 'T')).toLocaleDateString()}</span></div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="empty-state text-muted" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                Select an agreement type and entity to generate a preview.
                             </div>
                         )}
                     </div>
+                </div>
 
-                    {currentAgreement && currentAgreement.status === 'Draft' && (
-                        <div className="signature-box">
-                            <p>Digital Signature Required</p>
-                            {currentAgreement.blockReason ? (
-                                <div className="text-danger" style={{ padding: '10px', background: '#fee2e2', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '10px', color: '#991b1b' }}>
-                                    <strong>Signing Blocked:</strong> {currentAgreement.blockReason}
-                                </div>
-                            ) : (
-                                <BounceButton className="btn btn-secondary w-full" onClick={() => setShowSignModal(true)}>
-                                    <FileSignatureIcon size={18} /> Sign Document
+                {/* Signature Modal */}
+                {showSignModal && (
+                    <div className="modal-overlay">
+                        <Card className="modal-content" style={{ maxWidth: 400 }}>
+                            <h3 style={{ marginBottom: 20 }}>Digital Signature (CES)</h3>
+                            <p className="text-muted" style={{ marginBottom: 20 }}>
+                                By typing your name below, you electronically sign this <strong>{currentAgreement?.title}</strong>, serving as an electronic record and evidence of agreement under the Electronic Transactions Act.
+                            </p>
+                            <div className="form-group" style={{ marginBottom: 20 }}>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Enter your full name"
+                                    value={signName}
+                                    onChange={e => setSignName(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}
+                                />
+                            </div>
+                            <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                <BounceButton className="btn btn-ghost" onClick={() => setShowSignModal(false)}>Cancel</BounceButton>
+                                <BounceButton className="btn btn-primary" onClick={handleSign} disabled={!signName.trim() || isSaving}>
+                                    {isSaving ? 'Signing...' : 'Sign Legal Document'}
                                 </BounceButton>
-                            )}
-                            <small className="mt-2 text-muted">Serves as an electronic record under the Electronic Transactions Act</small>
-                        </div>
-                    )}
-
-                    {type === 'Client' && clientSubType === 'MOU' && currentAgreement && currentAgreement.status === 'Draft' && (
-                        <div className="form-group" style={{ marginTop: '20px' }}>
-                            <label>Custom MOU Clauses</label>
-                            <textarea
-                                value={mouText}
-                                onChange={e => setMouText(e.target.value)}
-                                placeholder="Enter custom project clauses, access times, or side-deals here..."
-                                rows={6}
-                                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', resize: 'vertical' }}
-                            />
-                        </div>
-                    )}
-
-                    {type === 'Client' && clientSubType === 'VariationOrder' && currentAgreement && currentAgreement.status === 'Draft' && (
-                        <div className="variation-form" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div className="form-group">
-                                <label>Variation Description</label>
-                                <textarea value={voDescription} onChange={e => setVoDescription(e.target.value)} placeholder="Describe the change..." rows={3} style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
                             </div>
-                            <div className="form-group">
-                                <label>Reason</label>
-                                <select value={voReason} onChange={e => setVoReason(e.target.value)} style={{ width: '100%' }}>
-                                    <option>Client Request</option>
-                                    <option>Design Change</option>
-                                    <option>Unforeseen Site Condition</option>
-                                    <option>Material Unavailability</option>
-                                </select>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <div className="form-group">
-                                    <label>Cost Impact (LKR)</label>
-                                    <input type="number" value={voCost} onChange={e => setVoCost(e.target.value)} placeholder="e.g. 150000 or -50000" style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Time Impact (Days)</label>
-                                    <input type="number" value={voTime} onChange={e => setVoTime(e.target.value)} placeholder="e.g. 5" style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }} />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </Card>
-
-                <div className="document-preview-container">
-                    {currentAgreement ? (
-                        <div className="document-preview" ref={previewRef}>
-                            <div dangerouslySetInnerHTML={{ __html: currentAgreement.content }} />
-
-                            <div className="signature-grid">
-                                <div className="signature-line">
-                                    <strong>For SSD CONSTRUCTIONS</strong>
-                                    <span>Authorized Signatory</span>
-                                </div>
-                                <div className="signature-line">
-                                    <strong>For the {type === 'Client' ? 'Employer' : type === 'Worker' ? 'Employee' : 'Supplier'}</strong>
-                                    <span>Authorized Signatory</span>
-                                </div>
-                            </div>
-
-                            {currentAgreement.status === 'Signed' && (
-                                <div className="watermark-signed">SIGNED<br /><span style={{ fontSize: 24 }}>{new Date(currentAgreement.signedAt.replace(' ', 'T')).toLocaleDateString()}</span></div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="empty-state text-muted" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            Select an agreement type and entity to generate a preview.
-                        </div>
-                    )}
-                </div>
+                        </Card>
+                    </div>
+                )}
             </div>
-
-            {/* Signature Modal */}
-            {showSignModal && (
-                <div className="modal-overlay">
-                    <Card className="modal-content" style={{ maxWidth: 400 }}>
-                        <h3 style={{ marginBottom: 20 }}>Digital Signature (CES)</h3>
-                        <p className="text-muted" style={{ marginBottom: 20 }}>
-                            By typing your name below, you electronically sign this <strong>{currentAgreement?.title}</strong>, serving as an electronic record and evidence of agreement under the Electronic Transactions Act.
-                        </p>
-                        <div className="form-group" style={{ marginBottom: 20 }}>
-                            <input
-                                type="text"
-                                autoFocus
-                                placeholder="Enter your full name"
-                                value={signName}
-                                onChange={e => setSignName(e.target.value)}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}
-                            />
-                        </div>
-                        <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                            <BounceButton className="btn btn-ghost" onClick={() => setShowSignModal(false)}>Cancel</BounceButton>
-                            <BounceButton className="btn btn-primary" onClick={handleSign} disabled={!signName.trim() || isSaving}>
-                                {isSaving ? 'Signing...' : 'Sign Legal Document'}
-                            </BounceButton>
-                        </div>
-                    </Card>
-                </div>
-            )}
-        </div>
+        </GlobalLoadingOverlay>
     );
 }

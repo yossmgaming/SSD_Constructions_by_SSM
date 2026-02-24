@@ -10,6 +10,10 @@ import Card from '../components/Card';
 import { getAll, queryEq, queryAdvanced, KEYS } from '../data/db';
 import './Dashboard.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#94a3b8'];
 
@@ -22,6 +26,10 @@ export default function Dashboard() {
     const [advances, setAdvances] = useState([]);
     const [activities, setActivities] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { profile, hasRole } = useAuth();
+    const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
+    const isClient = profile?.role === 'Client';
+    const isWorker = profile?.role === 'Worker';
 
     useEffect(() => { loadData(); }, []);
 
@@ -46,18 +54,18 @@ export default function Dashboard() {
             const dateFrom = sixMonthsAgo.toISOString().split('T')[0];
 
             const [p, w, m, pay, adv, recentProjs, recentWorkers, recentMats, recentPays, recentAdvs] = await Promise.all([
-                queryEq(KEYS.projects, 'status', 'Ongoing'),
-                queryEq(KEYS.workers, 'status', 'Active'),
-                getAll(KEYS.materials), // Usually doesn't grow indefinitely, but could be optimized later
-                queryAdvanced(KEYS.payments, { filters: { range: { column: 'date', from: dateFrom } } }),
-                queryAdvanced(KEYS.advances, { filters: { range: { column: 'date', from: dateFrom } } }),
+                queryEq(KEYS.projects, 'status', 'Ongoing', 'id, name, budget, contractValue, client, status'),
+                queryEq(KEYS.workers, 'status', 'Active', 'id, fullName, role, status'),
+                getAll(KEYS.materials, 'id'),
+                queryAdvanced(KEYS.payments, { filters: { range: { column: 'date', from: dateFrom } }, select: 'id, amount, direction, category, projectId, workerId, date' }),
+                queryAdvanced(KEYS.advances, { filters: { range: { column: 'date', from: dateFrom } }, select: 'id, amount, projectId, workerId, date' }),
 
                 // For activity feed: get last 10 of each
-                queryAdvanced(KEYS.projects, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
-                queryAdvanced(KEYS.workers, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
-                queryAdvanced(KEYS.materials, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
-                queryAdvanced(KEYS.payments, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 }),
-                queryAdvanced(KEYS.advances, { orderBy: { column: 'createdAt', ascending: false }, limit: 10 })
+                queryAdvanced(KEYS.projects, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, name, createdAt' }),
+                queryAdvanced(KEYS.workers, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, fullName, role, createdAt' }),
+                queryAdvanced(KEYS.materials, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, name, createdAt' }),
+                queryAdvanced(KEYS.payments, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, amount, direction, category, projectId, createdAt, date' }),
+                queryAdvanced(KEYS.advances, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, amount, projectId, workerId, createdAt, date' })
             ]);
 
             setProjects(p);
@@ -92,6 +100,38 @@ export default function Dashboard() {
         }
     }
 
+    // Role-based filtering of data
+    const filteredProjects = useMemo(() => {
+        if (isClient && profile?.target_id) {
+            return projects.filter(p => p.id.toString() === profile.target_id.toString());
+        }
+        return projects;
+    }, [projects, isClient, profile]);
+
+    const filteredPayments = useMemo(() => {
+        if (isClient && profile?.target_id) {
+            return payments.filter(p => p.projectId?.toString() === profile.target_id.toString());
+        }
+        return payments;
+    }, [payments, isClient, profile]);
+
+    const filteredAdvances = useMemo(() => {
+        if (isClient) return [];
+        return advances;
+    }, [advances, isClient]);
+
+    const filteredWorkers = useMemo(() => {
+        if (isClient) return [];
+        return workers;
+    }, [workers, isClient]);
+
+    const filteredActivities = useMemo(() => {
+        if (isClient && profile?.target_id) {
+            return activities.filter(a => a.text.includes(`"${filteredProjects[0]?.name}"`) || a.text.includes(`(${filteredProjects[0]?.name})`));
+        }
+        return activities;
+    }, [activities, isClient, filteredProjects]);
+
     // Formatters
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
     const fmtShort = (v) => {
@@ -102,26 +142,26 @@ export default function Dashboard() {
 
     // ─── KPI metrics ─────────────────────────────────────────
     const metrics = useMemo(() => {
-        const totalIn = payments.filter((p) => p.direction === 'In').reduce((s, p) => s + (p.amount || 0), 0);
-        const paymentsOut = payments.filter((p) => p.direction === 'Out').reduce((s, p) => s + (p.amount || 0), 0);
-        const advancesOut = advances.reduce((s, a) => s + (a.amount || 0), 0);
+        const totalIn = filteredPayments.filter((p) => p.direction === 'In').reduce((s, p) => s + (p.amount || 0), 0);
+        const paymentsOut = filteredPayments.filter((p) => p.direction === 'Out').reduce((s, p) => s + (p.amount || 0), 0);
+        const advancesOut = filteredAdvances.reduce((s, a) => s + (a.amount || 0), 0);
         const totalOut = paymentsOut + advancesOut;
-        const activeProjects = projects.filter((p) => p.status === 'Ongoing').length;
-        const activeWorkers = workers.filter((w) => w.status === 'Active').length;
+        const activeProjects = filteredProjects.length;
+        const activeWorkers = filteredWorkers.length;
         return { totalIn, totalOut, net: totalIn - totalOut, activeProjects, activeWorkers };
-    }, [payments, advances, projects, workers]);
+    }, [filteredPayments, filteredAdvances, filteredProjects, filteredWorkers]);
 
     // ─── Monthly cash flow (last 6 months) ───────────────────
-    const monthlyFlow = useMemo(() => {
+    const { data: monthlyFlow, isComputing: isComputingMonthlyFlow } = useAsyncData(async () => {
         const months = {};
-        payments.forEach((p) => {
+        filteredPayments.forEach((p) => {
             const m = p.date ? p.date.slice(0, 7) : null;
             if (!m) return;
             if (!months[m]) months[m] = { month: m, In: 0, Out: 0 };
             if (p.direction === 'In') months[m].In += (p.amount || 0);
             else months[m].Out += (p.amount || 0);
         });
-        advances.forEach((a) => {
+        filteredAdvances.forEach((a) => {
             const m = a.date ? a.date.slice(0, 7) : null;
             if (!m) return;
             if (!months[m]) months[m] = { month: m, In: 0, Out: 0 };
@@ -135,34 +175,50 @@ export default function Dashboard() {
                 ...m,
                 label: new Date(m.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
             }));
-    }, [payments, advances]);
+    }, [filteredPayments, filteredAdvances], []);
 
     // ─── Expense breakdown pie ───────────────────────────────
-    const expensePie = useMemo(() => {
+    const { data: expensePie, isComputing: isComputingExpensePie } = useAsyncData(async () => {
         const cats = {};
-        payments.filter((p) => p.direction === 'Out').forEach((p) => {
+        filteredPayments.filter((p) => p.direction === 'Out').forEach((p) => {
             const cat = p.category || 'Other';
             cats[cat] = (cats[cat] || 0) + (p.amount || 0);
         });
-        const totalAdvances = advances.reduce((s, a) => s + (a.amount || 0), 0);
+        const totalAdvances = filteredAdvances.reduce((s, a) => s + (a.amount || 0), 0);
         if (totalAdvances > 0) {
             cats['Advance'] = (cats['Advance'] || 0) + totalAdvances;
         }
         return Object.entries(cats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    }, [payments, advances]);
+    }, [filteredPayments, filteredAdvances], []);
 
     // ─── Project budget progress ─────────────────────────────
-    const projectProgress = useMemo(() => {
-        return projects.slice(0, 5).map((p) => {
+    const { data: projectProgress, isComputing: isComputingProjectProgress } = useAsyncData(async () => {
+        // Pre-indexing for speed
+        const payMap = new Map();
+        filteredPayments.forEach(p => {
+            if (!payMap.has(p.projectId)) payMap.set(p.projectId, []);
+            payMap.get(p.projectId).push(p);
+        });
+        const advMap = new Map();
+        filteredAdvances.forEach(a => {
+            if (!advMap.has(a.projectId)) advMap.set(a.projectId, []);
+            advMap.get(a.projectId).push(a);
+        });
+
+        return filteredProjects.slice(0, 5).map((p) => {
             const budget = p.contractValue || p.budget || 0;
-            const received = payments.filter((pay) => pay.direction === 'In' && pay.projectId === p.id).reduce((s, pay) => s + (pay.amount || 0), 0);
-            const paySpent = payments.filter((pay) => pay.direction === 'Out' && pay.projectId === p.id).reduce((s, pay) => s + (pay.amount || 0), 0);
-            const advSpent = advances.filter((adv) => adv.projectId === p.id).reduce((s, adv) => s + (adv.amount || 0), 0);
+            const projectPays = payMap.get(p.id) || [];
+            const projectAdvs = advMap.get(p.id) || [];
+
+            const received = projectPays.filter((pay) => pay.direction === 'In').reduce((s, pay) => s + (pay.amount || 0), 0);
+            const paySpent = projectPays.filter((pay) => pay.direction === 'Out').reduce((s, pay) => s + (pay.amount || 0), 0);
+            const advSpent = projectAdvs.reduce((s, adv) => s + (adv.amount || 0), 0);
+
             const spent = paySpent + advSpent;
             const pct = budget > 0 ? Math.round((received / budget) * 100) : 0;
             return { name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name, Budget: budget, Received: received, Spent: spent, pct, status: p.status };
         });
-    }, [projects, payments, advances]);
+    }, [filteredProjects, filteredPayments, filteredAdvances], []);
 
     // Tooltips
     const ChartTooltip = ({ active, payload, label }) => {
@@ -186,148 +242,156 @@ export default function Dashboard() {
         );
     };
 
-    const statCards = [
-        { label: t('dashboard.active_projects'), value: <CountUp to={metrics.activeProjects} />, icon: FolderKanban, color: 'indigo', sub: `${projects.length} ${t('dashboard.total')}` },
-        { label: t('dashboard.total_workers'), value: <CountUp to={metrics.activeWorkers} />, icon: Users, color: 'emerald', sub: `${workers.length} ${t('dashboard.total')}` },
-        { label: t('dashboard.money_in'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></>, icon: ArrowUpRight, color: 'emerald', sub: t('dashboard.total_received') },
-        { label: t('dashboard.money_out'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></>, icon: ArrowDownRight, color: 'rose', sub: t('dashboard.total_spent') },
-    ];
+    const statCards = useMemo(() => [
+        { label: t('dashboard.active_projects'), value: <CountUp to={metrics.activeProjects} />, icon: FolderKanban, color: 'indigo', sub: `${filteredProjects.length} ${t('dashboard.total')}`, visible: true },
+        { label: t('dashboard.total_workers'), value: <CountUp to={metrics.activeWorkers} />, icon: Users, color: 'emerald', sub: `${filteredWorkers.length} ${t('dashboard.total')}`, visible: !isClient },
+        { label: t('dashboard.money_in'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></>, icon: ArrowUpRight, color: 'emerald', sub: t('dashboard.total_received'), visible: true },
+        { label: t('dashboard.money_out'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></>, icon: ArrowDownRight, color: 'rose', sub: t('dashboard.total_spent'), visible: isSuperAdminOrFinance },
+    ], [metrics, filteredProjects, filteredWorkers, isClient, isSuperAdminOrFinance, t]);
+
+    const isGlobalLoading = isLoading || isComputingMonthlyFlow || isComputingExpensePie || isComputingProjectProgress;
 
     return (
-        <div className="dashboard">
-            <div className="page-header">
-                <h1>{t('dashboard.title')}</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={loadData}>{t('dashboard.refresh')}</BounceButton>
-            </div>
+        <GlobalLoadingOverlay loading={isGlobalLoading} message="Calculating Dashboard Intelligence...">
+            <div className="dashboard">
+                <div className="page-header">
+                    <h1>{t('dashboard.title')}</h1>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={loadData}>{t('dashboard.refresh')}</BounceButton>
+                </div>
 
-            {/* ─── Stat Cards ─────────────────────────── */}
-            <div className="dashboard-stats">
-                {statCards.map((s) => (
-                    <Card key={s.label} className={`stat-card ${s.color}`}>
-                        <div className={`stat-icon ${s.color}`}>
-                            <s.icon size={22} />
-                        </div>
-                        <div className="card-label">{s.label}</div>
-                        <div className="card-value">{s.value}</div>
-                        <div className="stat-sub">{s.sub}</div>
-                    </Card>
-                ))}
-            </div>
-
-            {/* ─── Net Cash Flow banner ────────────────── */}
-            <div className={`cash-flow-banner ${metrics.net >= 0 ? 'positive' : 'negative'}`}>
-                <TrendingUp size={18} />
-                <span>{t('dashboard.net_cash_flow')}: <strong>LKR <CountUp to={metrics.net} separator="," /></strong></span>
-                <span className="cash-flow-note">{materials.length} {t('nav.materials').toLowerCase()} · {payments.length} {t('nav.payments').toLowerCase()}</span>
-            </div>
-
-            {/* ─── Charts Row 1 ────────────────────────── */}
-            <div className="dashboard-charts-row">
-                <Card title={t('dashboard.cash_flow_trend')} className="dash-chart-card">
-                    {monthlyFlow.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={220}>
-                            <AreaChart data={monthlyFlow} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="dashGradIn" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="dashGradOut" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="label" fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Area type="monotone" dataKey="In" stroke="#10b981" fill="url(#dashGradIn)" strokeWidth={2} name={t('dashboard.money_in')} />
-                                <Area type="monotone" dataKey="Out" stroke="#ef4444" fill="url(#dashGradOut)" strokeWidth={2} name={t('dashboard.money_out')} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    ) : <div className="chart-empty-sm">{t('dashboard.no_transactions')}</div>}
-                </Card>
-
-                <Card title={t('dashboard.expense_breakdown')} className="dash-chart-card">
-                    {expensePie.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={220}>
-                            <PieChart>
-                                <Pie data={expensePie} cx="50%" cy="50%" innerRadius={45} outerRadius={80}
-                                    paddingAngle={3} dataKey="value"
-                                    label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}>
-                                    {expensePie.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                                </Pie>
-                                <Tooltip content={<PieTooltip />} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    ) : <div className="chart-empty-sm">{t('dashboard.no_expenses')}</div>}
-                </Card>
-            </div>
-
-            {/* ─── Project Budget Progress ─────────────── */}
-            <Card title={t('dashboard.project_budget_progress')} className="dash-bar-card">
-                {projectProgress.length > 0 ? (
-                    <>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={projectProgress} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Bar dataKey="Budget" fill="#e2e8f0" radius={[4, 4, 0, 0]} name={t('dashboard.budget')} />
-                                <Bar dataKey="Received" fill="#10b981" radius={[4, 4, 0, 0]} name={t('dashboard.received')} />
-                                <Bar dataKey="Spent" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.spent')} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                        <div className="progress-pills">
-                            {projectProgress.map((p) => (
-                                <div key={p.name} className="progress-pill">
-                                    <span className="progress-pill-name">{p.name}</span>
-                                    <div className="progress-mini-bar">
-                                        <div className="progress-mini-fill" style={{ width: `${Math.min(p.pct, 100)}%` }} />
-                                    </div>
-                                    <span className={`progress-pill-pct ${p.pct >= 100 ? 'complete' : ''}`}>{p.pct}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    </>
-                ) : <div className="chart-empty-sm">{t('dashboard.no_projects')}</div>}
-            </Card>
-
-            {/* ─── Activity + Projects ─────────────────── */}
-            <div className="dashboard-grid">
-                <Card title={t('dashboard.recent_activity')}>
-                    {activities.length === 0 ? (
-                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_activity')}</div>
-                    ) : activities.map((a, i) => (
-                        <div className="activity-item" key={i}>
-                            <div className={`activity-dot ${a.color}`} />
-                            <div>
-                                <div className="activity-text">{a.text}</div>
-                                <div className="activity-time">{a.time}</div>
+                {/* ─── Stat Cards ─────────────────────────── */}
+                <div className="dashboard-stats">
+                    {statCards.filter(s => s.visible).map((s) => (
+                        <Card key={s.label} className={`stat-card ${s.color}`}>
+                            <div className={`stat-icon ${s.color}`}>
+                                <s.icon size={22} />
                             </div>
-                        </div>
+                            <div className="card-label">{s.label}</div>
+                            <div className="card-value">{s.value}</div>
+                            <div className="stat-sub">{s.sub}</div>
+                        </Card>
                     ))}
+                </div>
+
+                {/* ─── Net Cash Flow banner ────────────────── */}
+                {isSuperAdminOrFinance && (
+                    <div className={`cash-flow-banner ${metrics.net >= 0 ? 'positive' : 'negative'}`}>
+                        <TrendingUp size={18} />
+                        <span>{t('dashboard.net_cash_flow')}: <strong>LKR <CountUp to={metrics.net} separator="," /></strong></span>
+                        <span className="cash-flow-note">{materials.length} {t('nav.materials').toLowerCase()} · {payments.length} {t('nav.payments').toLowerCase()}</span>
+                    </div>
+                )}
+
+                {/* ─── Charts Row 1 ────────────────────────── */}
+                {isSuperAdminOrFinance && (
+                    <div className="dashboard-charts-row">
+                        <Card title={t('dashboard.cash_flow_trend')} className="dash-chart-card">
+                            {monthlyFlow.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <AreaChart data={monthlyFlow} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="dashGradIn" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="dashGradOut" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                        <XAxis dataKey="label" fontSize={11} tick={{ fill: '#94a3b8' }} />
+                                        <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
+                                        <Tooltip content={<ChartTooltip />} />
+                                        <Area type="monotone" dataKey="In" stroke="#10b981" fill="url(#dashGradIn)" strokeWidth={2} name={t('dashboard.money_in')} />
+                                        <Area type="monotone" dataKey="Out" stroke="#ef4444" fill="url(#dashGradOut)" strokeWidth={2} name={t('dashboard.money_out')} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : <div className="chart-empty-sm">{t('dashboard.no_transactions')}</div>}
+                        </Card>
+
+                        <Card title={t('dashboard.expense_breakdown')} className="dash-chart-card">
+                            {expensePie.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <PieChart>
+                                        <Pie data={expensePie} cx="50%" cy="50%" innerRadius={45} outerRadius={80}
+                                            paddingAngle={3} dataKey="value"
+                                            label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}>
+                                            {expensePie.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip content={<PieTooltip />} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : <div className="chart-empty-sm">{t('dashboard.no_expenses')}</div>}
+                        </Card>
+                    </div>
+                )}
+
+                {/* ─── Project Budget Progress ─────────────── */}
+                <Card title={t('dashboard.project_budget_progress')} className="dash-bar-card">
+                    {projectProgress.length > 0 ? (
+                        <>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <BarChart data={projectProgress} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} />
+                                    <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
+                                    <Tooltip content={<ChartTooltip />} />
+                                    <Bar dataKey="Budget" fill="#e2e8f0" radius={[4, 4, 0, 0]} name={t('dashboard.budget')} />
+                                    <Bar dataKey="Received" fill="#10b981" radius={[4, 4, 0, 0]} name={t('dashboard.received')} />
+                                    <Bar dataKey="Spent" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.spent')} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                            <div className="progress-pills">
+                                {projectProgress.map((p) => (
+                                    <div key={p.name} className="progress-pill">
+                                        <span className="progress-pill-name">{p.name}</span>
+                                        <div className="progress-mini-bar">
+                                            <div className="progress-mini-fill" style={{ width: `${Math.min(p.pct, 100)}%` }} />
+                                        </div>
+                                        <span className={`progress-pill-pct ${p.pct >= 100 ? 'complete' : ''}`}>{p.pct}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : <div className="chart-empty-sm">{t('dashboard.no_projects')}</div>}
                 </Card>
 
-                <Card title={t('dashboard.active_projects')}>
-                    {projects.length === 0 ? (
-                        <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_projects')}</div>
-                    ) : (
-                        projects.slice(0, 5).map((p) => (
-                            <div className="project-mini" key={p.id}>
+                {/* ─── Activity + Projects ─────────────────── */}
+                <div className="dashboard-grid">
+                    <Card title={t('dashboard.recent_activity')}>
+                        {filteredActivities.length === 0 ? (
+                            <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_activity')}</div>
+                        ) : filteredActivities.map((a, i) => (
+                            <div className="activity-item" key={i}>
+                                <div className={`activity-dot ${a.color}`} />
                                 <div>
-                                    <div className="project-mini-name">{p.name}</div>
-                                    <div className="project-mini-client">{p.client}</div>
+                                    <div className="activity-text">{a.text}</div>
+                                    <div className="activity-time">{a.time}</div>
                                 </div>
-                                <span className={`badge ${p.status === 'Ongoing' ? 'badge-info' : p.status === 'Completed' ? 'badge-success' : 'badge-warning'}`}>
-                                    {p.status}
-                                </span>
                             </div>
-                        ))
-                    )}
-                </Card>
+                        ))}
+                    </Card>
+
+                    <Card title={t('dashboard.active_projects')}>
+                        {filteredProjects.length === 0 ? (
+                            <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_projects')}</div>
+                        ) : (
+                            filteredProjects.slice(0, 5).map((p) => (
+                                <div className="project-mini" key={p.id}>
+                                    <div>
+                                        <div className="project-mini-name">{p.name}</div>
+                                        <div className="project-mini-client">{p.client}</div>
+                                    </div>
+                                    <span className={`badge ${p.status === 'Ongoing' ? 'badge-info' : p.status === 'Completed' ? 'badge-success' : 'badge-warning'}`}>
+                                        {p.status}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </Card>
+                </div>
             </div>
-        </div>
+        </GlobalLoadingOverlay>
     );
 }

@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
+import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet, Eye, Maximize2 } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
-import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import { ProjectStatus, ProjectTypes } from '../models/enums';
 import './Projects.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { getAll, create, update, queryEq, KEYS } from '../data/db';
+import { Pencil } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 const emptyForm = {
     name: '', client: '', clientContact: '', clientPhone: '',
@@ -27,6 +30,10 @@ export default function Projects() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
+    const { profile, hasRole } = useAuth();
+    const isClient = profile?.role === 'Client';
+    const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
+
     // Dependencies for financials and delete checks
     const [payments, setPayments] = useState([]); // This will now hold payments FOR THE SELECTED PROJECT
     const [advances, setAdvances] = useState([]); // This will now hold advances FOR THE SELECTED PROJECT
@@ -36,10 +43,23 @@ export default function Projects() {
     async function loadData() {
         setIsLoading(true);
         try {
-            const projs = await getAll(KEYS.projects);
+            let projs = [];
+            if (isClient) {
+                if (profile?.target_id) {
+                    projs = await queryEq(KEYS.projects, 'id', profile.target_id);
+                    console.log(`Client RBAC: Loaded ${projs.length} project(s) matching target_id ${profile.target_id}`);
+                } else {
+                    console.warn("User is Client but has no target_id assigned.");
+                    projs = [];
+                }
+            } else {
+                projs = await getAll(KEYS.projects);
+                console.log(`Admin/Staff: Loaded ${projs.length} projects`);
+            }
             setProjects(projs);
+
         } catch (error) {
-            console.error(error);
+            console.error("Critical error loading projects:", error);
         } finally {
             setIsLoading(false);
         }
@@ -106,6 +126,43 @@ export default function Projects() {
         return { received, expenses, advancesTotal, pendingObl, remainingBalance, profitLoss, contractValue };
     }, [selectedId, projects, payments, advances]);
 
+    function renderFinancials() {
+        if (!selectedId || !financials) return null;
+        return (
+            <div className="financial-summary-inline">
+                <div className="fin-grid">
+                    <div className="fin-item">
+                        <div className="fin-label">{t('projects.contract_value')}</div>
+                        <div className="fin-value">{fmt(financials.contractValue)}</div>
+                    </div>
+                    <div className="fin-item received">
+                        <div className="fin-label"><TrendingUp size={14} /> {t('projects.total_received')}</div>
+                        <div className="fin-value">{fmt(financials.received)}</div>
+                    </div>
+                    <div className="fin-item expenses">
+                        <div className="fin-label"><TrendingDown size={14} /> {t('projects.total_expenses')}</div>
+                        <div className="fin-value">{fmt(financials.expenses)}</div>
+                    </div>
+                    <div className="fin-item balance">
+                        <div className="fin-label"><Wallet size={14} /> {t('projects.remaining_balance')}</div>
+                        <div className="fin-value">{fmt(financials.remainingBalance)}</div>
+                    </div>
+                    <div className={`fin-item ${financials.profitLoss >= 0 ? 'profit' : 'loss'}`}>
+                        <div className="fin-label"><DollarSign size={14} /> {t('projects.profit_loss')}</div>
+                        <div className="fin-value">{fmt(financials.profitLoss)}</div>
+                    </div>
+                    <div className="fin-item advances">
+                        <div className="fin-label">{t('projects.advances_given')}</div>
+                        <div className="fin-value">{fmt(financials.advancesTotal)}</div>
+                    </div>
+                </div>
+                {financials.pendingObl > 0 && (
+                    <div className="fin-alert">⚠ {t('projects.pending_obligations')}: {fmt(financials.pendingObl)}</div>
+                )}
+            </div>
+        );
+    }
+
     function selectProject(p) {
         setSelectedId(p.id);
         setForm({
@@ -115,6 +172,10 @@ export default function Projects() {
             startDate: p.startDate || '', endDate: p.endDate || '', progress: p.progress || 0,
             status: p.status, description: p.description || '',
         });
+    }
+
+    function openDetails(p) {
+        selectProject(p);
         setIsModalOpen(true);
     }
 
@@ -143,47 +204,6 @@ export default function Projects() {
         }
     }
 
-    // ✅ #10 Delete with dependency check
-    async function handleDelete() {
-        if (!selectedId) return;
-
-        setIsLoading(true);
-        try {
-            const [workerCount, paymentCount, materialCount, boqCount, advanceCount, oblCount] = await Promise.all([
-                queryEq(KEYS.projectWorkers, 'projectId', selectedId),
-                queryEq(KEYS.payments, 'projectId', selectedId),
-                queryEq(KEYS.projectMaterials, 'projectId', selectedId),
-                queryEq(KEYS.boqs, 'projectId', selectedId),
-                queryEq(KEYS.advances, 'projectId', selectedId),
-                queryEq(KEYS.obligationHeaders, 'projectId', selectedId),
-            ]).then(results => results.map(r => r.length));
-
-            const deps = [];
-            if (workerCount > 0) deps.push(`${workerCount} worker assignment${workerCount > 1 ? 's' : ''}`);
-            if (paymentCount > 0) deps.push(`${paymentCount} payment${paymentCount > 1 ? 's' : ''}`);
-            if (materialCount > 0) deps.push(`${materialCount} material record${materialCount > 1 ? 's' : ''}`);
-            if (boqCount > 0) deps.push(`${boqCount} BOQ${boqCount > 1 ? 's' : ''}`);
-            if (advanceCount > 0) deps.push(`${advanceCount} advance${advanceCount > 1 ? 's' : ''}`);
-            if (oblCount > 0) deps.push(`${oblCount} obligation${oblCount > 1 ? 's' : ''}`);
-
-            let msg = t('projects.delete_confirm');
-            if (deps.length > 0) {
-                msg = `⚠️ This project has ${deps.join(', ')}.\n\n${t('projects.delete_warning')}?`;
-            }
-
-            if (!confirm(msg)) {
-                setIsLoading(false);
-                return;
-            }
-            await remove(KEYS.projects, selectedId);
-            handleClear();
-            setIsModalOpen(false);
-            await loadData();
-        } catch (error) {
-            console.error(error);
-            setIsLoading(false);
-        }
-    }
 
     function handleClear() { setForm(emptyForm); setSelectedId(null); }
 
@@ -212,194 +232,230 @@ export default function Projects() {
         },
     ];
 
-    return (
-        <div className="crud-page projects-page">
-            <div className="page-header">
-                <h1>{t('projects.title')}</h1>
-                <div className="page-header-actions">
-                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('projects.new_project')}</BounceButton>
-                </div>
-            </div>
-
-            <div className="filter-bar">
-                <div className="filter-group" style={{ flex: 2 }}>
-                    <label>{t('common.search')}</label>
-                    <input placeholder={t('projects.search_placeholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                <div className="filter-group" style={{ flex: 1 }}>
-                    <label>{t('common.status')}</label>
-                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="All">{t('common.all')}</option>
-                        {Object.values(ProjectStatus).map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                </div>
-                <div className="filter-group" style={{ flex: 1 }}>
-                    <label>{t('common.type')}</label>
-                    <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                        <option value="All">{t('common.all')}</option>
-                        {ProjectTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            {/* ✅ #11 Project count */}
-            <div className="result-count">
-                Showing <strong>{filtered.length}</strong> of <strong>{projects.length}</strong> project{projects.length !== 1 ? 's' : ''}
-                {(search || statusFilter !== 'All' || typeFilter !== 'All') && <span className="filter-active-tag">Filtered</span>}
-            </div>
-
-            <div className="crud-layout">
-                <div className="project-left-col">
-                    <Card title={t('projects.project_list')}>
-                        <DataTable columns={columns} data={filtered} selectedId={selectedId} onRowClick={selectProject} emptyMessage={t('projects.no_projects')} />
-                    </Card>
-                </div>
-
-                {/* ✅ #5–9 Financial Summary Panel */}
-                {selectedId && financials && (
-                    <Card title={t('common.financial_summary')} className="financial-summary-card">
-                        <div className="fin-grid">
-                            <div className="fin-item">
-                                <div className="fin-label">{t('projects.contract_value')}</div>
-                                <div className="fin-value">{fmt(financials.contractValue)}</div>
-                            </div>
-                            <div className="fin-item received">
-                                <div className="fin-label"><TrendingUp size={14} /> {t('projects.total_received')}</div>
-                                <div className="fin-value">{fmt(financials.received)}</div>
-                            </div>
-                            <div className="fin-item expenses">
-                                <div className="fin-label"><TrendingDown size={14} /> {t('projects.total_expenses')}</div>
-                                <div className="fin-value">{fmt(financials.expenses)}</div>
-                            </div>
-                            <div className="fin-item balance">
-                                <div className="fin-label"><Wallet size={14} /> {t('projects.remaining_balance')}</div>
-                                <div className="fin-value">{fmt(financials.remainingBalance)}</div>
-                            </div>
-                            <div className={`fin-item ${financials.profitLoss >= 0 ? 'profit' : 'loss'}`}>
-                                <div className="fin-label"><DollarSign size={14} /> {t('projects.profit_loss')}</div>
-                                <div className="fin-value">{fmt(financials.profitLoss)}</div>
-                            </div>
-                            <div className="fin-item advances">
-                                <div className="fin-label">{t('projects.advances_given')}</div>
-                                <div className="fin-value">{fmt(financials.advancesTotal)}</div>
-                            </div>
-                        </div>
-                        {financials.pendingObl > 0 && (
-                            <div className="fin-alert">⚠ {t('projects.pending_obligations')}: {fmt(financials.pendingObl)}</div>
-                        )}
-                    </Card>
-                )}
-            </div>
-
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => { setIsModalOpen(false); handleClear(); }}
-                title={selectedId ? t('projects.edit_project') : t('projects.new_project')}
-                onSave={handleSave}
-                onDelete={selectedId ? handleDelete : undefined}
-            >
-                <div className="form-group">
-                    <label>{t('projects.project_name')}</label>
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </div>
-
-                {/* ✅ #4 Project Type */}
-                <div className="form-group">
-                    <label>{t('common.type')}</label>
-                    <select
-                        value={ProjectTypes.includes(form.projectType) ? form.projectType : 'Other'}
-                        onChange={(e) => {
-                            if (e.target.value === 'Other') {
-                                setForm({ ...form, projectType: '' });
-                            } else {
-                                setForm({ ...form, projectType: e.target.value });
-                            }
+    // Only allow Admins and PMs to edit
+    if (!isClient) {
+        columns.push({
+            key: 'actions', label: '', render: (_, row) => (
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <BounceButton
+                        className="icon-btn edit-btn"
+                        title="View Details"
+                        style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openDetails(row);
                         }}
                     >
-                        {ProjectTypes.map((t) => <option key={t}>{t}</option>)}
-                    </select>
+                        <Eye size={14} />
+                    </BounceButton>
+                    <BounceButton
+                        className="icon-btn edit-btn"
+                        title="Edit Project"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openDetails(row);
+                        }}
+                    >
+                        <Pencil size={14} />
+                    </BounceButton>
                 </div>
-                {(!ProjectTypes.includes(form.projectType) || form.projectType === 'Other' || form.projectType === '') && (
-                    <div className="form-group">
-                        <label>{t('projects.custom_type')}</label>
-                        <input
-                            placeholder="Enter project type..."
-                            value={form.projectType === 'Other' ? '' : form.projectType}
-                            onChange={(e) => setForm({ ...form, projectType: e.target.value })}
-                        />
-                    </div>
-                )}
+            )
+        });
+    }
 
-                <div className="form-group">
-                    <label>{t('projects.client_name')}</label>
-                    <input value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
-                </div>
-
-                {/* ✅ #2 Contact Person */}
-                <div className="form-grid">
-                    <div className="form-group">
-                        <label>{t('projects.contact_person')}</label>
-                        <input placeholder="Point of contact..." value={form.clientContact} onChange={(e) => setForm({ ...form, clientContact: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                        <label>{t('projects.contact_phone')}</label>
-                        <input placeholder="Phone number..." value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} />
+    return (
+        <GlobalLoadingOverlay loading={isLoading} message="Loading Project Information...">
+            <div className="crud-page projects-page">
+                <div className="page-header">
+                    <h1>{t('projects.title')}</h1>
+                    <div className="page-header-actions">
+                        {isSuperAdminOrFinance && (
+                            <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('projects.new_project')}</BounceButton>
+                        )}
                     </div>
                 </div>
 
-                {/* ✅ #1 Location */}
-                <div className="form-group">
-                    <label><MapPin size={13} style={{ marginRight: 4 }} />{t('common.location')}</label>
-                    <input placeholder="e.g. Colombo 07, Galle Road" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-                </div>
-
-                <div className="form-grid">
-                    <div className="form-group">
-                        <label>{t('dashboard.budget')} (LKR) {form.budget && <span className="rate-preview">{fmt(form.budget)}</span>}</label>
-                        <input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
+                <div className="filter-bar">
+                    <div className="filter-group" style={{ flex: 2 }}>
+                        <label>{t('common.search')}</label>
+                        <input placeholder={t('projects.search_placeholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
-                    {/* ✅ #3 Contract Value */}
-                    <div className="form-group">
-                        <label>{t('projects.contract_value')} (LKR) {form.contractValue && <span className="rate-preview">{fmt(form.contractValue)}</span>}</label>
-                        <input type="number" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} />
-                    </div>
-                </div>
-
-                <div className="form-grid">
-                    <div className="form-group">
-                        <label>{t('projects.start_date')}</label>
-                        <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                        <label>{t('projects.end_date')}</label>
-                        <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
-                    </div>
-                </div>
-
-                <div className="form-grid">
-                    <div className="form-group">
+                    <div className="filter-group" style={{ flex: 1 }}>
                         <label>{t('common.status')}</label>
-                        <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="All">{t('common.all')}</option>
                             {Object.values(ProjectStatus).map((s) => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
-                    {/* ✅ #12 Progress */}
-                    <div className="form-group">
-                        <label>{t('common.progress')}: <strong>{form.progress}%</strong></label>
-                        <input
-                            type="range" min="0" max="100" step="5"
-                            value={form.progress}
-                            onChange={(e) => setForm({ ...form, progress: parseInt(e.target.value) })}
-                            className="progress-slider"
-                        />
+                    <div className="filter-group" style={{ flex: 1 }}>
+                        <label>{t('common.type')}</label>
+                        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                            <option value="All">{t('common.all')}</option>
+                            {ProjectTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
                     </div>
                 </div>
 
-                <div className="form-group">
-                    <label>{t('common.description')}</label>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                {/* ✅ #11 Project count */}
+                <div className="result-count">
+                    Showing <strong>{filtered.length}</strong> of <strong>{projects.length}</strong> project{projects.length !== 1 ? 's' : ''}
+                    {(search || statusFilter !== 'All' || typeFilter !== 'All') && <span className="filter-active-tag">Filtered</span>}
                 </div>
-            </Modal>
-        </div>
+
+                <div className="crud-layout">
+                    <div className="project-list-full">
+                        <Card title={t('projects.project_list')}>
+                            <DataTable
+                                columns={columns}
+                                data={filtered}
+                                selectedId={selectedId}
+                                onRowClick={selectProject}
+                                emptyMessage={t('projects.no_projects')}
+                                renderExpansion={renderFinancials}
+                            />
+                        </Card>
+                    </div>
+                </div>
+
+                <Modal
+                    isOpen={isModalOpen}
+                    onClose={() => { setIsModalOpen(false); handleClear(); }}
+                    title={selectedId ? t('projects.edit_project') : t('projects.new_project')}
+                    onSave={handleSave}
+                >
+                    <div className="form-group">
+                        <label>{t('projects.project_name')}</label>
+                        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                    </div>
+
+                    {/* ✅ #4 Project Type */}
+                    <div className="form-group">
+                        <label>{t('common.type')}</label>
+                        <select
+                            value={ProjectTypes.includes(form.projectType) ? form.projectType : 'Other'}
+                            onChange={(e) => {
+                                if (e.target.value === 'Other') {
+                                    setForm({ ...form, projectType: '' });
+                                } else {
+                                    setForm({ ...form, projectType: e.target.value });
+                                }
+                            }}
+                        >
+                            {ProjectTypes.map((t) => <option key={t}>{t}</option>)}
+                        </select>
+                    </div>
+                    {(!ProjectTypes.includes(form.projectType) || form.projectType === 'Other' || form.projectType === '') && (
+                        <div className="form-group">
+                            <label>{t('projects.custom_type')}</label>
+                            <input
+                                placeholder="Enter project type..."
+                                value={form.projectType === 'Other' ? '' : form.projectType}
+                                onChange={(e) => setForm({ ...form, projectType: e.target.value })}
+                            />
+                        </div>
+                    )}
+
+                    <div className="form-group">
+                        <label>{t('projects.client_name')}</label>
+                        <input value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+                    </div>
+
+                    {/* ✅ #2 Contact Person */}
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>{t('projects.contact_person')}</label>
+                            <input placeholder="Point of contact..." value={form.clientContact} onChange={(e) => setForm({ ...form, clientContact: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>{t('projects.contact_phone')}</label>
+                            <input placeholder="Phone number..." value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} />
+                        </div>
+                    </div>
+
+                    {/* ✅ #1 Location */}
+                    <div className="form-group">
+                        <label><MapPin size={13} style={{ marginRight: 4 }} />{t('common.location')}</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: '8px' }}>
+                            <input
+                                placeholder="No."
+                                value={form.location.split(',')[0] || ''}
+                                onChange={(e) => {
+                                    const parts = form.location.split(',').map(s => s.trim());
+                                    parts[0] = e.target.value;
+                                    setForm({ ...form, location: parts.join(', ') });
+                                }}
+                            />
+                            <input
+                                placeholder="Street Address"
+                                value={form.location.split(',')[1]?.trim() || ''}
+                                onChange={(e) => {
+                                    const parts = form.location.split(',').map(s => s.trim());
+                                    if (parts.length < 2) parts[0] = parts[0] || '';
+                                    parts[1] = e.target.value;
+                                    setForm({ ...form, location: parts.join(', ') });
+                                }}
+                            />
+                            <input
+                                placeholder="City"
+                                value={form.location.split(',')[2]?.trim() || ''}
+                                onChange={(e) => {
+                                    const parts = form.location.split(',').map(s => s.trim());
+                                    while (parts.length < 3) parts.push('');
+                                    parts[2] = e.target.value;
+                                    setForm({ ...form, location: parts.join(', ') });
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>{t('dashboard.budget')} (LKR) {form.budget && <span className="rate-preview">{fmt(form.budget)}</span>}</label>
+                            <input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
+                        </div>
+                        {/* ✅ #3 Contract Value */}
+                        <div className="form-group">
+                            <label>{t('projects.contract_value')} (LKR) {form.contractValue && <span className="rate-preview">{fmt(form.contractValue)}</span>}</label>
+                            <input type="number" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>{t('projects.start_date')}</label>
+                            <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>{t('projects.end_date')}</label>
+                            <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>{t('common.status')}</label>
+                            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                                {Object.values(ProjectStatus).map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                        {/* ✅ #12 Progress */}
+                        <div className="form-group">
+                            <label>{t('common.progress')}: <strong>{form.progress}%</strong></label>
+                            <input
+                                type="range" min="0" max="100" step="5"
+                                value={form.progress}
+                                onChange={(e) => setForm({ ...form, progress: parseInt(e.target.value) })}
+                                className="progress-slider"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label>{t('common.description')}</label>
+                        <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                    </div>
+                </Modal>
+            </div>
+        </GlobalLoadingOverlay>
     );
 }

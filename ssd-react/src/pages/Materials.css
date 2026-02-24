@@ -45,8 +45,9 @@
 }
 
 .stock-card-alert {
-    border-color: rgba(239, 68, 68, 0.25);
-    background: rgba(239, 68, 68, 0.03);
+    border-color: #ef4444;
+    background: #fff5f5;
+    /* Solid light red */
 }
 
 .stock-card-alert .stock-card-label {
@@ -202,4 +203,98 @@
     color: #ef4444;
     border-color: rgba(239, 68, 68, 0.3);
     background: rgba(239, 68, 68, 0.04);
+}
+
+/* Material Expansion Styles */
+.material-expansion-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 24px;
+}
+
+.expansion-col h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+}
+
+.assignment-list-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.assignment-item-inline {
+    background: #ffffff;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    position: relative;
+    border-left: 3px solid var(--info);
+}
+
+.assign-p-name {
+    font-weight: 700;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.assign-p-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.assign-p-details .qty {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.assign-note {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.details-mini-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.detail-item label {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.detail-item span {
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.notes-text {
+    display: block;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 4px;
+    border: 1px dashed var(--border-color);
+    line-height: 1.5;
+    font-size: 0.8125rem;
+}
+
+.expansion-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
 }

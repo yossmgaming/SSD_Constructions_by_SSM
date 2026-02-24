@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
-import { getAll, create, update, remove, query, KEYS } from '../data/db';
+import { getAll, create, update, remove, queryEq, queryAdvanced, KEYS } from '../data/db';
 import './Finance.css';
 import BounceButton from '../components/BounceButton';
+import { useAuth } from '../context/AuthContext';
+import { Shield } from 'lucide-react';
+import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 export default function WorkerPayroll() {
     const [headers, setHeaders] = useState([]);
@@ -16,6 +19,7 @@ export default function WorkerPayroll() {
     const [settlements, setSettlements] = useState([]);
     const [settlementAmt, setSettlementAmt] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const { hasRole } = useAuth();
 
     // Date filters (Robust)
     const today = new Date();
@@ -36,8 +40,9 @@ export default function WorkerPayroll() {
     async function loadData() {
         setIsLoading(true);
         try {
+            const filters = { range: { column: 'periodEnd', from: fromDate, to: toDate } };
             const [allHeaders, allWorkers, allProjects] = await Promise.all([
-                getAll(KEYS.obligationHeaders),
+                queryAdvanced(KEYS.obligationHeaders, { filters, orderBy: { column: 'periodEnd', ascending: false } }),
                 getAll(KEYS.workers),
                 getAll(KEYS.projects)
             ]);
@@ -72,8 +77,8 @@ export default function WorkerPayroll() {
         setIsLoading(true);
         try {
             const [headerLines, headerSettlements] = await Promise.all([
-                query(KEYS.obligationLines, (l) => l.headerId === h.id),
-                query(KEYS.cashSettlements, (s) => s.obligationHeaderId === h.id)
+                queryEq(KEYS.obligationLines, 'headerId', h.id),
+                queryEq(KEYS.cashSettlements, 'obligationHeaderId', h.id)
             ]);
             setLines(headerLines);
             setSettlements(headerSettlements);
@@ -127,7 +132,7 @@ export default function WorkerPayroll() {
                 amount: parseFloat(settlementAmt) || 0, direction: 'Outgoing', method: 'Cash',
             });
             setSettlementAmt('');
-            const updatedSettlements = await query(KEYS.cashSettlements, (s) => s.obligationHeaderId === selectedId);
+            const updatedSettlements = await queryEq(KEYS.cashSettlements, 'obligationHeaderId', selectedId);
             setSettlements(updatedSettlements);
         } catch (error) {
             console.error(error);
@@ -154,75 +159,91 @@ export default function WorkerPayroll() {
         },
     ];
 
+    if (!hasRole(['Super Admin', 'Finance'])) {
+        return (
+            <div className="crud-page finance-page flex items-center justify-center" style={{ minHeight: '80vh' }}>
+                <Card>
+                    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+                        <Shield size={48} className="mx-auto mb-4" style={{ color: '#ef4444' }} />
+                        <h2 style={{ color: 'var(--text-color)', marginBottom: 8 }}>Access Denied</h2>
+                        <p>This module contains sensitive worker payroll and settlement data restricted to Finance and Super Admin roles.</p>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
     return (
-        <div className="crud-page finance-page">
-            <div className="page-header">
-                <h1>Worker Payroll</h1>
-                <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Payroll</BounceButton>
-            </div>
-
-            <div className="filter-bar" style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
-                <div className="filter-group">
-                    <label>From</label>
-                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <GlobalLoadingOverlay loading={isLoading} message="Calculating Field Force Payroll...">
+            <div className="crud-page finance-page">
+                <div className="page-header">
+                    <h1>Worker Payroll</h1>
+                    <BounceButton disabled={isLoading} className="btn btn-primary" onClick={handleClear}><Plus size={18} /> New Payroll</BounceButton>
                 </div>
-                <div className="filter-group">
-                    <label>To</label>
-                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+
+                <div className="filter-bar" style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
+                    <div className="filter-group">
+                        <label>From</label>
+                        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                    </div>
+                    <div className="filter-group">
+                        <label>To</label>
+                        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                    </div>
                 </div>
-            </div>
 
-            <div className="finance-detail">
-                <Card title="Payroll Records">
-                    <DataTable columns={columns} data={filteredHeaders} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No payroll records" />
-                </Card>
+                <div className="finance-detail">
+                    <Card title="Payroll Records">
+                        <DataTable columns={columns} data={filteredHeaders} selectedId={selectedId} onRowClick={selectHeader} emptyMessage="No payroll records" />
+                    </Card>
 
-                <Card title={selectedId ? 'Edit Payroll' : 'New Payroll'} className="animate-slideIn">
-                    <div className="form-group"><label>Worker</label>
-                        <select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
-                            <option value="">Select...</option>{workers.map((w) => <option key={w.id} value={w.id}>{w.fullName}</option>)}
-                        </select>
-                    </div>
-                    <div className="form-group"><label>Project</label>
-                        <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
-                            <option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="form-group"><label>Period Start</label><input type="date" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} /></div>
-                    <div className="form-group"><label>Period End</label><input type="date" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} /></div>
-                    <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
-                    <div className="form-group"><label>Status</label>
-                        <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                            <option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option>
-                        </select>
-                    </div>
-                    <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-
-                    {selectedId && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
-                            <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
-                            <div className="settlement-list">
-                                {settlements.map((s) => (
-                                    <div className="settlement-item" key={s.id}>
-                                        <span>{s.date ? new Date(s.date).toLocaleDateString() : '-'}</span>
-                                        <strong>{fmt(s.amount)}</strong>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                <input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} />
-                                <BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton>
-                            </div>
+                    <Card title={selectedId ? 'Edit Payroll' : 'New Payroll'} className="animate-slideIn">
+                        <div className="form-group"><label>Worker</label>
+                            <select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
+                                <option value="">Select...</option>{workers.map((w) => <option key={w.id} value={w.id}>{w.fullName}</option>)}
+                            </select>
                         </div>
-                    )}
+                        <div className="form-group"><label>Project</label>
+                            <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
+                                <option value="">Select...</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group"><label>Period Start</label><input type="date" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} /></div>
+                        <div className="form-group"><label>Period End</label><input type="date" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} /></div>
+                        <div className="form-group"><label>Total Amount (LKR)</label><input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} /></div>
+                        <div className="form-group"><label>Status</label>
+                            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                                <option>Draft</option><option>Approved</option><option>Partial</option><option>Settled</option>
+                            </select>
+                        </div>
+                        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
 
-                    <div className="form-actions">
-                        <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
-                        {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
-                        <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
-                    </div>
-                </Card>
+                        {selectedId && (
+                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>Settlements ({fmt(totalSettled)} paid)</label>
+                                <div className="settlement-list">
+                                    {settlements.map((s) => (
+                                        <div className="settlement-item" key={s.id}>
+                                            <span>{s.date ? new Date(s.date).toLocaleDateString() : '-'}</span>
+                                            <strong>{fmt(s.amount)}</strong>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                    <input type="number" placeholder="Amount" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} />
+                                    <BounceButton disabled={isLoading} className="btn btn-primary btn-sm" onClick={addSettlement}>Add</BounceButton>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="form-actions">
+                            <BounceButton disabled={isLoading} className="btn btn-success" onClick={handleSave}>{selectedId ? 'Update' : 'Save'}</BounceButton>
+                            {selectedId && <BounceButton disabled={isLoading} className="btn btn-danger" onClick={handleDelete}>Delete</BounceButton>}
+                            <BounceButton disabled={isLoading} className="btn btn-secondary" onClick={handleClear}>Clear</BounceButton>
+                        </div>
+                    </Card>
+                </div>
             </div>
-        </div>
+        </GlobalLoadingOverlay>
     );
 }
