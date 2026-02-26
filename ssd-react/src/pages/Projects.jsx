@@ -582,65 +582,65 @@ export default function Projects() {
                     </div>
 
                     {selectedId && (
-                        <div className="assignment-section mt-6 pt-6 border-t border-slate-100">
-                            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                <HardHat size={16} className="text-purple-500" />
+                        <div className="assignment-section">
+                            <h3 className="assignment-title">
+                                <HardHat size={16} className="title-icon" />
                                 Assigned Sub-Contractors
                             </h3>
 
-                            <div className="flex flex-wrap gap-2 mb-4">
+                            <div className="sub-assignments-list">
                                 {assignedSubcontractors.length === 0 ? (
-                                    <div className="text-xs text-slate-400 italic">No sub-contractors assigned to this project yet.</div>
+                                    <div className="empty-assignments">No sub-contractors assigned to this project yet.</div>
                                 ) : (
-                                    <div className="space-y-4 w-full">
+                                    <div className="cards-stack">
                                         {assignedSubcontractors.map(sub => (
-                                            <div key={sub.id} className="sub-assignment-card p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                                            <div key={sub.id} className="sub-assignment-card relative">
                                                 <button
                                                     type="button"
-                                                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-full"
+                                                    className="sub-remove-btn"
                                                     onClick={() => removeSubcontractor(sub.id)}
                                                 >
                                                     <X size={14} />
                                                 </button>
 
-                                                <div className="flex items-start gap-3 mb-4">
-                                                    <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                                                <div className="sub-card-header">
+                                                    <div className="sub-icon-box">
                                                         <HardHat size={18} />
                                                     </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-slate-800">{sub.fullName}</div>
-                                                        <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                                                    <div className="sub-info">
+                                                        <div className="sub-name">{sub.fullName}</div>
+                                                        <div className="sub-specialty">
                                                             {sub.specialty || sub.company || 'Sub-Contractor'}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="sub-card-details">
                                                     <div className="form-group mb-0">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Contract Amount (LKR)</label>
+                                                        <label className="detail-label">Contract Amount (LKR)</label>
                                                         <input
                                                             type="number"
-                                                            className="h-9 text-sm font-bold text-slate-700 bg-white"
+                                                            className="detail-input amount"
                                                             value={sub.assignment?.amount || ''}
                                                             onChange={(e) => updateAssignment(sub.id, 'amount', parseFloat(e.target.value) || 0)}
                                                             placeholder="0.00"
                                                         />
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-2">
+                                                    <div className="detail-dates">
                                                         <div className="form-group mb-0">
-                                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
+                                                            <label className="detail-label">Start Date</label>
                                                             <input
                                                                 type="date"
-                                                                className="h-9 text-xs font-semibold text-slate-700 bg-white px-2"
+                                                                className="detail-input date"
                                                                 value={sub.assignment?.startDate || ''}
                                                                 onChange={(e) => updateAssignment(sub.id, 'startDate', e.target.value)}
                                                             />
                                                         </div>
                                                         <div className="form-group mb-0">
-                                                            <label className="text-[10px] font-bold text-slate-400 uppercase">End Date</label>
+                                                            <label className="detail-label">End Date</label>
                                                             <input
                                                                 type="date"
-                                                                className="h-9 text-xs font-semibold text-slate-700 bg-white px-2"
+                                                                className="detail-input date"
                                                                 value={sub.assignment?.endDate || ''}
                                                                 onChange={(e) => updateAssignment(sub.id, 'endDate', e.target.value)}
                                                             />
@@ -653,12 +653,12 @@ export default function Projects() {
                                 )}
                             </div>
 
-                            <div className="form-group">
-                                <label className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Assign New Sub-Contractor</label>
+                            <div className="new-assignment-form">
+                                <label className="detail-label">Assign New Sub-Contractor</label>
                                 <select
                                     value=""
                                     onChange={(e) => assignSubcontractor(e.target.value)}
-                                    className="bg-slate-50 border-slate-200"
+                                    className="sub-select"
                                 >
                                     <option value="">-- Click to Select & Assign --</option>
                                     {allSubcontractors

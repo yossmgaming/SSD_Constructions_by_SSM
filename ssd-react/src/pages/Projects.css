@@ -274,3 +274,153 @@
     border-radius: 8px;
     margin-left: 6px;
 }
+
+/* Sub-contractor Assignments */
+.assignment-section {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.assignment-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.title-icon {
+    color: #9333ea;
+}
+
+.cards-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.sub-assignment-card {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    position: relative;
+    transition: var(--transition);
+}
+
+.sub-assignment-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: var(--shadow-sm);
+}
+
+.sub-remove-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.sub-remove-btn:hover {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.sub-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-right: 32px;
+    /* Avoid overlap with remove btn */
+}
+
+.sub-icon-box {
+    padding: 8px;
+    background: #f3e8ff;
+    color: #9333ea;
+    border-radius: 8px;
+    display: flex;
+}
+
+.sub-info {
+    min-width: 0;
+}
+
+.sub-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sub-specialty {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sub-card-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.detail-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.detail-label {
+    font-size: 0.625rem !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+}
+
+.detail-input {
+    height: 36px !important;
+    font-size: 0.8125rem !important;
+    padding: 0 10px !important;
+    background: white !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-sm) !important;
+}
+
+.detail-input.amount {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.new-assignment-form {
+    margin-top: 16px;
+}
+
+.sub-select {
+    background-color: #f8fafc;
+    border-color: var(--border-color);
+}
+
+@media (max-width: 640px) {
+    .sub-card-details {
+        grid-template-columns: 1fr;
+    }
+}
