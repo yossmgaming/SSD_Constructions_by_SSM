@@ -6,6 +6,9 @@ import Card from '../components/Card';
 import { Clock, Users, HardHat, ShieldCheck, MapPin } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
+import DailyReportForm from '../components/role-components/DailyReportForm';
+import MaterialUsageForm from '../components/role-components/MaterialUsageForm';
+import SafetyIncidentForm from '../components/role-components/SafetyIncidentForm';
 
 export default function SupervisorDashboard() {
     const { t } = useTranslation();
@@ -137,6 +140,12 @@ export default function SupervisorDashboard() {
                 </Card>
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 mb-6">
+                <DailyReportForm supervisorId={identity?.id} projects={projects} />
+                <MaterialUsageForm supervisorId={identity?.id} projects={projects} />
+                <SafetyIncidentForm reporterId={identity?.id} projects={projects} />
+            </div>
+
             <div className="dashboard-grid">
                 <Card title="My Sites">
                     {projects.length === 0 ? (
@@ -160,7 +169,7 @@ export default function SupervisorDashboard() {
                     {activities.length === 0 ? (
                         <div className="empty-state">No site activity reported.</div>
                     ) : (
-                        activities.map((a, i) => (
+                        activities.slice(0, 5).map((a, i) => (
                             <div className="activity-item" key={i}>
                                 <div className={`activity-dot ${a.color}`} />
                                 <div>

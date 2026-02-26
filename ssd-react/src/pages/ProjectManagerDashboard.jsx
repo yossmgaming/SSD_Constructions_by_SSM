@@ -6,6 +6,9 @@ import Card from '../components/Card';
 import { TrendingUp, ClipboardList, Users, ShieldCheck, Briefcase } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
+import ProjectTimeline from '../components/role-components/ProjectTimeline';
+import ResourceAllocationView from '../components/role-components/ResourceAllocationView';
+import ChangeOrderForm from '../components/role-components/ChangeOrderForm';
 
 export default function ProjectManagerDashboard() {
     const { t } = useTranslation();
@@ -143,6 +146,15 @@ export default function ProjectManagerDashboard() {
                 </Card>
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 mb-6">
+                <div className="lg:col-span-2">
+                    <ProjectTimeline projects={projects} />
+                </div>
+                <div>
+                    <ResourceAllocationView projects={projects} />
+                </div>
+            </div>
+
             <div className="dashboard-grid">
                 <Card title="Project Summary">
                     {projects.length === 0 ? (
@@ -161,6 +173,8 @@ export default function ProjectManagerDashboard() {
                         ))
                     )}
                 </Card>
+
+                <ChangeOrderForm projects={projects} />
 
                 <Card title="Recent Management Feed">
                     {activities.length === 0 ? (

@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import { HardHat, ConstructionIcon, ClipboardList, ShieldCheck, DollarSign } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
+import SubcontractorClaimsForm from '../components/role-components/SubcontractorClaimsForm';
 
 export default function SubContractorDashboard() {
     const { t } = useTranslation();
@@ -32,6 +33,8 @@ export default function SubContractorDashboard() {
             const { data: assignments, error: assignError } = await supabase
                 .from('project_subcontractors')
                 .select(`
+                    id,
+                    projectId,
                     amount,
                     startDate,
                     endDate,
@@ -112,6 +115,15 @@ export default function SubContractorDashboard() {
                     <div className="card-value" style={{ fontSize: '1.1rem' }}>{fmt(totalPaid)}</div>
                     <div className="stat-sub">From SSD accounts</div>
                 </Card>
+            </div>
+
+            <div className="mt-6 mb-6">
+                <SubcontractorClaimsForm subId={contractorId} assignments={projects.map(p => ({
+                    id: p.id,
+                    projectId: p.projectId,
+                    projectName: p.projects?.name,
+                    contractAmount: p.amount
+                }))} />
             </div>
 
             <div className="dashboard-grid">

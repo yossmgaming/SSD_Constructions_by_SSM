@@ -6,6 +6,8 @@ import Card from '../components/Card';
 import { Clock, ClipboardList, ShieldCheck } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
+import AttendanceHeatmap from '../components/role-components/AttendanceHeatmap';
+import LeaveRequestForm from '../components/role-components/LeaveRequestForm';
 
 export default function WorkerDashboard() {
     const { t } = useTranslation();
@@ -157,6 +159,12 @@ export default function WorkerDashboard() {
                     </div>
                     <div className="stat-sub">{t('dashboard.days_present', 'Days present this month')}</div>
                 </Card>
+            </div>
+
+            {/* Premium Role Components Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 mb-6">
+                <AttendanceHeatmap workerId={identity?.id} />
+                <LeaveRequestForm workerId={identity?.id} />
             </div>
 
             <div className="dashboard-grid">

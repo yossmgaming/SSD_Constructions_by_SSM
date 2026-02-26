@@ -6,6 +6,7 @@ import { TrendingUp, CheckCircle, Clock, ShieldCheck, DollarSign, Wallet } from 
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
 import { supabase } from '../data/supabase';
+import DocumentVault from '../components/role-components/DocumentVault';
 
 export default function ClientDashboard() {
     const { t } = useTranslation();
@@ -15,6 +16,7 @@ export default function ClientDashboard() {
     const [projects, setProjects] = useState([]);
     const [activities, setActivities] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
 
     const fmt = (val) => new Intl.NumberFormat('en-LK', {
         style: 'currency',
@@ -51,6 +53,10 @@ export default function ClientDashboard() {
                 .select('*')
                 .eq('client_id', identity.id);
             setProjects(p || []);
+
+            if (p && p.length > 0 && !selectedProjectId) {
+                setSelectedProjectId(p[0].id);
+            }
 
             if ((p || []).length > 0) {
                 const projectIds = p.map(x => x.id);
@@ -164,6 +170,28 @@ export default function ClientDashboard() {
                     )}
                 </Card>
             </div>
+
+            {selectedProjectId && (
+                <div className="mt-6">
+                    <Card>
+                        {projects.length > 1 && (
+                            <div className="mb-4">
+                                <label className="text-sm font-semibold text-slate-700 mr-3">Select Project Vault:</label>
+                                <select
+                                    className="p-2 border border-slate-200 rounded-md text-sm bg-slate-50"
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                >
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <DocumentVault projectId={selectedProjectId} readOnly={true} />
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

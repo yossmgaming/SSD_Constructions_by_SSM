@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import { Truck, Package, DollarSign, ShieldCheck, FileText, Hash } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
+import SupplierOrdersView from '../components/role-components/SupplierOrdersView';
 
 export default function SupplierDashboard() {
     const { t } = useTranslation();
@@ -106,6 +107,10 @@ export default function SupplierDashboard() {
                     <div className="card-value" style={{ fontSize: '1.1rem' }}>{fmt(totalPaid)}</div>
                     <div className="stat-sub">Payments outgoing from SSD</div>
                 </Card>
+            </div>
+
+            <div className="mt-6 mb-6">
+                <SupplierOrdersView supplierId={supplierId} />
             </div>
 
             <div className="dashboard-grid">
