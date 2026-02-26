@@ -162,14 +162,14 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin bypass messages" ON public.messages USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
 CREATE POLICY "Admin bypass documents" ON public.documents USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
 CREATE POLICY "Admin bypass notifications" ON public.notifications USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
-CREATE POLICY "Admin bypass daily_reports" ON public.daily_reports USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor')));
-CREATE POLICY "Admin bypass quality_checklists" ON public.quality_checklists USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor')));
+CREATE POLICY "Admin bypass daily_reports" ON public.daily_reports USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor', 'Site Supervisor')));
+CREATE POLICY "Admin bypass quality_checklists" ON public.quality_checklists USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor', 'Site Supervisor')));
 CREATE POLICY "Admin bypass leave_requests" ON public.leave_requests USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
 CREATE POLICY "Admin bypass orders" ON public.orders USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
-CREATE POLICY "Admin bypass incidents" ON public.incidents USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor')));
+CREATE POLICY "Admin bypass incidents" ON public.incidents USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Supervisor', 'Site Supervisor')));
 CREATE POLICY "Admin bypass project_tasks" ON public.project_tasks USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
 CREATE POLICY "Admin bypass change_orders" ON public.change_orders USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager')));
-CREATE POLICY "Admin bypass subcontractor_claims" ON public.subcontractor_claims USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Finance Manager')));
+CREATE POLICY "Admin bypass subcontractor_claims" ON public.subcontractor_claims USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Super Admin', 'Project Manager', 'Finance Manager', 'Finance')));
 
 -- User level logic for notifications/messages
 CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT USING (user_id = auth.uid());
