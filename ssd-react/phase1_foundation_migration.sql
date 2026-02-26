@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     sender_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     receiver_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Null if project-wide
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE, -- Context
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE, -- Context
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
 -- 2. DOCUMENTS (Secure file sharing & vault)
 CREATE TABLE IF NOT EXISTS public.documents (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     uploader_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 -- 4. DAILY REPORTS (Site operations logs)
 CREATE TABLE IF NOT EXISTS public.daily_reports (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     supervisor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     report_date DATE NOT NULL DEFAULT CURRENT_DATE,
     weather_condition VARCHAR(100),
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS public.daily_reports (
 -- 5. QUALITY CHECKLISTS (QA / QC)
 CREATE TABLE IF NOT EXISTS public.quality_checklists (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     inspector_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     item_name VARCHAR(255) NOT NULL,
     status VARCHAR(50) DEFAULT 'Pending' CHECK (status IN ('Pending', 'Passed', 'Failed', 'Needs Rework')),
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
 CREATE TABLE IF NOT EXISTS public.orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     supplier_id INTEGER REFERENCES public.suppliers(id) ON DELETE CASCADE,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     item_description TEXT NOT NULL,
     quantity NUMERIC NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 -- 8. INCIDENTS (Site Safety & Reporting)
 CREATE TABLE IF NOT EXISTS public.incidents (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     reporter_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     description TEXT NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS public.incidents (
 -- 9. PROJECT TASKS (For Gantt/Timeline view)
 CREATE TABLE IF NOT EXISTS public.project_tasks (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS public.project_tasks (
 -- 10. CHANGE ORDERS
 CREATE TABLE IF NOT EXISTS public.change_orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     cost_impact NUMERIC(10, 2) DEFAULT 0.00,
@@ -134,9 +134,9 @@ CREATE TABLE IF NOT EXISTS public.change_orders (
 -- 11. SUBCONTRACTOR CLAIMS
 CREATE TABLE IF NOT EXISTS public.subcontractor_claims (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    project_subcontractor_id UUID REFERENCES public.project_subcontractors(id) ON DELETE CASCADE,
+    project_subcontractor_id BIGINT REFERENCES public.project_subcontractors(id) ON DELETE CASCADE,
     subcontractor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id BIGINT REFERENCES public.projects(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     percentage_claimed INTEGER NOT NULL CHECK (percentage_claimed > 0 AND percentage_claimed <= 100),
     amount_claimed NUMERIC(15, 2) NOT NULL,
