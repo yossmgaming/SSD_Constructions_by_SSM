@@ -34,6 +34,7 @@ export default function Subcontractors() {
     const [selectedId, setSelectedId] = useState(null);
     const [form, setForm] = useState(emptyForm);
     const [search, setSearch] = useState('');
+    const [assignedProjects, setAssignedProjects] = useState([]);
     const [copiedPID, setCopiedPID] = useState(null);
 
     const isAdmin = hasRole(['Super Admin', 'Finance']);
@@ -102,7 +103,28 @@ export default function Subcontractors() {
             notes: sc.notes || '',
             status: sc.status || 'Active',
         });
+        fetchAssignedProjects(sc.id);
         setIsModalOpen(true);
+    };
+
+    const fetchAssignedProjects = async (scId) => {
+        try {
+            const { data, error } = await supabase
+                .from('project_subcontractors')
+                .select(`
+                    projectId,
+                    amount,
+                    startDate,
+                    endDate,
+                    projects (id, name, status, progress)
+                `)
+                .eq('subcontractorId', scId);
+            if (!error && data) {
+                setAssignedProjects(data || []);
+            }
+        } catch (error) {
+            console.error("Error fetching assigned projects:", error);
+        }
     };
 
     const handleCopyPID = (pid, e) => {
@@ -296,6 +318,57 @@ export default function Subcontractors() {
                                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                                 placeholder="Additional details..." rows={2} />
                         </div>
+
+                        {selectedId && (
+                            <div className="assignment-section mt-6 pt-6 border-t border-slate-100">
+                                <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                    <Shield size={16} className="text-purple-500" />
+                                    Active Project Assignments
+                                </h3>
+                                {assignedProjects.length === 0 ? (
+                                    <div className="text-xs text-slate-400 italic">This sub-contractor is not currently assigned to any projects.</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {assignedProjects.map(proj => (
+                                            <div key={proj.projects.id} className="flex flex-col p-3 bg-slate-50 rounded-xl border border-slate-100 gap-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-700">{proj.projects.name}</div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-purple-500" style={{ width: `${proj.projects.progress}%` }} />
+                                                            </div>
+                                                            <span className="text-[10px] font-medium text-slate-400">{proj.projects.progress}%</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${proj.projects.status === 'Ongoing' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                        {proj.projects.status}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[9px] uppercase font-bold text-slate-400">Total Contract</span>
+                                                        <span className="text-xs font-bold text-emerald-600">
+                                                            LKR {Number(proj.amount || 0).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[9px] uppercase font-bold text-slate-400">Schedule</span>
+                                                        <span className="text-[10px] font-semibold text-slate-600">
+                                                            {proj.startDate || '—'} to {proj.endDate || '—'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="text-[10px] text-slate-400 mt-4 italic">
+                                    Assignments can be managed directly from the <strong>Projects</strong> page.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </Modal>
             </div>

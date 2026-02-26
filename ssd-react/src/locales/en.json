@@ -131,6 +131,7 @@
         "delete_confirm": "Delete this project?",
         "delete_warning": "Warning: Deleting this project will affect related records.",
         "search_placeholder": "Search by name or client...",
+        "select_client": "Select Client",
         "no_projects": "No projects found"
     },
     "workers": {

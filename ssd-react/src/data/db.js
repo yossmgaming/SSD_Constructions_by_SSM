@@ -24,6 +24,8 @@ export const KEYS = {
     workRates: 'workRates',
     bankAccounts: 'bankAccounts',
     agreements: 'agreements',
+    clients: 'clients',
+    projectSubcontractors: 'project_subcontractors',
 };
 
 // --- Supabase Async CRUD Functions ---

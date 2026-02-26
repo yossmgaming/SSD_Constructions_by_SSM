@@ -28,20 +28,27 @@ export default function SubContractorDashboard() {
     async function loadData() {
         setLoading(true);
         try {
-            // Sub-contractors may be linked to projects via a subcontractorId field on projects
-            const [projResult, payResult] = await Promise.all([
-                supabase
-                    .from('projects')
-                    .select('id, name, status, progress, budget, contractValue')
-                    .eq('subcontract_id', contractorId),
-                supabase
-                    .from('payments')
-                    .select('id, amount, direction, category, date, createdAt')
-                    .eq('subcontractorId', contractorId)
-                    .order('date', { ascending: false })
-                    .limit(20),
-            ]);
-            setProjects(projResult.data || []);
+            // Sub-contractors are now linked to projects via the project_subcontractors junction table
+            const { data: assignments, error: assignError } = await supabase
+                .from('project_subcontractors')
+                .select(`
+                    amount,
+                    startDate,
+                    endDate,
+                    projects (id, name, status, progress, budget, contractValue)
+                `)
+                .eq('subcontractorId', contractorId);
+
+            if (assignError) throw assignError;
+
+            const payResult = await supabase
+                .from('payments')
+                .select('id, amount, direction, category, date, createdAt')
+                .eq('subcontractorId', contractorId)
+                .order('date', { ascending: false })
+                .limit(20);
+
+            setProjects(assignments || []);
             setPayments(payResult.data || []);
         } catch (e) {
             console.error('[SubContractorDashboard] Load error:', e);
@@ -111,23 +118,41 @@ export default function SubContractorDashboard() {
                 <Card title="My Projects">
                     {loading ? (
                         <div className="empty-state">Loading...</div>
-                    ) : projects.length === 0 ? (
-                        <div className="empty-state">No projects currently assigned to your account.</div>
                     ) : (
                         projects.map(p => (
-                            <div className="project-mini" key={p.id}>
-                                <div className="flex-grow">
-                                    <div className="project-mini-name">{p.name}</div>
-                                    <div className="project-mini-progress-wrapper">
-                                        <div className="progress-bar-mini">
-                                            <div className="progress-fill-mini" style={{ width: `${p.progress || 0}%` }} />
-                                        </div>
-                                        <span className="text-xs text-slate-400">{p.progress || 0}%</span>
+                            <div key={p.projects.id} className="project-mini flex-col items-stretch gap-3 p-4 bg-slate-50/50 rounded-xl border border-slate-100 hover:border-purple-200 transition-all">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-800">{p.projects.name}</div>
+                                        <div className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">Building Project</div>
+                                    </div>
+                                    <span className={`badge ${p.projects.status === 'Ongoing' ? 'badge-info' : 'badge-warning'}`}>
+                                        {p.projects.status}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between py-2 border-y border-slate-100/80">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] uppercase font-bold text-slate-400">Your Contract</span>
+                                        <span className="text-sm font-bold text-emerald-600">LKR {Number(p.amount || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[9px] uppercase font-bold text-slate-400">Dates</span>
+                                        <span className="text-[10px] font-semibold text-slate-600">
+                                            {p.startDate || '—'} to {p.endDate || '—'}
+                                        </span>
                                     </div>
                                 </div>
-                                <span className={`badge ${p.status === 'Ongoing' ? 'badge-info' : 'badge-warning'}`}>
-                                    {p.status}
-                                </span>
+
+                                <div className="project-mini-progress-wrapper mb-0">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Overall Progress</span>
+                                        <span className="text-xs font-bold text-purple-600">{p.projects.progress || 0}%</span>
+                                    </div>
+                                    <div className="progress-bar-mini w-full">
+                                        <div className="progress-fill-mini" style={{ width: `${p.projects.progress || 0}%` }} />
+                                    </div>
+                                </div>
                             </div>
                         ))
                     )}

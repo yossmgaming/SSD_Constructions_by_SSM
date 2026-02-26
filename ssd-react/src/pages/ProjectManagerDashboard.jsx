@@ -3,24 +3,24 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../data/supabase';
 import Card from '../components/Card';
-import { Clock, ClipboardList, ShieldCheck } from 'lucide-react';
+import { TrendingUp, ClipboardList, Users, ShieldCheck, Briefcase } from 'lucide-react';
 import CountUp from '../components/CountUp';
 import './Dashboard.css';
 
-export default function WorkerDashboard() {
+export default function ProjectManagerDashboard() {
     const { t } = useTranslation();
     const { profile, identity } = useAuth();
 
-    // Independent State
     const [projects, setProjects] = useState([]);
     const [activities, setActivities] = useState([]);
-    const [attendanceDays, setAttendanceDays] = useState(null);
+    const [stats, setStats] = useState({ workers: 0, budget: 0 });
     const [isLoading, setIsLoading] = useState(true);
-    const [loadingAtt, setLoadingAtt] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [identity?.id]);
+    const fmt = (val) => new Intl.NumberFormat('en-LK', {
+        style: 'currency',
+        currency: 'LKR',
+        maximumFractionDigits: 0
+    }).format(val || 0);
 
     const timeAgo = (dateStr) => {
         if (!dateStr) return '';
@@ -34,6 +34,10 @@ export default function WorkerDashboard() {
         return `${days}${t('dashboard.d_ago')}`;
     };
 
+    useEffect(() => {
+        loadData();
+    }, [identity?.id]);
+
     async function loadData() {
         if (!identity?.id) {
             setIsLoading(false);
@@ -41,7 +45,7 @@ export default function WorkerDashboard() {
         }
         setIsLoading(true);
         try {
-            // 1. Fetch assigned projects
+            // 1. Fetch projects assigned to PM
             const { data: assignments } = await supabase
                 .from('projectWorkers')
                 .select('projectId')
@@ -52,29 +56,37 @@ export default function WorkerDashboard() {
             if (allowedIds.length > 0) {
                 const { data: p } = await supabase
                     .from('projects')
-                    .select('id, name, client, status, createdAt')
-                    .in('id', allowedIds)
-                    .eq('status', 'Ongoing');
+                    .select('*')
+                    .in('id', allowedIds);
                 setProjects(p || []);
 
-                // 2. Fetch recent activity for these projects
+                // 2. Fetch worker count for these projects
+                const { count: workerCount } = await supabase
+                    .from('projectWorkers')
+                    .select('*', { count: 'exact', head: true })
+                    .in('projectId', allowedIds);
+
+                setStats({
+                    workers: workerCount || 0,
+                    budget: (p || []).reduce((s, x) => s + (x.contractValue || x.budget || 0), 0)
+                });
+
+                // 3. Fetch recent payments/activities
                 const { data: recentPays } = await supabase
                     .from('payments')
-                    .select('id, category, date, createdAt, projectId')
+                    .select('id, category, amount, date, createdAt, projectId')
                     .in('projectId', allowedIds)
                     .order('createdAt', { ascending: false })
                     .limit(5);
 
                 const feed = [];
-                // Add project creation events
                 (p || []).forEach(r =>
-                    feed.push({ text: `Project "${r.name}" assigned to you`, time: r.createdAt, color: 'blue' })
+                    feed.push({ text: `Project oversight: ${r.name}`, time: r.createdAt, color: 'blue' })
                 );
-                // Add relevant payments/events
                 (recentPays || []).forEach(r => {
-                    const proj = (p || []).find(x => x.id === r.projectId);
+                    const proj = p.find(x => x.id === r.projectId);
                     feed.push({
-                        text: `Activity: ${r.category || 'Record'} added ${proj ? `(${proj.name})` : ''}`,
+                        text: `${r.category}: ${fmt(r.amount)} ${proj ? `(${proj.name})` : ''}`,
                         time: r.createdAt || r.date, color: 'rose'
                     });
                 });
@@ -82,50 +94,21 @@ export default function WorkerDashboard() {
                 feed.sort((a, b) => new Date(b.time) - new Date(a.time));
                 setActivities(feed.slice(0, 10).map(a => ({ ...a, time: timeAgo(a.time) })));
             }
-
-            // 3. Fetch attendance
-            await fetchAttendance();
-
         } catch (e) {
-            console.error('[WorkerDashboard] Load error:', e);
+            console.error('[PMDashboard] Load error:', e);
         } finally {
             setIsLoading(false);
         }
     }
 
-    async function fetchAttendance() {
-        if (!identity?.id) return;
-        setLoadingAtt(true);
-        try {
-            const now = new Date();
-            const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-            const { data: att } = await supabase
-                .from('attendances')
-                .select('id, isPresent, isHalfDay, hoursWorked, date')
-                .eq('workerId', identity.id)
-                .eq('isPresent', true)
-                .gte('date', monthStart);
-
-            const days = (att || []).reduce((sum, a) => {
-                const h = a.hoursWorked || (a.isHalfDay ? 4 : 8);
-                return sum + (h / 8);
-            }, 0);
-            setAttendanceDays(Math.round(days * 10) / 10);
-        } catch (e) {
-            console.warn('[WorkerDashboard] Attendance fetch failed:', e.message);
-        } finally {
-            setLoadingAtt(false);
-        }
-    }
-
     return (
-        <div className="worker-dashboard">
+        <div className="pm-dashboard">
             <div className="worker-welcome">
                 <div className="welcome-text">
-                    <h2>{t('dashboard.welcome_back')}, {profile?.full_name || 'Worker'}</h2>
-                    <p>{t('dashboard.worker_subtitle', 'Stay updated with your assigned projects and attendance.')}</p>
+                    <h2>{t('dashboard.welcome_back')}, {profile?.full_name || 'PM'}</h2>
+                    <p>{t('dashboard.pm_subtitle', 'Managing your assigned projects and team performance.')}</p>
                 </div>
-                <div className="worker-status-badge">
+                <div className="worker-status-badge pm-badge">
                     <ShieldCheck size={18} />
                     <span>{profile?.role} Access</span>
                 </div>
@@ -134,41 +117,42 @@ export default function WorkerDashboard() {
             <div className="dashboard-stats">
                 <Card className="stat-card indigo">
                     <div className="stat-icon indigo">
-                        <ClipboardList size={22} />
+                        <Briefcase size={22} />
                     </div>
-                    <div className="card-label">{t('dashboard.assigned_projects', 'Assigned Projects')}</div>
+                    <div className="card-label">Managed Projects</div>
                     <div className="card-value"><CountUp to={projects.length} /></div>
-                    <div className="stat-sub">{t('dashboard.active_now', 'Active now')}</div>
+                    <div className="stat-sub">Active Oversight</div>
                 </Card>
 
                 <Card className="stat-card emerald">
                     <div className="stat-icon emerald">
-                        <Clock size={22} />
+                        <Users size={22} />
                     </div>
-                    <div className="card-label">{t('dashboard.attendance_this_month', 'Attendance (Month)')}</div>
-                    <div className="card-value">
-                        {loadingAtt ? (
-                            <span style={{ fontSize: '1rem', color: '#94a3b8' }}>—</span>
-                        ) : !identity ? (
-                            <span style={{ fontSize: '0.8rem', color: '#f87171' }}>ID Link Missing</span>
-                        ) : (
-                            <CountUp to={attendanceDays ?? 0} />
-                        )}
+                    <div className="card-label">Assigned Workforce</div>
+                    <div className="card-value"><CountUp to={stats.workers} /></div>
+                    <div className="stat-sub">Across all projects</div>
+                </Card>
+
+                <Card className="stat-card amber">
+                    <div className="stat-icon amber">
+                        <TrendingUp size={22} />
                     </div>
-                    <div className="stat-sub">{t('dashboard.days_present', 'Days present this month')}</div>
+                    <div className="card-label">Total Managed Value</div>
+                    <div className="card-value" style={{ fontSize: '1.2rem' }}>{fmt(stats.budget)}</div>
+                    <div className="stat-sub">Portfolio scale</div>
                 </Card>
             </div>
 
             <div className="dashboard-grid">
-                <Card title={t('dashboard.my_active_projects', 'My Active Projects')}>
+                <Card title="Project Summary">
                     {projects.length === 0 ? (
-                        <div className="empty-state">{t('dashboard.no_projects_assigned', 'No projects currently assigned.')}</div>
+                        <div className="empty-state">No projects assigned for management.</div>
                     ) : (
                         projects.map((p) => (
                             <div className="project-mini" key={p.id}>
-                                <div>
+                                <div className="flex-grow">
                                     <div className="project-mini-name">{p.name}</div>
-                                    <div className="project-mini-client">{p.client}</div>
+                                    <div className="text-xs text-slate-400">{p.projectType} • {p.client}</div>
                                 </div>
                                 <span className={`badge ${p.status === 'Ongoing' ? 'badge-info' : 'badge-warning'}`}>
                                     {p.status}
@@ -178,9 +162,9 @@ export default function WorkerDashboard() {
                     )}
                 </Card>
 
-                <Card title={t('dashboard.latest_notifications', 'Latest Notifications')}>
+                <Card title="Recent Management Feed">
                     {activities.length === 0 ? (
-                        <div className="empty-state">{t('dashboard.no_recent_notifications', 'No new notifications.')}</div>
+                        <div className="empty-state">No recent activities found.</div>
                     ) : (
                         activities.map((a, i) => (
                             <div className="activity-item" key={i}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet, Eye, Maximize2 } from 'lucide-react';
+import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet, Eye, Maximize2, HardHat, X } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
@@ -9,11 +9,12 @@ import './Projects.css';
 import BounceButton from '../components/BounceButton';
 import { useAuth } from '../context/AuthContext';
 import { getAll, create, update, queryEq, KEYS } from '../data/db';
+import { supabase } from '../data/supabase';
 import { Pencil } from 'lucide-react';
 import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 
 const emptyForm = {
-    name: '', client: '', clientContact: '', clientPhone: '',
+    name: '', client: '', client_id: '', clientContact: '', clientPhone: '',
     location: '', projectType: 'Residential', budget: '', contractValue: '',
     startDate: '', endDate: '', progress: 0,
     status: 'Ongoing', description: '',
@@ -22,6 +23,9 @@ const emptyForm = {
 export default function Projects() {
     const { t } = useTranslation();
     const [projects, setProjects] = useState([]);
+    const [allClients, setAllClients] = useState([]);
+    const [allSubcontractors, setAllSubcontractors] = useState([]);
+    const [assignedSubcontractors, setAssignedSubcontractors] = useState([]);
     const [form, setForm] = useState(emptyForm);
     const [selectedId, setSelectedId] = useState(null);
     const [search, setSearch] = useState('');
@@ -58,6 +62,24 @@ export default function Projects() {
             }
             setProjects(projs);
 
+            // Fetch All Clients for Dropdown
+            const { data: clientsData, error: clientError } = await supabase
+                .from('clients')
+                .select('id, fullName')
+                .order('fullName', { ascending: true });
+
+            if (clientError) throw clientError;
+            setAllClients(clientsData || []);
+
+            // Fetch All Subcontractors
+            const { data: subsData, error: subsError } = await supabase
+                .from('subcontractors')
+                .select('id, fullName, company, specialty')
+                .order('fullName', { ascending: true });
+
+            if (subsError) throw subsError;
+            setAllSubcontractors(subsData || []);
+
         } catch (error) {
             console.error("Critical error loading projects:", error);
         } finally {
@@ -75,12 +97,32 @@ export default function Projects() {
 
         async function loadFinancials() {
             try {
-                const [pays, advs] = await Promise.all([
+                const [pays, advs, subs] = await Promise.all([
                     queryEq(KEYS.payments, 'projectId', selectedId),
-                    queryEq(KEYS.advances, 'projectId', selectedId)
+                    queryEq(KEYS.advances, 'projectId', selectedId),
+                    supabase
+                        .from('project_subcontractors')
+                        .select(`
+                            subcontractorId,
+                            amount,
+                            startDate,
+                            endDate,
+                            notes,
+                            subcontractors (id, fullName, specialty, company)
+                        `)
+                        .eq('projectId', selectedId)
                 ]);
                 setPayments(pays);
                 setAdvances(advs);
+                setAssignedSubcontractors(subs.data?.map(s => ({
+                    ...s.subcontractors,
+                    assignment: {
+                        amount: s.amount,
+                        startDate: s.startDate,
+                        endDate: s.endDate,
+                        notes: s.notes
+                    }
+                })) || []);
             } catch (error) {
                 console.error("Error loading financials:", error);
             }
@@ -166,11 +208,20 @@ export default function Projects() {
     function selectProject(p) {
         setSelectedId(p.id);
         setForm({
-            name: p.name, client: p.client || '', clientContact: p.clientContact || '', clientPhone: p.clientPhone || '',
-            location: p.location || '', projectType: p.projectType || 'Residential',
-            budget: p.budget || '', contractValue: p.contractValue || '',
-            startDate: p.startDate || '', endDate: p.endDate || '', progress: p.progress || 0,
-            status: p.status, description: p.description || '',
+            name: p.name,
+            client: p.client || '',
+            client_id: p.client_id || '',
+            clientContact: p.clientContact || '',
+            clientPhone: p.clientPhone || '',
+            location: p.location || '',
+            projectType: p.projectType || 'Residential',
+            budget: p.budget || '',
+            contractValue: p.contractValue || '',
+            startDate: p.startDate || '',
+            endDate: p.endDate || '',
+            progress: p.progress || 0,
+            status: p.status,
+            description: p.description || '',
         });
     }
 
@@ -201,6 +252,66 @@ export default function Projects() {
         } catch (error) {
             console.error(error);
             setIsLoading(false);
+        }
+    }
+
+    async function updateAssignment(subId, field, value) {
+        try {
+            const { error } = await supabase
+                .from('project_subcontractors')
+                .update({ [field]: value })
+                .eq('projectId', selectedId)
+                .eq('subcontractorId', subId);
+            if (error) throw error;
+            setAssignedSubcontractors(prev => prev.map(s =>
+                s.id === subId ? { ...s, assignment: { ...s.assignment, [field]: value } } : s
+            ));
+        } catch (error) {
+            console.error("Error updating assignment:", error);
+        }
+    }
+
+    async function assignSubcontractor(subId) {
+        if (!selectedId || !subId) return;
+        try {
+            const { error } = await supabase
+                .from('project_subcontractors')
+                .insert({
+                    projectId: selectedId,
+                    subcontractorId: subId,
+                    startDate: new Date().toISOString().split('T')[0] // Default to today
+                });
+            if (error) {
+                if (error.code === '23505') alert('Sub-contractor already assigned to this project.');
+                else throw error;
+            } else {
+                // Refresh local state
+                const sub = allSubcontractors.find(s => s.id === parseInt(subId));
+                if (sub) setAssignedSubcontractors(prev => [...prev, {
+                    ...sub,
+                    assignment: { amount: 0, startDate: new Date().toISOString().split('T')[0], endDate: '', notes: '' }
+                }]);
+            }
+        } catch (error) {
+            console.error("Error assigning sub-contractor:", error);
+            alert("Failed to assign: " + error.message);
+        }
+    }
+
+    async function removeSubcontractor(subId) {
+        if (!selectedId || !subId) return;
+        if (!window.confirm('Remove this sub-contractor from the project?')) return;
+        try {
+            const { error } = await supabase
+                .from('project_subcontractors')
+                .delete()
+                .eq('projectId', selectedId)
+                .eq('subcontractorId', subId);
+            if (error) throw error;
+            setAssignedSubcontractors(prev => prev.filter(s => s.id !== subId));
+        } catch (error) {
+            console.error("Error removing sub-contractor:", error);
+            alert("Failed to remove: " + error.message);
         }
     }
 
@@ -357,7 +468,22 @@ export default function Projects() {
 
                     <div className="form-group">
                         <label>{t('projects.client_name')}</label>
-                        <input value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+                        <select
+                            value={form.client_id}
+                            onChange={(e) => {
+                                const selectedClient = allClients.find(c => c.id === e.target.value);
+                                setForm({
+                                    ...form,
+                                    client_id: e.target.value,
+                                    client: selectedClient ? selectedClient.fullName : ''
+                                });
+                            }}
+                        >
+                            <option value="">-- {t('projects.select_client')} --</option>
+                            {allClients.map(c => (
+                                <option key={c.id} value={c.id}>{c.fullName}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* ✅ #2 Contact Person */}
@@ -454,6 +580,99 @@ export default function Projects() {
                         <label>{t('common.description')}</label>
                         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                     </div>
+
+                    {selectedId && (
+                        <div className="assignment-section mt-6 pt-6 border-t border-slate-100">
+                            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <HardHat size={16} className="text-purple-500" />
+                                Assigned Sub-Contractors
+                            </h3>
+
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {assignedSubcontractors.length === 0 ? (
+                                    <div className="text-xs text-slate-400 italic">No sub-contractors assigned to this project yet.</div>
+                                ) : (
+                                    <div className="space-y-4 w-full">
+                                        {assignedSubcontractors.map(sub => (
+                                            <div key={sub.id} className="sub-assignment-card p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                                                <button
+                                                    type="button"
+                                                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-full"
+                                                    onClick={() => removeSubcontractor(sub.id)}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+
+                                                <div className="flex items-start gap-3 mb-4">
+                                                    <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                                                        <HardHat size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-800">{sub.fullName}</div>
+                                                        <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                                                            {sub.specialty || sub.company || 'Sub-Contractor'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="form-group mb-0">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Contract Amount (LKR)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="h-9 text-sm font-bold text-slate-700 bg-white"
+                                                            value={sub.assignment?.amount || ''}
+                                                            onChange={(e) => updateAssignment(sub.id, 'amount', parseFloat(e.target.value) || 0)}
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="form-group mb-0">
+                                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
+                                                            <input
+                                                                type="date"
+                                                                className="h-9 text-xs font-semibold text-slate-700 bg-white px-2"
+                                                                value={sub.assignment?.startDate || ''}
+                                                                onChange={(e) => updateAssignment(sub.id, 'startDate', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div className="form-group mb-0">
+                                                            <label className="text-[10px] font-bold text-slate-400 uppercase">End Date</label>
+                                                            <input
+                                                                type="date"
+                                                                className="h-9 text-xs font-semibold text-slate-700 bg-white px-2"
+                                                                value={sub.assignment?.endDate || ''}
+                                                                onChange={(e) => updateAssignment(sub.id, 'endDate', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Assign New Sub-Contractor</label>
+                                <select
+                                    value=""
+                                    onChange={(e) => assignSubcontractor(e.target.value)}
+                                    className="bg-slate-50 border-slate-200"
+                                >
+                                    <option value="">-- Click to Select & Assign --</option>
+                                    {allSubcontractors
+                                        .filter(sub => !assignedSubcontractors.some(as => as.id === sub.id))
+                                        .map(sub => (
+                                            <option key={sub.id} value={sub.id}>
+                                                {sub.fullName} {sub.specialty ? `(${sub.specialty})` : sub.company ? `(${sub.company})` : ''}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </Modal>
             </div>
         </GlobalLoadingOverlay>
