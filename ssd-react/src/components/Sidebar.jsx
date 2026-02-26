@@ -17,7 +17,7 @@ import { PackageIcon } from './icons/PackageIcon';
 import { LandmarkIcon } from './icons/LandmarkIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { FileTextIcon } from './icons/FileTextIcon';
-import { KeyIcon } from 'lucide-react'; // Import KeyIcon from lucide-react
+import { KeyIcon, HardHat } from 'lucide-react'; // lucide imports
 import GradientText from './GradientText';
 import GlareHover from './GlareHover';
 import logoSrc from '../../Logo/Logo_16-9.png';
@@ -28,11 +28,12 @@ import './Sidebar.css';
 
 const navItems = [
     { to: '/', label: 'nav.dashboard', icon: LayoutPanelTopIcon },
-    { to: '/projects', label: 'nav.projects', icon: ConstructionIcon },
+    { to: '/projects', label: 'nav.projects', icon: ConstructionIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/clients', label: 'nav.clients', icon: UsersIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/workers', label: 'nav.workers', icon: SmileIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/materials', label: 'nav.materials', icon: PackageIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+    { to: '/subcontractors', label: 'nav.subcontractors', icon: HardHat, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/payments', label: 'nav.payments', icon: DollarSignIcon, roles: ['Super Admin', 'Finance'] },
     { to: '/attendance', label: 'nav.attendance', icon: CalendarCheckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
     { to: '/reports', label: 'nav.reports', icon: ChartSplineIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },

@@ -24,6 +24,26 @@ export function generateClientPID() {
 }
 
 /**
+ * Generates a Supplier ID (PID)
+ * Format: SSD-SP-[YEAR]-[RANDOM] (e.g., SSD-SP-2026-K3T7)
+ */
+export function generateSupplierPID() {
+    const year = new Date().getFullYear();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `SSD-SP-${year}-${random}`;
+}
+
+/**
+ * Generates a Sub-Contractor ID (PID)
+ * Format: SSD-SC-[YEAR]-[RANDOM] (e.g., SSD-SC-2026-M5R1)
+ */
+export function generateSubcontractorPID() {
+    const year = new Date().getFullYear();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `SSD-SC-${year}-${random}`;
+}
+
+/**
  * Generates a high-entropy secure token for invitations
  * Uses window.crypto for cryptographic strength
  */

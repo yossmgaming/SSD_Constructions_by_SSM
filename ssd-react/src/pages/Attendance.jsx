@@ -83,6 +83,10 @@ export default function Attendance() {
             const projectMap = {};
             workerAtt.forEach((a) => {
                 if (!a.projectId) return;
+                // Strict validation to avoid "ghost" records from previous spacing bug
+                const dateStr = a.date ? a.date.substring(0, 10).trim() : '';
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
                 if (!projectMap[a.projectId]) projectMap[a.projectId] = { projectId: a.projectId, dates: [], hours: 0 };
                 projectMap[a.projectId].dates.push(a.date);
                 projectMap[a.projectId].hours += (a.hoursWorked || a.hours || 0);
@@ -203,13 +207,15 @@ export default function Attendance() {
         if (!selectedWorker) return [];
         return attendances.filter((a) => {
             const d = new Date(a.date);
-            return a.workerId === selectedWorker.id && d.getMonth() === month && d.getFullYear() === year &&
-                (!selectedProject || a.projectId === parseInt(selectedProject));
+            const matchWorker = a.workerId === selectedWorker.id;
+            const matchMonth = d.getMonth() === month && d.getFullYear() === year;
+            const matchProject = !selectedProject || String(a.projectId) === String(selectedProject);
+            return matchWorker && matchMonth && matchProject;
         });
     }, [selectedWorker, month, year, selectedProject, attendances]);
 
     function getDateStr(day) {
-        return `${year} -${String(month + 1).padStart(2, '0')} -${String(day).padStart(2, '0')} `;
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
 
     function getAttendance(day) {

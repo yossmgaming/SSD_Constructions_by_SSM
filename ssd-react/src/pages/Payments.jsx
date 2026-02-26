@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, ArrowDownCircle, ArrowUpCircle, Zap, FileSpreadsheet, Download, ChevronDown, FileText, Box, Pencil } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
@@ -108,6 +108,53 @@ export default function Payments() {
         }
     }
 
+    const calculateEarnings = useCallback((atts, hr, rate, from, to) => {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        let total = 0;
+        let totalHours = 0;
+        let totalDays = 0;
+        const debugBreakdown = [];
+
+        atts.forEach(a => {
+            const dateStr = a.date ? a.date.substring(0, 10).trim() : '';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
+            // Date Cap: Ignore future records
+            if (dateStr > todayStr) return;
+
+            // Range Filter (Optional)
+            if (from && dateStr < from) return;
+            if (to && dateStr > to) return;
+
+            let hours = 0;
+            if (a.isPresent === true) {
+                if (a.hoursWorked != null && a.hoursWorked !== '') hours = parseFloat(a.hoursWorked);
+                else if (a.isHalfDay) hours = 4;
+                else hours = 8;
+            } else if (a.isPresent === false) {
+                hours = 0;
+            } else {
+                // Fallback for legacy data (status-based)
+                if (a.hours != null && a.hours !== '') hours = parseFloat(a.hours);
+                else if (a.status === 'Present' || a.status === 'Full') hours = 8;
+                else if (a.status === 'Half' || a.status === 'Half Day') hours = 4;
+                else if (a.status === 'Absent') hours = 0;
+            }
+
+            if (hours > 0) {
+                // Calculation matches calcWorkerSuggestion logic
+                const dailyEarned = hours * (hr || (rate / 8));
+                total += dailyEarned;
+                totalHours += hours;
+                totalDays += hours / 8;
+                debugBreakdown.push({ date: dateStr, amount: dailyEarned });
+            }
+        });
+        return { total, totalHours, totalDays, debugBreakdown };
+    }, []);
+
     // ─── Smart Auto-fill ─────────────────────────────────────────
     async function calcWorkerSuggestion(workerId, projectId, salaryFrom, salaryTo) {
         if (!workerId) { setSuggestion(null); return; }
@@ -123,68 +170,20 @@ export default function Payments() {
             ]);
 
             const rate = worker.dailyRate || 0;
-            const filteredAttendance = workerAttendance.filter((a) => {
-                const matchProject = !projectId || a.projectId === parseInt(projectId);
-
-                // Date Range Filter
-                let matchDate = true;
-                if (salaryFrom || salaryTo) {
-                    const dateStr = a.date ? a.date.substring(0, 10) : '';
-                    if (!dateStr) matchDate = false; // Hide undated if range selected
-                    else {
-                        if (salaryFrom && dateStr < salaryFrom) matchDate = false;
-                        if (salaryTo && dateStr > salaryTo) matchDate = false;
-                    }
-                }
-
-                return matchProject && matchDate;
-            });
-
-            // Sum up hours worked
-            let totalDays = 0;
-            let totalHours = 0;
-            workerAttendance.forEach((a) => {
-                // 1. Check for new UI fields (isPresent explicit)
-                if (a.isPresent !== undefined) {
-                    if (!a.isPresent) return; // Explicitly absent
-                    if (a.hoursWorked) {
-                        const h = parseFloat(a.hoursWorked);
-                        totalDays += h / 8;
-                        totalHours += h;
-                    } else if (a.isHalfDay) {
-                        totalDays += 0.5;
-                        totalHours += 4;
-                    } else {
-                        totalDays += 1;
-                        totalHours += 8;
-                    }
-                }
-                // 2. Fallback to legacy/seed data (only if UI hasn't touched it)
-                else {
-                    if (a.hours !== undefined && a.hours !== null) {
-                        const h = parseFloat(a.hours);
-                        totalDays += h / 8;
-                        totalHours += h;
-                    } else if (a.status === 'Present' || a.status === 'Full') {
-                        totalDays += 1;
-                        totalHours += 8;
-                    } else if (a.status === 'Half' || a.status === 'Half Day') {
-                        totalDays += 0.5;
-                        totalHours += 4;
-                    }
-                }
-            });
+            const hr = worker.hourlyRate ? parseFloat(worker.hourlyRate) : 0;
+            const projectFilteredAtts = workerAttendance.filter(a => !projectId || a.projectId === parseInt(projectId));
+            const { total: totalEarned, totalHours, totalDays } = calculateEarnings(projectFilteredAtts, hr, rate, salaryFrom, salaryTo);
 
             // Fetch ALL-TIME payments for this worker to calculate true balance
             const allWorkerPayments = await queryEq(KEYS.payments, 'workerId', parseInt(workerId));
 
-            // Already paid for this worker+project (period-based for earning, but maybe all-time for balance?)
-            // Actually, let's show BOTH if period is set, or just all-time if no period.
-            // For now, let's stick to All-time for "Already Paid" and "Outstanding" to satisfy 
-            // the user's request for "remaining balance".
-
+            // Already paid for this worker (All-time, but project-filtered if project selected)
             const alreadyPaid = allWorkerPayments
-                .filter((p) => p.direction === 'Out' && p.category === 'Worker Pay')
+                .filter((p) => {
+                    if (p.direction !== 'Out' || p.category !== 'Worker Pay') return false;
+                    if (projectId && p.projectId !== parseInt(projectId)) return false;
+                    return true;
+                })
                 .reduce((s, p) => s + (p.amount || 0), 0);
 
             // For Period-specific payout, we can calculate periodPaid too
@@ -200,29 +199,16 @@ export default function Payments() {
                 })
                 .reduce((s, p) => s + (p.amount || 0), 0);
 
-            // Calculate Total Earned: Use Hourly if available, else Daily
-            let totalEarned = 0;
-            const hr = worker.hourlyRate ? parseFloat(worker.hourlyRate) : 0;
-            if (hr > 0) {
-                totalEarned = totalHours * hr;
-            } else {
-                totalEarned = totalDays * rate;
-            }
-
             // Also fetch all-time earnings for this worker/project to show cumulative balance
-            const [allAttsForWorker, allAdvsForWorker] = await Promise.all([
-                queryEq(KEYS.attendances, 'workerId', parseInt(workerId)),
-                queryEq(KEYS.advances, 'workerId', parseInt(workerId))
-            ]);
+            const attsQuery = projectId
+                ? queryAdvanced(KEYS.attendances, { filters: { eq: { workerId: parseInt(workerId), projectId: parseInt(projectId) } } })
+                : queryEq(KEYS.attendances, 'workerId', parseInt(workerId));
 
-            let allTimeEarnings = 0;
-            allAttsForWorker.forEach(a => {
-                if (a.isPresent === false) return;
-                if (a.hoursWorked) allTimeEarnings += parseFloat(a.hoursWorked) * (hr || (rate / 8));
-                else if (a.isHalfDay) allTimeEarnings += (rate / 2);
-                else allTimeEarnings += rate;
-            });
+            const advsQuery = queryEq(KEYS.advances, 'workerId', parseInt(workerId));
 
+            const [allAttsForWorker, allAdvsForWorker] = await Promise.all([attsQuery, advsQuery]);
+
+            const { total: allTimeEarnings, debugBreakdown } = calculateEarnings(allAttsForWorker, hr, rate);
             const activeAdvs = allAdvsForWorker.filter((a) => a.status === 'Active');
             const activeAdvances = activeAdvs.reduce((s, a) => s + (a.amount || 0), 0);
             const oldestAdv = activeAdvs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
@@ -247,6 +233,7 @@ export default function Payments() {
                 activeAdvances,
                 suggestedProjectId,
                 allTimeEarnings,
+                debugBreakdown,
                 outstanding: (salaryFrom || salaryTo) ? periodOutstanding : cumulativeOutstanding,
                 cumulativeOutstanding
             });
@@ -411,16 +398,8 @@ export default function Payments() {
                 if (workerFilter !== 'All') {
                     const w = workers.find(x => x.id === parseInt(workerFilter));
                     if (w) {
-                        const rate = w.dailyRate || 0;
-                        const hr = w.hourlyRate || 0;
-                        let days = 0; let hours = 0;
-                        allAtts.forEach(a => {
-                            if (a.isPresent === false) return;
-                            if (a.hoursWorked) { hours += parseFloat(a.hoursWorked); days += parseFloat(a.hoursWorked) / 8; }
-                            else if (a.isHalfDay) { days += 0.5; hours += 4; }
-                            else { days += 1; hours += 8; }
-                        });
-                        earnings = hr > 0 ? (hours * hr) : (days * rate);
+                        const { total: earned } = calculateEarnings(allAtts, w.hourlyRate, w.dailyRate);
+                        earnings = earned;
                     }
                 }
 
@@ -461,13 +440,7 @@ export default function Payments() {
                     const rate = worker?.dailyRate || 0;
                     const hr = worker?.hourlyRate || 0;
 
-                    let totalEarnings = 0;
-                    workerAttendance.forEach(a => {
-                        if (a.isPresent === false) return;
-                        if (a.hoursWorked) totalEarnings += parseFloat(a.hoursWorked) * (hr || (rate / 8));
-                        else if (a.isHalfDay) totalEarnings += (rate / 2);
-                        else totalEarnings += rate;
-                    });
+                    const { total: totalEarnings } = calculateEarnings(workerAttendance, hr, rate);
 
                     const alreadyPaid = allWorkerPayments
                         .filter(p => p.direction === 'Out' && p.category === 'Worker Pay')
@@ -809,6 +782,18 @@ export default function Payments() {
                         <span>Active Advances:</span><strong className="text-red">-{fmt(suggestion.activeAdvances)}</strong>
                         <div style={{ gridColumn: '1 / -1', height: '1px', background: 'rgba(99, 102, 241, 0.2)', margin: '8px 0' }} />
                         <span style={{ fontWeight: 700 }}>Total Balance:</span><strong className={suggestion.cumulativeOutstanding >= 0 ? 'text-green' : 'text-red'}>{fmt(suggestion.cumulativeOutstanding)}</strong>
+
+                        {suggestion.debugBreakdown && suggestion.debugBreakdown.length > 0 && (
+                            <div style={{ gridColumn: '1 / -1', marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', maxHeight: '100px', overflowY: 'auto', fontSize: '0.7rem' }}>
+                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>Earnings Trace (Project/Filtered):</div>
+                                {suggestion.debugBreakdown.map((b, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
+                                        <span>{b.date}</span>
+                                        <span>{fmt(b.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {suggestion.periodOutstanding > 0 && (

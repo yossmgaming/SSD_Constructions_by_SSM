@@ -1,14 +1,198 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../data/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Plus, Key, Info, Zap, Check } from 'lucide-react';
+import { Shield, Plus, Key, Zap, Check, Search, User, X, ChevronDown } from 'lucide-react';
 import Card from '../components/Card';
 import BounceButton from '../components/BounceButton';
 import DataTable from '../components/DataTable';
 import { ClipboardIcon } from '../components/icons/ClipboardIcon';
 import { TrashIcon } from '../components/icons/TrashIcon';
 import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+import { generateSecureToken, hashToken } from '../utils/security';
+
+// ─── Role → Table routing configuration ────────────────────────────────────
+// Maps each user role to: which table to search, which field is the "PID/ID"
+// stored in invite_codes.target_id, and display fields.
+// Field names match the actual DB columns used in each page's form/queries:
+//   workers: fullName, pid
+//   clients: fullName, pid  (clients also use pid since previous session)
+//   suppliers: name, pid
+//   subcontractors: name, pid (check actual schema)
+const ROLE_TABLE_MAP = {
+    'Worker': { table: 'workers', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Worker PID' },
+    'Site Supervisor': { table: 'workers', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Worker PID' },
+    'Project Manager': { table: 'workers', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Worker PID' },
+    'Finance': { table: 'workers', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Worker PID' },
+    'Sub Contractor': { table: 'subcontractors', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Subcontractor PID' },
+    'Client': { table: 'clients', idField: 'pid', nameField: 'fullName', searchField: 'fullName', label: 'Client PID' },
+    'Supplier': { table: 'suppliers', idField: 'pid', nameField: 'name', searchField: 'name', label: 'Supplier PID' },
+    'Super Admin': { table: null, idField: null, nameField: null, searchField: null, label: 'N/A (Global)' },
+};
+
+// ─── Person Picker Component ────────────────────────────────────────────────
+function PersonPicker({ role, value, onSelect }) {
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const [selectedName, setSelectedName] = useState('');
+    const wrapperRef = useRef(null);
+    const debounceRef = useRef(null);
+
+    const config = ROLE_TABLE_MAP[role];
+
+    // Reset when role changes
+    useEffect(() => {
+        setQuery('');
+        setResults([]);
+        setSelectedName('');
+        setIsOpen(false);
+        onSelect('', '');
+    }, [role]);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const search = useCallback(async (q) => {
+        if (!config?.table || q.trim().length < 1) {
+            setResults([]);
+            return;
+        }
+        setIsSearching(true);
+        try {
+            const { data } = await supabase
+                .from(config.table)
+                .select(`${config.idField}, ${config.nameField}`)
+                .ilike(config.searchField, `%${q.trim()}%`)
+                .limit(8);
+            setResults(data || []);
+            setIsOpen(true);
+        } catch {
+            setResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [config]);
+
+    const handleInput = (e) => {
+        const q = e.target.value;
+        setQuery(q);
+        setSelectedName(''); // Clear selection when typing
+        onSelect('', '');
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => search(q), 280);
+    };
+
+    const handleSelect = (person) => {
+        const id = String(person[config.idField]);
+        const name = person[config.nameField];
+        setQuery(name);
+        setSelectedName(name);
+        setIsOpen(false);
+        setResults([]);
+        onSelect(id, name);
+    };
+
+    const handleClear = () => {
+        setQuery('');
+        setSelectedName('');
+        setResults([]);
+        onSelect('', '');
+    };
+
+    if (!config?.table) {
+        // Super Admin — no linking needed
+        return (
+            <div className="form-group">
+                <label>Linked Identity</label>
+                <div className="pid-picker-disabled">
+                    <Shield size={14} className="text-slate-400" />
+                    <span className="text-slate-400 text-sm">Super Admin — no identity linking required</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="form-group" ref={wrapperRef}>
+            <label>Link to Person <span className="text-red-500">*</span></label>
+            <div className="pid-picker-wrapper">
+                <div className="pid-picker-input-row">
+                    <Search size={15} className="pid-picker-icon" />
+                    <input
+                        type="text"
+                        className={`pid-picker-input ${selectedName ? 'has-selection' : ''}`}
+                        placeholder={`Search ${config.table} by name...`}
+                        value={query}
+                        onChange={handleInput}
+                        onFocus={() => query && results.length > 0 && setIsOpen(true)}
+                        autoComplete="off"
+                    />
+                    {isSearching && <div className="pid-spinner" />}
+                    {query && !isSearching && (
+                        <button type="button" className="pid-clear-btn" onClick={handleClear}>
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Dropdown */}
+                {isOpen && results.length > 0 && (
+                    <ul className="pid-dropdown">
+                        {results.map((person) => (
+                            <li
+                                key={person[config.idField]}
+                                className="pid-dropdown-item"
+                                onMouseDown={() => handleSelect(person)}
+                            >
+                                <div className="pid-dropdown-id">
+                                    {String(person[config.idField]).slice(0, 16)}
+                                </div>
+                                <div className="pid-dropdown-name">
+                                    <User size={12} className="mr-1 opacity-60" />
+                                    {person[config.nameField]}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {isOpen && !isSearching && results.length === 0 && query.length >= 1 && (
+                    <div className="pid-no-results">No matches found for "{query}"</div>
+                )}
+            </div>
+
+            {/* Selected person badge */}
+            {selectedName && value && (
+                <div className="pid-selected-badge">
+                    <Check size={13} className="text-emerald-500" />
+                    <span className="pid-selected-name">{selectedName}</span>
+                    <code className="pid-selected-id">{value}</code>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Role color chips ────────────────────────────────────────────────────────
+const ROLE_COLORS = {
+    'Worker': 'bg-blue-100 text-blue-700',
+    'Site Supervisor': 'bg-indigo-100 text-indigo-700',
+    'Project Manager': 'bg-violet-100 text-violet-700',
+    'Finance': 'bg-yellow-100 text-yellow-700',
+    'Client': 'bg-teal-100 text-teal-700',
+    'Supplier': 'bg-orange-100 text-orange-700',
+    'Sub Contractor': 'bg-rose-100 text-rose-700',
+    'Super Admin': 'bg-slate-800 text-white',
+};
 
 export default function InviteCodes() {
     const { t } = useTranslation();
@@ -20,6 +204,7 @@ export default function InviteCodes() {
     // Form state
     const [newRole, setNewRole] = useState('Worker');
     const [newTargetId, setNewTargetId] = useState('');
+    const [newTargetName, setNewTargetName] = useState(''); // Human-readable name for confirmation
     const [copiedNode, setCopiedNode] = useState(null);
 
     useEffect(() => {
@@ -46,6 +231,14 @@ export default function InviteCodes() {
         e.preventDefault();
         setGenerating(true);
 
+        // Validate: Super Admin doesn't need a target, but everyone else does
+        const config = ROLE_TABLE_MAP[newRole];
+        if (config?.table && !newTargetId) {
+            alert('Please search and select a person to link this invite to.');
+            setGenerating(false);
+            return;
+        }
+
         try {
             const rawCode = generateSecureToken();
             const codeHash = await hashToken(rawCode);
@@ -59,10 +252,11 @@ export default function InviteCodes() {
             const { data, error } = await supabase
                 .from('invite_codes')
                 .insert({
-                    code: rawCode, // User-facing code
-                    token_hash: codeHash, // Secure hash for verification
+                    code: rawCode,
+                    token_hash: codeHash,
                     role: newRole,
-                    target_id: newTargetId,
+                    target_id: newTargetId || null,
+                    target_name: newTargetName || null, // Store name for display
                     expires_at: expirationDate.toISOString(),
                     created_by: profile?.id || user?.id
                 })
@@ -74,6 +268,7 @@ export default function InviteCodes() {
             if (data) {
                 setCodes(prev => [{ ...data, id: data.code }, ...prev]);
                 setNewTargetId('');
+                setNewTargetName('');
             }
         } catch (error) {
             console.error("Invite generation error:", error);
@@ -113,8 +308,11 @@ export default function InviteCodes() {
                         <Key size={14} className="opacity-70" />
                         {val}
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider font-semibold opacity-40 mt-1">
-                        Target: {row.target_id ? row.target_id.slice(0, 8) : 'Global'}
+                    <div className="flex items-center gap-1.5 mt-1">
+                        <User size={10} className="opacity-40" />
+                        <span className="text-[11px] font-medium text-slate-500">
+                            {row.target_name || (row.target_id ? row.target_id.slice(0, 12) + '…' : 'Global Access')}
+                        </span>
                     </div>
                 </div>
             )
@@ -123,9 +321,13 @@ export default function InviteCodes() {
             key: 'role',
             label: t('invite_codes.table_role'),
             render: (val) => (
-                <span className="font-medium text-slate-700">{val}</span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${ROLE_COLORS[val] || 'bg-slate-100 text-slate-700'
+                    }`}>
+                    {val}
+                </span>
             )
         },
+
         {
             key: 'status',
             label: t('invite_codes.table_status'),
@@ -216,28 +418,23 @@ export default function InviteCodes() {
                                         value={newRole}
                                         onChange={(e) => setNewRole(e.target.value)}
                                     >
-                                        <option value="Worker">Worker</option>
-                                        <option value="Site Supervisor">Site Supervisor</option>
-                                        <option value="Project Manager">Project Manager</option>
-                                        <option value="Client">Client</option>
-                                        <option value="Finance">Finance</option>
-                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Worker">🔨 Worker</option>
+                                        <option value="Site Supervisor">🦺 Site Supervisor</option>
+                                        <option value="Project Manager">📋 Project Manager</option>
+                                        <option value="Finance">💰 Finance</option>
+                                        <option value="Client">🤝 Client</option>
+                                        <option value="Supplier">🚚 Supplier</option>
+                                        <option value="Sub Contractor">🏗️ Sub Contractor</option>
+                                        <option value="Super Admin">🛡️ Super Admin</option>
                                     </select>
                                 </div>
-                                <div className="form-group">
-                                    <label>{t('invite_codes.target_id')}</label>
-                                    <input
-                                        type="text"
-                                        placeholder={t('invite_codes.target_id_placeholder')}
-                                        value={newTargetId}
-                                        onChange={(e) => setNewTargetId(e.target.value)}
-                                        required
-                                    />
-                                    <div className="info-box-tiny mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100" style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                        <Info size={12} className="inline mr-1 text-blue-500" />
-                                        {t('invite_codes.target_id_hint')}
-                                    </div>
-                                </div>
+
+                                {/* Smart Person Picker */}
+                                <PersonPicker
+                                    role={newRole}
+                                    value={newTargetId}
+                                    onSelect={(id, name) => { setNewTargetId(id); setNewTargetName(name); }}
+                                />
                                 <BounceButton
                                     type="submit"
                                     disabled={generating}
@@ -273,21 +470,4 @@ export default function InviteCodes() {
     );
 }
 
-// Security Helpers
-function generateSecureToken(length = 12) {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const randomBuffer = new Uint32Array(length);
-    window.crypto.getRandomValues(randomBuffer);
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += charset[randomBuffer[i] % charset.length];
-    }
-    return result;
-}
-
-async function hashToken(token) {
-    const msgUint8 = new TextEncoder().encode(token);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// NOTE: generateSecureToken and hashToken are now imported from ../utils/security

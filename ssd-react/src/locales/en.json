@@ -21,7 +21,8 @@
         "system": "System",
         "invite_codes": "Invitation Gatekeeper",
         "personnel_command": "Personnel Command",
-        "clients": "Clients"
+        "clients": "Clients",
+        "subcontractors": "Sub-Contractors"
     },
     "common": {
         "add_new": "Add New",
@@ -96,7 +97,17 @@
         "m_ago": "m ago",
         "h_ago": "h ago",
         "d_ago": "d ago",
-        "refresh": "Refresh"
+        "refresh": "Refresh",
+        "welcome_back": "Welcome back",
+        "worker_subtitle": "Stay updated with your assigned projects and attendance.",
+        "assigned_projects": "Assigned Projects",
+        "active_now": "Active now",
+        "attendance_this_month": "Attendance (Month)",
+        "days_present": "Days present this month",
+        "my_active_projects": "My Active Projects",
+        "no_projects_assigned": "No projects currently assigned.",
+        "latest_notifications": "Latest Notifications",
+        "no_recent_notifications": "No new notifications."
     },
     "projects": {
         "title": "Projects",

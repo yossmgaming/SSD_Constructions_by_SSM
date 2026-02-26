@@ -423,3 +423,191 @@
         transform: rotate(360deg);
     }
 }
+
+/* ─── Person Picker (InviteCodes smart search) ────────────────────────────── */
+
+.pid-picker-wrapper {
+    position: relative;
+}
+
+.pid-picker-input-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.pid-picker-icon {
+    position: absolute;
+    left: 11px;
+    color: #94a3b8;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.pid-picker-input {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 2.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.625rem;
+    font-size: 0.875rem;
+    background: #f8fafc;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pid-picker-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    background: #fff;
+}
+
+.pid-picker-input.has-selection {
+    border-color: #10b981;
+    background: #f0fdf4;
+    color: #065f46;
+    font-weight: 600;
+}
+
+.pid-spinner {
+    position: absolute;
+    right: 10px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+.pid-clear-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    padding: 3px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.pid-clear-btn:hover {
+    color: #ef4444;
+    background: #fee2e2;
+}
+
+.pid-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    list-style: none;
+    padding: 0.375rem;
+    margin: 0;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.pid-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.pid-dropdown-item:hover {
+    background: #f1f5f9;
+}
+
+.pid-dropdown-id {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #3b82f6;
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    border-radius: 0.375rem;
+    padding: 2px 6px;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.pid-dropdown-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+}
+
+.pid-no-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem;
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+}
+
+.pid-selected-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.625rem;
+    animation: fadeIn 0.2s ease;
+}
+
+.pid-selected-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #065f46;
+    flex: 1;
+}
+
+.pid-selected-id {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 0.6875rem;
+    color: #047857;
+    background: #d1fae5;
+    border-radius: 0.375rem;
+    padding: 2px 6px;
+}
+
+.pid-picker-disabled {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.625rem;
+    color: #94a3b8;
+    font-size: 0.8125rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -162,7 +162,18 @@ export default function Workers() {
             setAssignments([]);
         } else {
             setSelectedId(w.id);
-            setForm({ fullName: w.fullName, nic: w.nic, role: w.role, hourlyRate: w.hourlyRate || '', dailyRate: w.dailyRate, overtimeRate: w.overtimeRate || '', phone: w.phone || '', phone2: w.phone2 || '', status: w.status, notes: w.notes || '' });
+            setForm({
+                fullName: w.fullName,
+                nic: w.nic || '',
+                role: w.role,
+                hourlyRate: w.hourlyRate || '',
+                dailyRate: w.dailyRate || '',
+                overtimeRate: w.otRate || w.overtimeRate || '',
+                phone: w.phone || '',
+                phone2: w.phone2 || '',
+                status: w.status,
+                notes: w.notes || ''
+            });
             loadAssignments(w.id);
         }
     }
@@ -171,11 +182,11 @@ export default function Workers() {
         setSelectedId(w.id);
         setForm({
             fullName: w.fullName,
-            nic: w.nic,
+            nic: w.nic || '',
             role: w.role,
             hourlyRate: w.hourlyRate || '',
-            dailyRate: w.dailyRate,
-            overtimeRate: w.overtimeRate || '',
+            dailyRate: w.dailyRate || '',
+            overtimeRate: w.otRate || w.overtimeRate || '',
             phone: w.phone || '',
             phone2: w.phone2 || '',
             status: w.status,
@@ -200,7 +211,13 @@ export default function Workers() {
         }
 
         setIsLoading(true);
-        const data = { ...form, dailyRate: parseFloat(form.dailyRate) || 0, hourlyRate: parseFloat(form.hourlyRate) || 0, overtimeRate: parseFloat(form.overtimeRate) || 0 };
+        const { overtimeRate, ...rest } = form;
+        const data = {
+            ...rest,
+            dailyRate: parseFloat(form.dailyRate) || 0,
+            hourlyRate: parseFloat(form.hourlyRate) || 0,
+            otRate: parseFloat(form.overtimeRate) || 0
+        };
 
         try {
             if (selectedId) {
@@ -644,7 +661,7 @@ export default function Workers() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="form-group">
-                                    <label>{t('workers.base_salary')} <span className="text-muted text-xs">(Locked)</span></label>
+                                    <label>{t('workers.base_salary')} <span className="text-muted text-xs">(Auto-filled from Rates)</span></label>
                                     <div className="relative">
                                         <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                         <input
@@ -652,8 +669,8 @@ export default function Workers() {
                                             type="number"
                                             placeholder="0.00"
                                             value={form.hourlyRate || ''}
-                                            readOnly
-                                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                            disabled={!isSuperAdminOrFinance}
+                                            onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
                                         />
                                     </div>
                                 </div>
@@ -664,16 +681,17 @@ export default function Workers() {
                                         <input
                                             className="pl-9"
                                             type="number"
-                                            value={form.dailyRate}
-                                            readOnly
-                                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                            placeholder="0.00"
+                                            value={form.dailyRate || ''}
+                                            disabled={!isSuperAdminOrFinance}
+                                            onChange={(e) => setForm({ ...form, dailyRate: e.target.value })}
                                         />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="form-group">
-                                <label>{t('workers.overtime_rate') || t('rates.overtime_rate')} <span className="text-muted text-xs">(Locked)</span></label>
+                                <label>{t('workers.overtime_rate') || t('rates.overtime_rate')} <span className="text-muted text-xs">(per hour over 8h)</span></label>
                                 <div className="relative">
                                     <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
@@ -681,8 +699,8 @@ export default function Workers() {
                                         type="number"
                                         placeholder="0.00"
                                         value={form.overtimeRate || ''}
-                                        readOnly
-                                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                        disabled={!isSuperAdminOrFinance}
+                                        onChange={(e) => setForm({ ...form, overtimeRate: e.target.value })}
                                     />
                                 </div>
                             </div>

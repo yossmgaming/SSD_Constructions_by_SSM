@@ -1,21 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FolderKanban, Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import CountUp from '../components/CountUp';
-import {
-    PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, AreaChart, Area
-} from 'recharts';
-import Card from '../components/Card';
-import { getAll, queryEq, queryAdvanced, KEYS } from '../data/db';
-import './Dashboard.css';
 import BounceButton from '../components/BounceButton';
 import { useAuth } from '../context/AuthContext';
-import { Shield } from 'lucide-react';
 import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { getAll, queryEq, queryAdvanced, KEYS } from '../data/db';
+import { supabase } from '../data/supabase';
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#94a3b8'];
+// Sub-dashboards
+import AdminDashboard from './AdminDashboard';
+import WorkerDashboard from './WorkerDashboard';
+import ClientDashboard from './ClientDashboard';
+import SupplierDashboard from './SupplierDashboard';
+import SubContractorDashboard from './SubContractorDashboard';
+import './Dashboard.css';
 
 export default function Dashboard() {
     const { t } = useTranslation();
@@ -26,12 +24,16 @@ export default function Dashboard() {
     const [advances, setAdvances] = useState([]);
     const [activities, setActivities] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { profile, hasRole } = useAuth();
-    const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
+    const { profile, identity, hasRole } = useAuth();
+
     const isClient = profile?.role === 'Client';
     const isWorker = profile?.role === 'Worker';
+    const isSupervisorOrPM = profile?.role === 'Site Supervisor' || profile?.role === 'Project Manager';
+    const isSupplier = profile?.role === 'Supplier';
+    const isSubContractor = profile?.role === 'Sub Contractor';
+    const isRestricted = isClient || isWorker || isSupplier || isSubContractor || isSupervisorOrPM;
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); }, [profile?.id, identity?.id]);
 
     function timeAgo(dateStr) {
         if (!dateStr) return '';
@@ -48,89 +50,208 @@ export default function Dashboard() {
     async function loadData() {
         setIsLoading(true);
         try {
-            // Calculate 6 months ago for financial charts
             const sixMonthsAgo = new Date();
             sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
             const dateFrom = sixMonthsAgo.toISOString().split('T')[0];
 
-            const [p, w, m, pay, adv, recentProjs, recentWorkers, recentMats, recentPays, recentAdvs] = await Promise.all([
-                queryEq(KEYS.projects, 'status', 'Ongoing', 'id, name, budget, contractValue, client, status'),
-                queryEq(KEYS.workers, 'status', 'Active', 'id, fullName, role, status'),
-                getAll(KEYS.materials, 'id'),
-                queryAdvanced(KEYS.payments, { filters: { range: { column: 'date', from: dateFrom } }, select: 'id, amount, direction, category, projectId, workerId, date' }),
-                queryAdvanced(KEYS.advances, { filters: { range: { column: 'date', from: dateFrom } }, select: 'id, amount, projectId, workerId, date' }),
+            // ─── STEP 1: Determine which project IDs this user is allowed to see ───
+            let allowedProjectIds = isRestricted ? [] : null; // Admin/Finance see ALL (null), everyone else starts with NONE ([])
 
-                // For activity feed: get last 10 of each
-                queryAdvanced(KEYS.projects, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, name, createdAt' }),
-                queryAdvanced(KEYS.workers, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, fullName, role, createdAt' }),
-                queryAdvanced(KEYS.materials, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, name, createdAt' }),
-                queryAdvanced(KEYS.payments, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, amount, direction, category, projectId, createdAt, date' }),
-                queryAdvanced(KEYS.advances, { orderBy: { column: 'createdAt', ascending: false }, limit: 10, select: 'id, amount, projectId, workerId, createdAt, date' })
-            ]);
+            if (isWorker && identity?.id) {
+                // Workers are linked to projects via the projectWorkers junction table
+                const { data: assignments } = await supabase
+                    .from('projectWorkers')
+                    .select('projectId')
+                    .eq('workerId', identity.id);
 
-            setProjects(p);
-            setWorkers(w);
-            setMaterials(m);
+                allowedProjectIds = (assignments || []).map(a => a.projectId);
+                console.log(`[Dashboard] Worker sees ${allowedProjectIds.length} assigned projects`);
+            }
+
+            if ((isSupervisorOrPM) && identity?.id) {
+                // Supervisors/PMs: scope to their specific worker assignment
+                const { data: assignments } = await supabase
+                    .from('projectWorkers')
+                    .select('projectId')
+                    .eq('workerId', identity.id);
+                if (assignments && assignments.length > 0) {
+                    allowedProjectIds = assignments.map(a => a.projectId);
+                }
+            }
+
+            if (isClient && identity?.id) {
+                // Clients are linked to projects via projects.client_id
+                const { data: clientProjects } = await supabase
+                    .from('projects')
+                    .select('id')
+                    .eq('client_id', identity.id);
+
+                allowedProjectIds = (clientProjects || []).map(p => p.id);
+                console.log(`[Dashboard] Client sees ${allowedProjectIds.length} projects`);
+            }
+
+            if (isSubContractor && identity?.id) {
+                // Sub-Contractors are linked to projects via projects.subcontract_id
+                const { data: contractorProjects } = await supabase
+                    .from('projects')
+                    .select('id')
+                    .eq('subcontract_id', identity.id);
+
+                allowedProjectIds = (contractorProjects || []).map(p => p.id);
+                console.log(`[Dashboard] Sub-Contractor sees ${allowedProjectIds.length} projects`);
+            }
+
+            if (isSupplier && identity?.id) {
+                // Suppliers see projects where they have supplied materials (linked via payments)
+                // OR we check if they have specific material records linked to projects
+                const { data: supplierPays } = await supabase
+                    .from('payments')
+                    .select('projectId')
+                    .eq('supplierId', identity.id);
+
+                const projIds = (supplierPays || []).map(p => p.projectId).filter(Boolean);
+                allowedProjectIds = [...new Set(projIds)];
+                console.log(`[Dashboard] Supplier sees ${allowedProjectIds.length} projects through payment/supply history`);
+            }
+
+            // ─── STEP 2: Load projects scoped to allowed IDs ───
+            let projectQuery = supabase
+                .from('projects')
+                .select('id, name, budget, contractValue, client, client_id, status, progress, createdAt')
+                .eq('status', 'Ongoing');
+
+            if (allowedProjectIds !== null) {
+                if (allowedProjectIds.length === 0) {
+                    // No projects assigned — short-circuit
+                    setProjects([]);
+                    setWorkers([]);
+                    setMaterials([]);
+                    setPayments([]);
+                    setAdvances([]);
+                    setActivities([]);
+                    setIsLoading(false);
+                    return;
+                }
+                projectQuery = projectQuery.in('id', allowedProjectIds);
+            }
+
+            const { data: p = [] } = await projectQuery;
+            setProjects(p || []);
+
+            // ─── STEP 3: Load supporting data ───
+            // Only admin/finance need the full worker/material lists
+            let w = [], m = [];
+            if (!isRestricted) {
+                [w, m] = await Promise.all([
+                    queryEq(KEYS.workers, 'status', 'Active', 'id, fullName, role, status'),
+                    getAll(KEYS.materials, 'id'),
+                ]);
+                setWorkers(w);
+                setMaterials(m);
+            }
+
+            // ─── STEP 4: Load financial data ───
+            let pay = [], adv = [];
+
+            if (!isRestricted) {
+                // Admin/Finance: load everything regardless of project count
+                const [payResult, advResult] = await Promise.all([
+                    queryAdvanced(KEYS.payments, {
+                        filters: { range: { column: 'date', from: dateFrom } },
+                        select: 'id, amount, direction, category, projectId, workerId, date, createdAt'
+                    }),
+                    queryAdvanced(KEYS.advances, {
+                        filters: { range: { column: 'date', from: dateFrom } },
+                        select: 'id, amount, projectId, workerId, date, createdAt'
+                    }),
+                ]);
+                pay = payResult || [];
+                adv = advResult || [];
+            } else if (allowedProjectIds && allowedProjectIds.length > 0) {
+                // Workers/Clients/Supervisors: only load financial data for their allowed projects
+                const [payResult, advResult] = await Promise.all([
+                    supabase
+                        .from('payments')
+                        .select('id, amount, direction, category, projectId, workerId, date, createdAt')
+                        .in('projectId', allowedProjectIds)
+                        .gte('date', dateFrom),
+                    supabase
+                        .from('advances')
+                        .select('id, amount, projectId, workerId, date, createdAt')
+                        .in('projectId', allowedProjectIds)
+                        .gte('date', dateFrom),
+                ]);
+                pay = payResult.data || [];
+                adv = advResult.data || [];
+            }
+
             setPayments(pay);
             setAdvances(adv || []);
 
-            // Activity feed - compiled from recent records
+            // ─── STEP 4: Build activity feed scoped to allowed projects ───
             const feed = [];
-            recentProjs.forEach((r) => feed.push({ text: `Project "${r.name}" created`, time: r.createdAt, color: 'blue' }));
-            recentWorkers.forEach((r) => feed.push({ text: `Worker ${r.fullName} added (${r.role})`, time: r.createdAt, color: 'green' }));
-            recentMats.forEach((r) => feed.push({ text: `Material "${r.name}" registered`, time: r.createdAt, color: 'orange' }));
-            recentPays.forEach((r) => {
-                const proj = p.find((x) => x.id === r.projectId);
+
+            // Recent projects (scoped)
+            const recentProjs = [...(p || [])].sort((a, b) =>
+                new Date(b.createdAt) - new Date(a.createdAt)
+            ).slice(0, 5);
+            recentProjs.forEach(r =>
+                feed.push({ text: `Project "${r.name}" created`, time: r.createdAt, color: 'blue', projectId: r.id })
+            );
+
+            // Workers and materials only show for admin
+            if (!isRestricted) {
+                const [recentWorkers, recentMats] = await Promise.all([
+                    queryAdvanced(KEYS.workers, { orderBy: { column: 'createdAt', ascending: false }, limit: 8, select: 'id, fullName, role, createdAt' }),
+                    queryAdvanced(KEYS.materials, { orderBy: { column: 'createdAt', ascending: false }, limit: 5, select: 'id, name, createdAt' }),
+                ]);
+                recentWorkers?.forEach(r =>
+                    feed.push({ text: `Worker ${r.fullName} added (${r.role})`, time: r.createdAt, color: 'green' })
+                );
+                recentMats?.forEach(r =>
+                    feed.push({ text: `Material "${r.name}" registered`, time: r.createdAt, color: 'orange' })
+                );
+            }
+
+            // Recent payments (already project-scoped above)
+            const recentPays = [...pay].sort((a, b) =>
+                new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+            ).slice(0, 8);
+            recentPays.forEach(r => {
+                const proj = (p || []).find(x => x.id === r.projectId);
                 const dir = r.direction === 'In' ? '↗' : '↙';
-                feed.push({ text: `${dir} ${r.category || 'Payment'} — LKR ${(r.amount || 0).toLocaleString()} ${proj ? `(${proj.name})` : ''}`, time: r.createdAt || r.date, color: r.direction === 'In' ? 'green' : 'rose' });
+                // Don't show financial amounts to Workers — just show project events
+                if (!isWorker) {
+                    feed.push({
+                        text: `${dir} ${r.category || 'Payment'} — LKR ${(r.amount || 0).toLocaleString()} ${proj ? `(${proj.name})` : ''}`,
+                        time: r.createdAt || r.date, color: r.direction === 'In' ? 'green' : 'rose', projectId: r.projectId
+                    });
+                }
             });
-            recentAdvs?.forEach((r) => {
-                const proj = p.find((x) => x.id === r.projectId);
-                const wrk = w.find((x) => x.id === r.workerId);
-                feed.push({ text: `↙ Advance — LKR ${(r.amount || 0).toLocaleString()} ${wrk ? `to ${wrk.fullName}` : ''} ${proj ? `(${proj.name})` : ''}`, time: r.createdAt || r.date, color: 'rose' });
+
+            // Recent advances (already project-scoped)
+            const recentAdvs = [...(adv || [])].sort((a, b) =>
+                new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+            ).slice(0, 5);
+            recentAdvs.forEach(r => {
+                const proj = (p || []).find(x => x.id === r.projectId);
+                if (!isWorker) {
+                    feed.push({
+                        text: `↙ Advance — LKR ${(r.amount || 0).toLocaleString()} ${proj ? `(${proj.name})` : ''}`,
+                        time: r.createdAt || r.date, color: 'rose', projectId: r.projectId
+                    });
+                }
             });
 
             feed.sort((a, b) => new Date(b.time) - new Date(a.time));
-            setActivities(feed.slice(0, 8).map((a) => ({ ...a, time: timeAgo(a.time) })));
+            setActivities(feed.slice(0, 10).map(a => ({ ...a, time: timeAgo(a.time) })));
 
         } catch (error) {
-            console.error(error);
+            console.error('[Dashboard] Load error:', error);
         } finally {
             setIsLoading(false);
         }
     }
-
-    // Role-based filtering of data
-    const filteredProjects = useMemo(() => {
-        if (isClient && profile?.target_id) {
-            return projects.filter(p => p.id.toString() === profile.target_id.toString());
-        }
-        return projects;
-    }, [projects, isClient, profile]);
-
-    const filteredPayments = useMemo(() => {
-        if (isClient && profile?.target_id) {
-            return payments.filter(p => p.projectId?.toString() === profile.target_id.toString());
-        }
-        return payments;
-    }, [payments, isClient, profile]);
-
-    const filteredAdvances = useMemo(() => {
-        if (isClient) return [];
-        return advances;
-    }, [advances, isClient]);
-
-    const filteredWorkers = useMemo(() => {
-        if (isClient) return [];
-        return workers;
-    }, [workers, isClient]);
-
-    const filteredActivities = useMemo(() => {
-        if (isClient && profile?.target_id) {
-            return activities.filter(a => a.text.includes(`"${filteredProjects[0]?.name}"`) || a.text.includes(`(${filteredProjects[0]?.name})`));
-        }
-        return activities;
-    }, [activities, isClient, filteredProjects]);
 
     // Formatters
     const fmt = (v) => `LKR ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
@@ -140,87 +261,60 @@ export default function Dashboard() {
         return v;
     };
 
-    // ─── KPI metrics ─────────────────────────────────────────
     const metrics = useMemo(() => {
-        const totalIn = filteredPayments.filter((p) => p.direction === 'In').reduce((s, p) => s + (p.amount || 0), 0);
-        const paymentsOut = filteredPayments.filter((p) => p.direction === 'Out').reduce((s, p) => s + (p.amount || 0), 0);
-        const advancesOut = filteredAdvances.reduce((s, a) => s + (a.amount || 0), 0);
+        const totalIn = payments.filter(p => p.direction === 'In').reduce((s, p) => s + (p.amount || 0), 0);
+        const paymentsOut = payments.filter(p => p.direction === 'Out').reduce((s, p) => s + (p.amount || 0), 0);
+        const advancesOut = advances.reduce((s, a) => s + (a.amount || 0), 0);
         const totalOut = paymentsOut + advancesOut;
-        const activeProjects = filteredProjects.length;
-        const activeWorkers = filteredWorkers.length;
-        return { totalIn, totalOut, net: totalIn - totalOut, activeProjects, activeWorkers };
-    }, [filteredPayments, filteredAdvances, filteredProjects, filteredWorkers]);
+        return { totalIn, totalOut, net: totalIn - totalOut, activeProjects: projects.length, activeWorkers: workers.length };
+    }, [payments, advances, projects, workers]);
 
-    // ─── Monthly cash flow (last 6 months) ───────────────────
     const { data: monthlyFlow, isComputing: isComputingMonthlyFlow } = useAsyncData(async () => {
         const months = {};
-        filteredPayments.forEach((p) => {
+        payments.forEach(p => {
             const m = p.date ? p.date.slice(0, 7) : null;
             if (!m) return;
             if (!months[m]) months[m] = { month: m, In: 0, Out: 0 };
             if (p.direction === 'In') months[m].In += (p.amount || 0);
             else months[m].Out += (p.amount || 0);
         });
-        filteredAdvances.forEach((a) => {
+        advances.forEach(a => {
             const m = a.date ? a.date.slice(0, 7) : null;
             if (!m) return;
             if (!months[m]) months[m] = { month: m, In: 0, Out: 0 };
             months[m].Out += (a.amount || 0);
         });
+        return Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
+            .map(m => ({ ...m, label: new Date(m.month + '-01').toLocaleDateString('en-US', { month: 'short' }) }));
+    }, [payments, advances], []);
 
-        return Object.values(months)
-            .sort((a, b) => a.month.localeCompare(b.month))
-            .slice(-6)
-            .map((m) => ({
-                ...m,
-                label: new Date(m.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
-            }));
-    }, [filteredPayments, filteredAdvances], []);
-
-    // ─── Expense breakdown pie ───────────────────────────────
     const { data: expensePie, isComputing: isComputingExpensePie } = useAsyncData(async () => {
         const cats = {};
-        filteredPayments.filter((p) => p.direction === 'Out').forEach((p) => {
+        payments.filter(p => p.direction === 'Out').forEach(p => {
             const cat = p.category || 'Other';
             cats[cat] = (cats[cat] || 0) + (p.amount || 0);
         });
-        const totalAdvances = filteredAdvances.reduce((s, a) => s + (a.amount || 0), 0);
-        if (totalAdvances > 0) {
-            cats['Advance'] = (cats['Advance'] || 0) + totalAdvances;
-        }
+        const totalAdvances = advances.reduce((s, a) => s + (a.amount || 0), 0);
+        if (totalAdvances > 0) cats['Advance'] = (cats['Advance'] || 0) + totalAdvances;
         return Object.entries(cats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    }, [filteredPayments, filteredAdvances], []);
+    }, [payments, advances], []);
 
-    // ─── Project budget progress ─────────────────────────────
     const { data: projectProgress, isComputing: isComputingProjectProgress } = useAsyncData(async () => {
-        // Pre-indexing for speed
-        const payMap = new Map();
-        filteredPayments.forEach(p => {
-            if (!payMap.has(p.projectId)) payMap.set(p.projectId, []);
-            payMap.get(p.projectId).push(p);
-        });
-        const advMap = new Map();
-        filteredAdvances.forEach(a => {
-            if (!advMap.has(a.projectId)) advMap.set(a.projectId, []);
-            advMap.get(a.projectId).push(a);
-        });
-
-        return filteredProjects.slice(0, 5).map((p) => {
+        return projects.slice(0, 5).map(p => {
             const budget = p.contractValue || p.budget || 0;
-            const projectPays = payMap.get(p.id) || [];
-            const projectAdvs = advMap.get(p.id) || [];
-
-            const received = projectPays.filter((pay) => pay.direction === 'In').reduce((s, pay) => s + (pay.amount || 0), 0);
-            const paySpent = projectPays.filter((pay) => pay.direction === 'Out').reduce((s, pay) => s + (pay.amount || 0), 0);
-            const advSpent = projectAdvs.reduce((s, adv) => s + (adv.amount || 0), 0);
-
-            const spent = paySpent + advSpent;
-            const pct = budget > 0 ? Math.round((received / budget) * 100) : 0;
-            return { name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name, Budget: budget, Received: received, Spent: spent, pct, status: p.status };
+            const projectPays = payments.filter(pay => pay.projectId === p.id);
+            const projectAdvs = advances.filter(adv => adv.projectId === p.id);
+            const received = projectPays.filter(pay => pay.direction === 'In').reduce((s, pay) => s + (pay.amount || 0), 0);
+            const spent = projectPays.filter(pay => pay.direction === 'Out').reduce((s, pay) => s + (pay.amount || 0), 0)
+                + projectAdvs.reduce((s, adv) => s + (adv.amount || 0), 0);
+            return {
+                name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
+                Budget: budget, Received: received, Spent: spent,
+                pct: budget > 0 ? Math.round((received / budget) * 100) : 0, status: p.status
+            };
         });
-    }, [filteredProjects, filteredPayments, filteredAdvances], []);
+    }, [projects, payments, advances], []);
 
-    // Tooltips
     const ChartTooltip = ({ active, payload, label }) => {
         if (!active || !payload?.length) return null;
         return (
@@ -242,13 +336,6 @@ export default function Dashboard() {
         );
     };
 
-    const statCards = useMemo(() => [
-        { label: t('dashboard.active_projects'), value: <CountUp to={metrics.activeProjects} />, icon: FolderKanban, color: 'indigo', sub: `${filteredProjects.length} ${t('dashboard.total')}`, visible: true },
-        { label: t('dashboard.total_workers'), value: <CountUp to={metrics.activeWorkers} />, icon: Users, color: 'emerald', sub: `${filteredWorkers.length} ${t('dashboard.total')}`, visible: !isClient },
-        { label: t('dashboard.money_in'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></>, icon: ArrowUpRight, color: 'emerald', sub: t('dashboard.total_received'), visible: true },
-        { label: t('dashboard.money_out'), value: <><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></>, icon: ArrowDownRight, color: 'rose', sub: t('dashboard.total_spent'), visible: isSuperAdminOrFinance },
-    ], [metrics, filteredProjects, filteredWorkers, isClient, isSuperAdminOrFinance, t]);
-
     const isGlobalLoading = isLoading || isComputingMonthlyFlow || isComputingExpensePie || isComputingProjectProgress;
 
     return (
@@ -259,138 +346,36 @@ export default function Dashboard() {
                     <BounceButton disabled={isLoading} className="btn btn-primary" onClick={loadData}>{t('dashboard.refresh')}</BounceButton>
                 </div>
 
-                {/* ─── Stat Cards ─────────────────────────── */}
-                <div className="dashboard-stats">
-                    {statCards.filter(s => s.visible).map((s) => (
-                        <Card key={s.label} className={`stat-card ${s.color}`}>
-                            <div className={`stat-icon ${s.color}`}>
-                                <s.icon size={22} />
-                            </div>
-                            <div className="card-label">{s.label}</div>
-                            <div className="card-value">{s.value}</div>
-                            <div className="stat-sub">{s.sub}</div>
-                        </Card>
-                    ))}
-                </div>
-
-                {/* ─── Net Cash Flow banner ────────────────── */}
-                {isSuperAdminOrFinance && (
-                    <div className={`cash-flow-banner ${metrics.net >= 0 ? 'positive' : 'negative'}`}>
-                        <TrendingUp size={18} />
-                        <span>{t('dashboard.net_cash_flow')}: <strong>LKR <CountUp to={metrics.net} separator="," /></strong></span>
-                        <span className="cash-flow-note">{materials.length} {t('nav.materials').toLowerCase()} · {payments.length} {t('nav.payments').toLowerCase()}</span>
-                    </div>
+                {(isWorker || isSupervisorOrPM) ? (
+                    <WorkerDashboard
+                        projects={projects}
+                        activities={activities}
+                    />
+                ) : isClient ? (
+                    <ClientDashboard
+                        projects={projects}
+                        activities={activities}
+                        fmt={fmt}
+                    />
+                ) : isSupplier ? (
+                    <SupplierDashboard />
+                ) : isSubContractor ? (
+                    <SubContractorDashboard />
+                ) : (
+                    <AdminDashboard
+                        metrics={metrics}
+                        monthlyFlow={monthlyFlow}
+                        expensePie={expensePie}
+                        projectProgress={projectProgress}
+                        activities={activities}
+                        projects={projects}
+                        t={t}
+                        fmt={fmt}
+                        fmtShort={fmtShort}
+                        ChartTooltip={ChartTooltip}
+                        PieTooltip={PieTooltip}
+                    />
                 )}
-
-                {/* ─── Charts Row 1 ────────────────────────── */}
-                {isSuperAdminOrFinance && (
-                    <div className="dashboard-charts-row">
-                        <Card title={t('dashboard.cash_flow_trend')} className="dash-chart-card">
-                            {monthlyFlow.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={220}>
-                                    <AreaChart data={monthlyFlow} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="dashGradIn" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="dashGradOut" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                        <XAxis dataKey="label" fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                        <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                        <Tooltip content={<ChartTooltip />} />
-                                        <Area type="monotone" dataKey="In" stroke="#10b981" fill="url(#dashGradIn)" strokeWidth={2} name={t('dashboard.money_in')} />
-                                        <Area type="monotone" dataKey="Out" stroke="#ef4444" fill="url(#dashGradOut)" strokeWidth={2} name={t('dashboard.money_out')} />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            ) : <div className="chart-empty-sm">{t('dashboard.no_transactions')}</div>}
-                        </Card>
-
-                        <Card title={t('dashboard.expense_breakdown')} className="dash-chart-card">
-                            {expensePie.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={220}>
-                                    <PieChart>
-                                        <Pie data={expensePie} cx="50%" cy="50%" innerRadius={45} outerRadius={80}
-                                            paddingAngle={3} dataKey="value"
-                                            label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}>
-                                            {expensePie.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                                        </Pie>
-                                        <Tooltip content={<PieTooltip />} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            ) : <div className="chart-empty-sm">{t('dashboard.no_expenses')}</div>}
-                        </Card>
-                    </div>
-                )}
-
-                {/* ─── Project Budget Progress ─────────────── */}
-                <Card title={t('dashboard.project_budget_progress')} className="dash-bar-card">
-                    {projectProgress.length > 0 ? (
-                        <>
-                            <ResponsiveContainer width="100%" height={200}>
-                                <BarChart data={projectProgress} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                    <YAxis tickFormatter={fmtShort} fontSize={11} tick={{ fill: '#94a3b8' }} />
-                                    <Tooltip content={<ChartTooltip />} />
-                                    <Bar dataKey="Budget" fill="#e2e8f0" radius={[4, 4, 0, 0]} name={t('dashboard.budget')} />
-                                    <Bar dataKey="Received" fill="#10b981" radius={[4, 4, 0, 0]} name={t('dashboard.received')} />
-                                    <Bar dataKey="Spent" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.spent')} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                            <div className="progress-pills">
-                                {projectProgress.map((p) => (
-                                    <div key={p.name} className="progress-pill">
-                                        <span className="progress-pill-name">{p.name}</span>
-                                        <div className="progress-mini-bar">
-                                            <div className="progress-mini-fill" style={{ width: `${Math.min(p.pct, 100)}%` }} />
-                                        </div>
-                                        <span className={`progress-pill-pct ${p.pct >= 100 ? 'complete' : ''}`}>{p.pct}%</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </>
-                    ) : <div className="chart-empty-sm">{t('dashboard.no_projects')}</div>}
-                </Card>
-
-                {/* ─── Activity + Projects ─────────────────── */}
-                <div className="dashboard-grid">
-                    <Card title={t('dashboard.recent_activity')}>
-                        {filteredActivities.length === 0 ? (
-                            <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_activity')}</div>
-                        ) : filteredActivities.map((a, i) => (
-                            <div className="activity-item" key={i}>
-                                <div className={`activity-dot ${a.color}`} />
-                                <div>
-                                    <div className="activity-text">{a.text}</div>
-                                    <div className="activity-time">{a.time}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </Card>
-
-                    <Card title={t('dashboard.active_projects')}>
-                        {filteredProjects.length === 0 ? (
-                            <div style={{ color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>{t('dashboard.no_projects')}</div>
-                        ) : (
-                            filteredProjects.slice(0, 5).map((p) => (
-                                <div className="project-mini" key={p.id}>
-                                    <div>
-                                        <div className="project-mini-name">{p.name}</div>
-                                        <div className="project-mini-client">{p.client}</div>
-                                    </div>
-                                    <span className={`badge ${p.status === 'Ongoing' ? 'badge-info' : p.status === 'Completed' ? 'badge-success' : 'badge-warning'}`}>
-                                        {p.status}
-                                    </span>
-                                </div>
-                            ))
-                        )}
-                    </Card>
-                </div>
             </div>
         </GlobalLoadingOverlay>
     );

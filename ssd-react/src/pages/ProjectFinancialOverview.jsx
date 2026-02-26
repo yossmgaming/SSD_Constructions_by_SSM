@@ -120,7 +120,7 @@ export default function ProjectFinancialOverview() {
             allAttendance.forEach((a) => {
                 const w = workers.find((wk) => wk.id === a.workerId);
                 const name = w ? w.fullName : `Worker ${a.workerId}`;
-                if (!workerAttendance[name]) workerAttendance[name] = { days: 0, cost: 0, rate: w?.dailyRate || 0, otRate: w?.overtimeRate || 0 };
+                if (!workerAttendance[name]) workerAttendance[name] = { days: 0, cost: 0, rate: w?.dailyRate || 0, otRate: w?.otRate || 0 };
 
                 let hours = 0;
                 // 1. Check for new UI fields
@@ -138,10 +138,14 @@ export default function ProjectFinancialOverview() {
                 }
 
                 workerAttendance[name].days += hours / 8;
+                const dailyRate = w?.dailyRate || 0;
+                const hourlyRate = w?.hourlyRate || (dailyRate / 8);
+                const otRate = w?.otRate || 0;
+
                 if (hours > 8) {
-                    workerAttendance[name].cost += (w?.dailyRate || 0) + (hours - 8) * (w?.overtimeRate || 0);
+                    workerAttendance[name].cost += (8 * hourlyRate) + (hours - 8) * otRate;
                 } else {
-                    workerAttendance[name].cost += (hours / 8) * (w?.dailyRate || 0);
+                    workerAttendance[name].cost += hours * hourlyRate;
                 }
             });
 

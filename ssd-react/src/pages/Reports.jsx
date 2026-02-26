@@ -61,7 +61,7 @@ export default function Reports() {
 
             const [projs, wrks, mats, sups, pays, atts, advs] = await Promise.all([
                 getAll(KEYS.projects, 'id, name, client, contractValue, budget, status'),
-                getAll(KEYS.workers, 'id, fullName, role, dailyRate, overtimeRate, status'),
+                getAll(KEYS.workers, 'id, fullName, role, dailyRate, hourlyRate, otRate, status'),
                 getAll(KEYS.materials, 'id'),
                 getAll(KEYS.suppliers, 'id'),
                 queryAdvanced(KEYS.payments, { filters: payFilter, select: 'id, amount, direction, category, projectId, workerId, date' }),
@@ -242,13 +242,17 @@ export default function Reports() {
                 }
 
                 daysWorked += hours / 8;
+                const dailyRate = w.dailyRate || 0;
+                const hourlyRate = w.hourlyRate || (dailyRate / 8);
+                const otRate = w.otRate || 0;
+
                 if (hours > 8) {
-                    totalEarned += (w.dailyRate || 0) + (hours - 8) * (w.overtimeRate || 0);
+                    totalEarned += (8 * hourlyRate) + (hours - 8) * otRate;
                 } else {
-                    totalEarned += (hours / 8) * (w.dailyRate || 0);
+                    totalEarned += hours * hourlyRate;
                 }
             });
-            return { id: w.id, name: w.fullName, role: w.role, dailyRate: w.dailyRate, overtimeRate: w.overtimeRate, daysWorked: Math.round(daysWorked * 10) / 10, totalEarned, totalPaid, totalAdv, outstanding: totalEarned - totalPaid - totalAdv, status: w.status };
+            return { id: w.id, name: w.fullName, role: w.role, dailyRate: w.dailyRate, otRate: w.otRate, daysWorked: Math.round(daysWorked * 10) / 10, totalEarned, totalPaid, totalAdv, outstanding: totalEarned - totalPaid - totalAdv, status: w.status };
         });
     }, [workers, payments, advances, allAttendance], []);
 
@@ -299,10 +303,14 @@ export default function Reports() {
                 }
 
                 effectiveDays += hours / 8;
+                const dailyRate = w.dailyRate || 0;
+                const hourlyRate = w.hourlyRate || (dailyRate / 8);
+                const otRate = w.otRate || 0;
+
                 if (hours > 8) {
-                    earned += (w.dailyRate || 0) + (hours - 8) * (w.overtimeRate || 0);
+                    earned += (8 * hourlyRate) + (hours - 8) * otRate;
                 } else {
-                    earned += (hours / 8) * (w.dailyRate || 0);
+                    earned += hours * hourlyRate;
                 }
             });
             const attendanceRate = Math.min(100, Math.round((effectiveDays / totalWorkingDays) * 100));
@@ -451,6 +459,7 @@ export default function Reports() {
         { key: 'name', label: 'Worker' },
         { key: 'role', label: 'Role' },
         { key: 'dailyRate', label: 'Rate/Day', render: (v) => fmt(v) },
+        { key: 'otRate', label: 'Rate/OT', render: (v) => fmt(v) },
         { key: 'daysWorked', label: 'Days' },
         { key: 'totalEarned', label: 'Earned', render: (v) => fmt(v) },
         { key: 'totalPaid', label: 'Paid', render: (v) => fmt(v) },

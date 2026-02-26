@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import { AuthProvider } from './context/AuthContext';
+import { RoleProvider } from './context/RoleContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -26,6 +27,7 @@ const Clients = lazy(() => import('./pages/Clients'));
 const AgreementGenerator = lazy(() => import('./pages/AgreementGenerator'));
 const PersonnelCommand = lazy(() => import('./pages/PersonnelCommand'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Subcontractors = lazy(() => import('./pages/Subcontractors'));
 
 seedIfEmpty();
 
@@ -33,34 +35,49 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Suspense fallback={null}><Login /></Suspense>} />
-          <Route path="/signup" element={<Suspense fallback={null}><Signup /></Suspense>} />
+        <RoleProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<Suspense fallback={null}><Login /></Suspense>} />
+            <Route path="/signup" element={<Suspense fallback={null}><Signup /></Suspense>} />
 
-          {/* Protected Application Routes with Persistent Shell */}
-          <Route element={<Layout />}>
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/workers" element={<Workers />} />
-              <Route path="/materials" element={<Materials />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/attendance" element={<Attendance />} />
-              <Route path="/boq-generator" element={<BOQGenerator />} />
-              <Route path="/agreements" element={<AgreementGenerator />} />
-              <Route path="/project-overview" element={<ProjectFinancialOverview />} />
-              <Route path="/advances" element={<Advances />} />
-              <Route path="/rates" element={<Rates />} />
-              <Route path="/bank-accounts" element={<BankAccounts />} />
-              <Route path="/suppliers" element={<Suppliers />} />
-              <Route path="/personnel-command" element={<PersonnelCommand />} />
-              <Route path="/settings" element={<Settings />} />
+            {/* Protected Application Routes with Persistent Shell */}
+            <Route element={<Layout />}>
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/settings" element={<Settings />} />
+
+                {/* Construction & Personnel Management */}
+                <Route element={<ProtectedRoute allowedRoles={['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor']} />}>
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="/clients" element={<Clients />} />
+                  <Route path="/workers" element={<Workers />} />
+                  <Route path="/materials" element={<Materials />} />
+                  <Route path="/suppliers" element={<Suppliers />} />
+                  <Route path="/subcontractors" element={<Subcontractors />} />
+                  <Route path="/attendance" element={<Attendance />} />
+                </Route>
+
+                {/* Finance & High-Level Reporting */}
+                <Route element={<ProtectedRoute allowedRoles={['Super Admin', 'Finance']} />}>
+                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/project-overview" element={<ProjectFinancialOverview />} />
+                  <Route path="/advances" element={<Advances />} />
+                  <Route path="/rates" element={<Rates />} />
+                  <Route path="/bank-accounts" element={<BankAccounts />} />
+                  <Route path="/personnel-command" element={<PersonnelCommand />} />
+                </Route>
+
+                {/* Management & Planning Tools */}
+                <Route element={<ProtectedRoute allowedRoles={['Super Admin', 'Finance', 'Project Manager']} />}>
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/boq-generator" element={<BOQGenerator />} />
+                  <Route path="/agreements" element={<AgreementGenerator />} />
+                </Route>
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+        </RoleProvider>
       </AuthProvider>
       <Analytics />
     </BrowserRouter>

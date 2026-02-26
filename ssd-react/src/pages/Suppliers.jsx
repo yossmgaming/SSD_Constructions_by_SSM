@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, ChevronDown, FileSpreadsheet, FileText, Pencil } from 'lucide-react';
+import { Plus, Download, ChevronDown, FileSpreadsheet, FileText, Pencil, Check } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
@@ -13,6 +13,8 @@ import BounceButton from '../components/BounceButton';
 import { useAuth } from '../context/AuthContext';
 import { Shield } from 'lucide-react';
 import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+import { generateSupplierPID } from '../utils/security';
+import { ClipboardIcon } from '../components/icons/ClipboardIcon';
 
 const emptyForm = { name: '', contact: '', email: '', address: '', notes: '', isActive: true };
 
@@ -26,6 +28,7 @@ export default function Suppliers() {
     const [statusFilter, setStatusFilter] = useState('All');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [copiedPID, setCopiedPID] = useState(null);
 
     const { profile, hasRole } = useAuth();
     const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
@@ -120,7 +123,11 @@ export default function Suppliers() {
         const data = { ...form };
         try {
             if (selectedId) { await update(KEYS.suppliers, selectedId, data); }
-            else { await create(KEYS.suppliers, data); }
+            else {
+                // Generate a PID for new suppliers
+                const pid = generateSupplierPID();
+                await create(KEYS.suppliers, { ...data, pid });
+            }
             handleClear();
             setIsModalOpen(false);
             await loadData();
@@ -191,6 +198,20 @@ export default function Suppliers() {
     function handleClear() { setForm(emptyForm); setSelectedId(null); }
 
     const columns = [
+        {
+            key: 'pid',
+            label: 'PID',
+            render: (v) => v ? (
+                <div className="flex items-center gap-2">
+                    <span className="pid-badge">{v}</span>
+                    <BounceButton className="icon-btn copy-btn" style={{ width: 22, height: 22 }}
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(v); setCopiedPID(v); setTimeout(() => setCopiedPID(null), 2000); }}
+                        title="Copy PID">
+                        {copiedPID === v ? <Check size={12} className="text-emerald-500" /> : <ClipboardIcon size={12} />}
+                    </BounceButton>
+                </div>
+            ) : <span className="text-slate-400 text-xs">—</span>
+        },
         { key: 'name', label: t('suppliers.supplier_name') },
         { key: 'contact', label: t('common.phone') },
         { key: 'email', label: t('common.email'), render: (v) => v || '—' },
