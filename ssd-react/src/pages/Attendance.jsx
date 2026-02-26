@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Briefcase, CalendarDays, Clock, Download, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Briefcase, CalendarDays, Clock, Download, ChevronDown, Lightbulb } from 'lucide-react';
 import ExportDropdown from '../components/ExportDropdown';
 import Card from '../components/Card';
 import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
@@ -614,7 +614,7 @@ export default function Attendance() {
 
                         <div className="attendance-hint">
                             {selectedWorker
-                                ? t('attendance.hint_active') || '💡 Left-click to quick toggle  •  Right-click for options'
+                                ? <><Lightbulb size={14} style={{ color: 'var(--accent-primary)' }} /> {t('attendance.hint_active') || 'Left-click to quick toggle  •  Right-click for options'}</>
                                 : t('attendance.hint_empty') || 'Select a worker to view / mark attendance'}
                         </div>
 

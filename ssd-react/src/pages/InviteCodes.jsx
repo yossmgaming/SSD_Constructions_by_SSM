@@ -418,14 +418,14 @@ export default function InviteCodes() {
                                         value={newRole}
                                         onChange={(e) => setNewRole(e.target.value)}
                                     >
-                                        <option value="Worker">🔨 Worker</option>
-                                        <option value="Site Supervisor">🦺 Site Supervisor</option>
-                                        <option value="Project Manager">📋 Project Manager</option>
-                                        <option value="Finance">💰 Finance</option>
-                                        <option value="Client">🤝 Client</option>
-                                        <option value="Supplier">🚚 Supplier</option>
-                                        <option value="Sub Contractor">🏗️ Sub Contractor</option>
-                                        <option value="Super Admin">🛡️ Super Admin</option>
+                                        <option value="Worker">Worker</option>
+                                        <option value="Site Supervisor">Site Supervisor</option>
+                                        <option value="Project Manager">Project Manager</option>
+                                        <option value="Finance">Finance</option>
+                                        <option value="Client">Client</option>
+                                        <option value="Supplier">Supplier</option>
+                                        <option value="Sub Contractor">Sub Contractor</option>
+                                        <option value="Super Admin">Super Admin</option>
                                     </select>
                                 </div>
 

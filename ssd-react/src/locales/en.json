@@ -70,7 +70,9 @@
         "phone_2": "Phone 2",
         "export": "Export",
         "format": "Format",
-        "nic_passport": "NIC / Passport"
+        "nic_passport": "NIC / Passport",
+        "text": "Text",
+        "context": "Context"
     },
     "dashboard": {
         "title": "Dashboard",

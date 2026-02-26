@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet, Eye, Maximize2, HardHat, X } from 'lucide-react';
+import { Plus, MapPin, TrendingUp, TrendingDown, DollarSign, Wallet, Eye, Maximize2, HardHat, X, AlertCircle } from 'lucide-react';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
@@ -199,7 +199,7 @@ export default function Projects() {
                     </div>
                 </div>
                 {financials.pendingObl > 0 && (
-                    <div className="fin-alert">⚠ {t('projects.pending_obligations')}: {fmt(financials.pendingObl)}</div>
+                    <div className="fin-alert"><AlertCircle size={14} /> {t('projects.pending_obligations')}: {fmt(financials.pendingObl)}</div>
                 )}
             </div>
         );

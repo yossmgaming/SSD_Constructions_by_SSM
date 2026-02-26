@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, CalendarDays, Pencil, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Key, Check, User, Phone, Shield, Fingerprint, Briefcase, Banknote, Calendar, MapPin, Search, Mail, Info } from 'lucide-react';
+import { Plus, CalendarDays, Pencil, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Key, Check, User, Phone, Shield, Fingerprint, Briefcase, Banknote, Calendar, MapPin, Search, Mail, Info, AlertCircle } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -613,7 +613,7 @@ export default function Workers() {
                                         />
                                     </div>
                                     {isNICDuplicate(form.nic) && (
-                                        <span className="field-error">⚠ A worker with this NIC already exists</span>
+                                        <span className="field-error"><AlertCircle size={14} /> A worker with this NIC already exists</span>
                                     )}
                                 </div>
                                 <div className="form-group">

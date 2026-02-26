@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, ChevronDown, FileSpreadsheet, FileText, Pencil, Check } from 'lucide-react';
+import { Plus, Download, ChevronDown, FileSpreadsheet, FileText, Pencil, Check, AlertCircle } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
@@ -304,7 +304,7 @@ export default function Suppliers() {
                         <div className="form-group">
                             <label>{t('suppliers.supplier_name')}</label>
                             <input disabled={!isSuperAdminOrFinance} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={isNameDuplicate(form.name) ? 'input-error' : ''} />
-                            {isNameDuplicate(form.name) && <span className="field-error">⚠ {t('suppliers.duplicate_error') || 'A supplier with this name already exists'}</span>}
+                            {isNameDuplicate(form.name) && <span className="field-error"><AlertCircle size={14} /> {t('suppliers.duplicate_error') || 'A supplier with this name already exists'}</span>}
                         </div>
                         <div className="form-grid">
                             <div className="form-group">

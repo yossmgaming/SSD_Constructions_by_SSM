@@ -460,7 +460,7 @@ export default function Reports() {
         { key: 'role', label: 'Role' },
         { key: 'dailyRate', label: 'Rate/Day', render: (v) => fmt(v) },
         { key: 'otRate', label: 'Rate/OT', render: (v) => fmt(v) },
-        { key: 'daysWorked', label: 'Days' },
+        { key: 'daysWorked', label: 'Days', render: (v) => v.toFixed(1) },
         { key: 'totalEarned', label: 'Earned', render: (v) => fmt(v) },
         { key: 'totalPaid', label: 'Paid', render: (v) => fmt(v) },
         { key: 'outstanding', label: 'Outstanding', render: (v) => <span className={v > 0 ? 'amount-out' : ''}>{fmt(v)}</span> },
@@ -472,7 +472,7 @@ export default function Reports() {
         { key: 'name', label: 'Worker' },
         { key: 'role', label: 'Role' },
         { key: 'attendanceRate', label: 'Attendance', render: (v) => <span className={v >= 80 ? 'amount-in' : v >= 60 ? '' : 'amount-out'}>{v}%</span> },
-        { key: 'effectiveDays', label: 'Days' },
+        { key: 'effectiveDays', label: 'Days', render: (v) => v.toFixed(1) },
         { key: 'paySettlement', label: 'Pay Settled', render: (v) => `${v}%` },
         { key: 'advanceRatio', label: 'Adv. Ratio', render: (v) => <span className={v > 20 ? 'amount-out' : ''}>{v}%</span> },
         { key: 'overall', label: 'Score', render: (v) => <strong style={{ color: v >= 80 ? '#10b981' : v >= 60 ? '#f59e0b' : '#ef4444' }}>{v}%</strong> },
@@ -519,19 +519,19 @@ export default function Reports() {
                         <div className="report-summary-cards">
                             <Card className="report-summary-card kpi-in">
                                 <div className="card-label">Money In</div>
-                                <div className="card-value" style={{ color: '#10b981' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," /></div>
+                                <div className="card-value" style={{ color: '#10b981' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalIn} separator="," decimals={2} /></div>
                             </Card>
                             <Card className="report-summary-card kpi-out">
                                 <div className="card-label">Money Out</div>
-                                <div className="card-value" style={{ color: '#ef4444' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," /></div>
+                                <div className="card-value" style={{ color: '#ef4444' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalOut} separator="," decimals={2} /></div>
                             </Card>
                             <Card className="report-summary-card kpi-net">
                                 <div className="card-label">Net Cash Flow</div>
-                                <div className="card-value" style={{ color: metrics.net >= 0 ? '#10b981' : '#ef4444' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.net} separator="," /></div>
+                                <div className="card-value" style={{ color: metrics.net >= 0 ? '#10b981' : '#ef4444' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.net} separator="," decimals={2} /></div>
                             </Card>
                             <Card className="report-summary-card">
                                 <div className="card-label">Total Budget</div>
-                                <div className="card-value" style={{ color: '#6366f1' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalBudget} separator="," /></div>
+                                <div className="card-value" style={{ color: '#6366f1' }}><span className="currency-prefix">LKR</span> <CountUp to={metrics.totalBudget} separator="," decimals={2} /></div>
                             </Card>
                         </div>
 
@@ -688,13 +688,13 @@ export default function Reports() {
                             <Card className="report-summary-card" style={{ borderLeft: '3px solid #6366f1' }}>
                                 <div className="card-label">Avg Attendance</div>
                                 <div className="card-value" style={{ color: '#6366f1' }}>
-                                    <CountUp to={perfData.length > 0 ? Math.round(perfData.reduce((s, w) => s + w.attendanceRate, 0) / perfData.length) : 0} />%
+                                    <CountUp to={perfData.length > 0 ? Math.round(perfData.reduce((s, w) => s + w.attendanceRate, 0) / perfData.length) : 0} decimals={0} />%
                                 </div>
                             </Card>
                             <Card className="report-summary-card" style={{ borderLeft: '3px solid #10b981' }}>
                                 <div className="card-label">Avg Performance</div>
                                 <div className="card-value" style={{ color: '#10b981' }}>
-                                    <CountUp to={perfData.length > 0 ? Math.round(perfData.reduce((s, w) => s + w.overall, 0) / perfData.length) : 0} />%
+                                    <CountUp to={perfData.length > 0 ? Math.round(perfData.reduce((s, w) => s + w.overall, 0) / perfData.length) : 0} decimals={0} />%
                                 </div>
                             </Card>
                             <Card className="report-summary-card" style={{ borderLeft: '3px solid #f59e0b' }}>
@@ -729,29 +729,29 @@ export default function Reports() {
                                                 strokeDasharray={`${w.overall * 2.64} 264`}
                                                 transform="rotate(-90 50 50)" />
                                         </svg>
-                                        <div className="ring-label"><CountUp to={w.overall} />%</div>
+                                        <div className="ring-label"><CountUp to={w.overall} decimals={0} />%</div>
                                     </div>
                                     <div className="perf-metrics">
                                         <div className="perf-metric">
                                             <span>Attendance</span>
                                             <div className="perf-bar-track"><div className="perf-bar-fill" style={{ width: `${w.attendanceRate}%`, background: '#6366f1' }} /></div>
-                                            <span className="perf-val"><CountUp to={w.attendanceRate} />%</span>
+                                            <span className="perf-val"><CountUp to={w.attendanceRate} decimals={0} />%</span>
                                         </div>
                                         <div className="perf-metric">
                                             <span>Pay Settled</span>
                                             <div className="perf-bar-track"><div className="perf-bar-fill" style={{ width: `${w.paySettlement}%`, background: '#10b981' }} /></div>
-                                            <span className="perf-val"><CountUp to={w.paySettlement} />%</span>
+                                            <span className="perf-val"><CountUp to={w.paySettlement} decimals={0} />%</span>
                                         </div>
                                         <div className="perf-metric">
                                             <span>Adv. Discipline</span>
                                             <div className="perf-bar-track"><div className="perf-bar-fill" style={{ width: `${w.advanceScore}%`, background: '#f59e0b' }} /></div>
-                                            <span className="perf-val"><CountUp to={w.advanceScore} />%</span>
+                                            <span className="perf-val"><CountUp to={w.advanceScore} decimals={0} />%</span>
                                         </div>
                                     </div>
                                     <div className="perf-stats">
-                                        <span><CountUp to={w.effectiveDays} /> days</span>
+                                        <span><CountUp to={w.effectiveDays} decimals={1} /> days</span>
                                         <span>{w.projectCount} project{w.projectCount !== 1 ? 's' : ''}</span>
-                                        <span>LKR <CountUp to={w.totalEarned} separator="," /></span>
+                                        <span>LKR <CountUp to={w.totalEarned} separator="," decimals={2} /></span>
                                     </div>
                                 </Card>
                             ))}

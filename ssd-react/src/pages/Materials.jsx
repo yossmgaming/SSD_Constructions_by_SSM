@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, AlertTriangle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Folder, Pencil } from 'lucide-react';
+import { Plus, AlertTriangle, AlertCircle, Package, Trash2, Download, ChevronDown, FileSpreadsheet, FileText, Folder, Pencil } from 'lucide-react';
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import { useTranslation } from 'react-i18next';
 import CountUp from '../components/CountUp';
@@ -257,7 +257,7 @@ export default function Materials() {
 
             let msg = 'Delete this material?';
             if (deps.length > 0) {
-                msg = `⚠️ This material has ${deps.join(', ')}.\n\nDeleting will leave orphan records. Are you sure?`;
+                msg = `<AlertTriangle size={18} /> This material has ${deps.join(', ')}.\n\nDeleting will leave orphan records. Are you sure?`;
             }
             if (!confirm(msg)) {
                 setIsLoading(false);
@@ -456,7 +456,7 @@ export default function Materials() {
                             <label>{t('materials.material_name')}</label>
                             <input disabled={!isSuperAdminOrFinance} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={isNameDuplicate(form.name) ? 'input-error' : ''} />
                             {/* ✅ Duplicate warning */}
-                            {isNameDuplicate(form.name) && <span className="field-error">⚠ A material with this name already exists</span>}
+                            {isNameDuplicate(form.name) && <span className="field-error"><AlertCircle size={14} /> A material with this name already exists</span>}
                         </div>
 
                         {/* ✅ Category dropdown */}
