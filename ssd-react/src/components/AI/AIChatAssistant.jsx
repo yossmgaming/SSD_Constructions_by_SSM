@@ -1,14 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, Bot, User, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, X, Bot, User, Sparkles, AlertTriangle, Activity, TrendingUp, Clock } from 'lucide-react';
 import { BotMessageSquareIcon } from './BotMessageSquareIcon';
 import { supabase } from '../../data/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { aiCommandOrchestrator } from '../../ai-core/AICommandOrchestrator';
+import { riskEngine } from '../../ai-core/RiskEngine';
+import { confidenceEngine } from '../../ai-core/ConfidenceEngine';
+import { structuredResponseBuilder } from '../../ai-core/StructuredResponseBuilder';
 import './AIChatAssistant.css';
 
 const AIChatAssistant = () => {
     const { profile, identity, hasRole } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
+    const [showOverview, setShowOverview] = useState(true);
+    const [commandOverview, setCommandOverview] = useState(null);
+    const [criticalAlert, setCriticalAlert] = useState(null);
+    const [activeTab, setActiveTab] = useState('overview');
+    const [simulationMode, setSimulationMode] = useState(false);
 
     // Role-based agent selection
     const getAgentType = () => {
@@ -100,8 +109,66 @@ const AIChatAssistant = () => {
         scrollToBottom();
     }, [messages]);
 
-    // Only show for Admin and Finance for now - we'll expand this later
-    if (!hasRole(['Super Admin', 'Finance'])) return null;
+    useEffect(() => {
+        if (isOpen && showOverview) {
+            loadCommandOverview();
+            checkCriticalAlerts();
+        }
+    }, [isOpen]);
+
+    const loadCommandOverview = async () => {
+        try {
+            const overview = await aiCommandOrchestrator.getCommandOverview();
+            setCommandOverview(overview);
+        } catch (e) {
+            console.error('Failed to load overview:', e);
+        }
+    };
+
+    const formatTimeAgo = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${Math.floor(diffHours / 24)}d ago`;
+    };
+
+    const handleRiskClick = (risk) => {
+        setInput(`What's the status of ${risk.projectName}?`);
+        setShowOverview(false);
+    };
+
+    const handleSimSuggestion = (suggestion) => {
+        setInput(suggestion);
+        setShowOverview(false);
+    };
+
+    const checkCriticalAlerts = async () => {
+        try {
+            const risks = await riskEngine.getProjectRisks();
+            const critical = risks.find(r => r.level === 'critical');
+            if (critical) {
+                setCriticalAlert({
+                    projectName: critical.projectName,
+                    level: critical.level,
+                    score: critical.totalScore
+                });
+            } else {
+                setCriticalAlert(null);
+            }
+        } catch (e) {
+            console.error('Failed to check alerts:', e);
+        }
+    };
+
+    // Show for all authenticated roles with role-scoped AI
+    if (!hasRole(['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor', 'Client', 'Worker'])) return null;
 
     // Enhanced context fetching using new snapshot tables
     const fetchContext = async () => {
@@ -365,36 +432,186 @@ const AIChatAssistant = () => {
                             </button>
                         </div>
 
-                        <div className="ai-chat-messages">
-                            {messages.map((msg, i) => (
-                                <div key={i} className={`message ${msg.role}`}>
-                                    {msg.content}
+                        {criticalAlert && (
+                            <div className="critical-banner">
+                                <AlertTriangle size={16} />
+                                <span>
+                                    <strong>CRITICAL:</strong> {criticalAlert.projectName} requires immediate attention
+                                </span>
+                                <button onClick={() => setShowOverview(true)}>View Details</button>
+                            </div>
+                        )}
+
+                        {showOverview && commandOverview && (
+                            <div className="command-overview">
+                                <div className="overview-header">
+                                    <Activity size={20} />
+                                    <h4>AI Command Center</h4>
                                 </div>
-                            ))}
-                            {isLoading && (
-                                <div className="message ai">
-                                    <div className="typing-indicator">
-                                        <div className="typing-dot" />
-                                        <div className="typing-dot" />
-                                        <div className="typing-dot" />
+                                
+                                <div className="overview-tabs">
+                                    <button 
+                                        className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('overview')}
+                                    >
+                                        Overview
+                                    </button>
+                                    <button 
+                                        className={`tab-btn ${activeTab === 'risks' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('risks')}
+                                    >
+                                        Risks
+                                    </button>
+                                    <button 
+                                        className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('simulation')}
+                                    >
+                                        Simulate
+                                    </button>
+                                </div>
+
+                                {activeTab === 'overview' && (
+                                    <>
+                                        <div className="overview-stats">
+                                            <div className="stat-card">
+                                                <span className="stat-value">{commandOverview.overview.activeRisks}</span>
+                                                <span className="stat-label">Active Risks</span>
+                                            </div>
+                                            <div className="stat-card critical">
+                                                <span className="stat-value">{commandOverview.overview.criticalAlerts}</span>
+                                                <span className="stat-label">Critical</span>
+                                            </div>
+                                            <div className="stat-card">
+                                                <span className="stat-value">{commandOverview.overview.aiInteractionsToday}</span>
+                                                <span className="stat-label">Today's Queries</span>
+                                            </div>
+                                            <div className="stat-card">
+                                                <span className="stat-value">{Math.round((commandOverview.overview.avgConfidence || 0) * 100)}%</span>
+                                                <span className="stat-label">Avg Confidence</span>
+                                            </div>
+                                        </div>
+
+                                        {commandOverview.topRisks?.length > 0 && (
+                                            <div className="overview-risks">
+                                                <h5>Top Risks</h5>
+                                                {commandOverview.topRisks.slice(0, 3).map((r, i) => (
+                                                    <div key={i} className={`risk-item ${r.level}`} onClick={() => handleRiskClick(r)}>
+                                                        <span className="risk-name">{r.projectName}</span>
+                                                        <span className="risk-level">{r.level.toUpperCase()}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="overview-hot-alerts">
+                                            <h5>🔥 Recent Activity</h5>
+                                            {commandOverview.recentActivity?.slice(0, 3).map((log, i) => (
+                                                <div key={i} className="hot-alert-item">
+                                                    <span className="alert-action">{log.intent_type || 'query'}</span>
+                                                    <span className="alert-time">{formatTimeAgo(log.created_at)}</span>
+                                                </div>
+                                            ))}
+                                            {(!commandOverview.recentActivity || commandOverview.recentActivity.length === 0) && (
+                                                <p className="no-activity">No recent activity</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 'risks' && (
+                                    <div className="overview-risks-full">
+                                        <h5>⚠️ All Project Risks</h5>
+                                        {commandOverview.topRisks?.map((r, i) => (
+                                            <div key={i} className={`risk-item-full ${r.level}`} onClick={() => handleRiskClick(r)}>
+                                                <div className="risk-header">
+                                                    <span className="risk-name">{r.projectName}</span>
+                                                    <span className="risk-score">{Math.round((r.totalScore || 0) * 100)}%</span>
+                                                </div>
+                                                <div className="risk-bar">
+                                                    <div className="risk-bar-fill" style={{ width: `${(r.totalScore || 0) * 100}%` }} />
+                                                </div>
+                                                <div className="risk-factors">
+                                                    {r.factors?.map((f, j) => (
+                                                        <span key={j} className="risk-factor">{f.label}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
+                                )}
+
+                                {activeTab === 'simulation' && (
+                                    <div className="overview-simulation">
+                                        <h5>⚡ Quick Simulation</h5>
+                                        <p className="sim-hint">Try asking:</p>
+                                        <div className="sim-suggestions">
+                                            <button onClick={() => handleSimSuggestion("What if we hire 3 more workers?")}>
+                                                👷 Hire Workers
+                                            </button>
+                                            <button onClick={() => handleSimSuggestion("If we start a new project, what's the cash impact?")}>
+                                                🏗️ New Project
+                                            </button>
+                                            <button onClick={() => handleSimSuggestion("What if we have a cash shortage?")}>
+                                                💰 Cash Flow
+                                            </button>
+                                        </div>
+                                        <div className="simulation-mode-toggle">
+                                            <label>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={simulationMode}
+                                                    onChange={(e) => setSimulationMode(e.target.checked)}
+                                                />
+                                                <span>Simulation Mode</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button 
+                                    className="overview-start-btn"
+                                    onClick={() => setShowOverview(false)}
+                                >
+                                    <Sparkles size={16} />
+                                    Start AI Session
+                                </button>
+                            </div>
+                        )}
+
+                            {!showOverview && (
+                                <div className="ai-chat-messages">
+                                    {messages.map((msg, i) => (
+                                        <div key={i} className={`message ${msg.role}`}>
+                                            {msg.content}
+                                        </div>
+                                    ))}
+                                    {isLoading && (
+                                        <div className="message ai">
+                                            <div className="typing-indicator">
+                                                <div className="typing-dot" />
+                                                <div className="typing-dot" />
+                                                <div className="typing-dot" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
-                        </div>
 
-                        <div className="ai-chat-input">
-                            <input
-                                type="text"
-                                placeholder="Ask about your projects, finances, attendance..."
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            />
-                            <button onClick={handleSend} disabled={!input.trim() || isLoading}>
-                                <Send size={18} />
-                            </button>
-                        </div>
+                            {!showOverview && (
+                                <div className="ai-chat-input">
+                                    <input
+                                        type="text"
+                                        placeholder="Ask about your projects, finances, attendance..."
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                                    />
+                                    <button onClick={handleSend} disabled={!input.trim() || isLoading}>
+                                        <Send size={18} />
+                                    </button>
+                                </div>
+                            )}
                     </motion.div>
                 )}
             </AnimatePresence>
