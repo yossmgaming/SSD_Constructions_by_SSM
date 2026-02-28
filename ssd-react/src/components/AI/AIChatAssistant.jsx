@@ -3,10 +3,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Send, X, Bot, User, Sparkles } from 'lucide-react';
 import { BotMessageSquareIcon } from './BotMessageSquareIcon';
 import { supabase } from '../../data/supabase';
+import { useAuth } from '../../context/AuthContext';
 import './AIChatAssistant.css';
 
 const AIChatAssistant = () => {
+    const { hasRole } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
+
+    // Only show for Admin and Finance for now
+    if (!hasRole(['Super Admin', 'Finance'])) return null;
+
     const [messages, setMessages] = useState([
         { role: 'ai', content: "Hello! I'm your SSD Construction Assistant. How can I help you today with project details, attendance, or material requisitions?" }
     ]);
@@ -111,7 +117,7 @@ Current System State:
             setMessages(prev => [...prev, { role: 'ai', content: reply }]);
         } catch (err) {
             console.error('AI Chat Error:', err);
-            setMessages(prev => [...prev, { role: 'ai', content: `Sorry, I'm having trouble: ${err.message}. Please restart your dev server if you just updated .env.local.` }]);
+            setMessages(prev => [...prev, { role: 'ai', content: `🔧 Connection Error: ${err.message}. Please RESTART your terminal (npm run dev) and ensure your .env.local has the key. NEVER commit keys to git!` }]);
         } finally {
             setIsLoading(false);
         }

@@ -8,6 +8,7 @@ import BounceButton from './BounceButton';
 import GlobalLoadingOverlay from './GlobalLoadingOverlay';
 import NotificationBell from './NotificationBell';
 import AIAlerts from './AIAlerts';
+import AIChatAssistant from './AI/AIChatAssistant';
 import './Layout.css';
 
 const IRIDESCENCE_COLOR = [0.9, 1, 1];
@@ -70,6 +71,9 @@ export default function Layout() {
                     </AnimatePresence>
                 </div>
             </main>
+
+            {/* Global AI Assistant - Visible only to Super Admin and Finance */}
+            <AIChatAssistant />
         </div>
     );
 }

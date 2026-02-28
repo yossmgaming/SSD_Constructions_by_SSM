@@ -15,7 +15,6 @@ import SupplierDashboard from './SupplierDashboard';
 import SubContractorDashboard from './SubContractorDashboard';
 import ProjectManagerDashboard from './ProjectManagerDashboard';
 import SupervisorDashboard from './SupervisorDashboard';
-import AIChatAssistant from '../components/AI/AIChatAssistant';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -223,8 +222,6 @@ export default function Dashboard() {
                         PieTooltip={PieTooltip}
                     />
                 )}
-
-                {isAdminView && <AIChatAssistant />}
             </div>
         </GlobalLoadingOverlay>
     );
