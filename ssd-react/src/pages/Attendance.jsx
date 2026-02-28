@@ -5,6 +5,7 @@ import ExportDropdown from '../components/ExportDropdown';
 import Card from '../components/Card';
 import { getAll, create, update, remove, queryEq, KEYS } from '../data/db';
 import GlobalLoadingOverlay from '../components/GlobalLoadingOverlay';
+import { supabase } from '../data/supabase';
 
 import { exportToPDF, exportToExcel, exportToWord, exportToCSV } from '../utils/exportUtils';
 import './Attendance.css';
@@ -16,7 +17,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function Attendance() {
     const { t, i18n } = useTranslation();
-    const { hasRole } = useAuth();
+    const { profile, identity, hasRole } = useAuth();
     const [workers, setWorkers] = useState([]);
     const [projects, setProjects] = useState([]);
     const [attendances, setAttendances] = useState([]);
@@ -38,20 +39,67 @@ export default function Attendance() {
     const [isLoadingExport, setIsLoadingExport] = useState(false);
     const menuRef = useRef(null);
 
+    const isSupervisor = profile?.role === 'Site Supervisor';
+    const canEdit = hasRole(['Super Admin', 'Finance', 'Project Manager']);
+
     useEffect(() => {
         loadBaseData();
-    }, [refreshKey]);
+    }, [refreshKey, identity?.id]);
 
     async function loadBaseData() {
         setIsLoading(true);
         try {
-            // Only fetch active reference data. Attendances will be fetched per worker.
-            const [wrks, projs] = await Promise.all([
-                getAll(KEYS.workers),
-                getAll(KEYS.projects)
-            ]);
+            let wrks = [];
+            let projs = [];
+            let projWorkers = [];
+            
+            if (isSupervisor && identity?.id) {
+                // Supervisors can only see their assigned projects and workers on those projects
+                const { data: supervisorAssignments } = await supabase
+                    .from('projectWorkers')
+                    .select('projectId')
+                    .eq('workerId', identity.id);
+                
+                const supervisorProjectIds = [...new Set((supervisorAssignments || []).map(a => a.projectId))];
+                
+                if (supervisorProjectIds.length > 0) {
+                    // Get ALL workers assigned to supervisor's projects
+                    const { data: allProjectWorkers } = await supabase
+                        .from('projectWorkers')
+                        .select('workerId, projectId')
+                        .in('projectId', supervisorProjectIds);
+                    
+                    projWorkers = allProjectWorkers || [];
+                    const workerIds = [...new Set((allProjectWorkers || []).map(a => a.workerId))];
+                    
+                    const [assignedProjects, assignedWorkers] = await Promise.all([
+                        supabase.from('projects').select('*').in('id', supervisorProjectIds).eq('status', 'Ongoing'),
+                        workerIds.length > 0 ? supabase.from('workers').select('*').in('id', workerIds) : Promise.resolve({ data: [] })
+                    ]);
+                    projs = assignedProjects.data || [];
+                    wrks = (assignedWorkers.data || []);
+                }
+                
+                // Set default project to first assigned
+                if (projs.length > 0) {
+                    setSelectedProject(projs[0].id);
+                }
+            } else {
+                // Admin/PM can see all
+                [wrks, projs] = await Promise.all([
+                    getAll(KEYS.workers),
+                    getAll(KEYS.projects)
+                ]);
+                // Also load all projectWorker relationships for filtering
+                const { data: allProjWorkers } = await supabase
+                    .from('projectWorkers')
+                    .select('workerId, projectId');
+                projWorkers = allProjWorkers || [];
+            }
+            
             setWorkers(wrks);
             setProjects(projs);
+            setProjectWorkers(projWorkers);
         } catch (error) {
             console.error(error);
         } finally {
@@ -132,11 +180,6 @@ export default function Attendance() {
             setIsLoading(false);
         }
     }, [projects, selectedProject]);
-
-    function handleSelectWorker(worker) {
-        setSelectedWorker(worker);
-        detectWorkerProjects(worker);
-    }
 
     // Close context menu on outside click
     useEffect(() => {
@@ -327,19 +370,19 @@ export default function Attendance() {
         });
 
         try {
-            if (existing && typeof existing.id === 'number') {
-                // Direct update by known ID — no full table scan
-                await update(KEYS.attendances, existing.id, updateData);
-            } else {
-                // Server-side check: prevent duplicate by querying worker+date
-                const serverMatch = await queryEq(KEYS.attendances, 'workerId', selectedWorker.id);
-                const exactMatch = serverMatch.find(a => a.date === dateStr && a.projectId === projId);
+            // Always check server first to avoid duplicate key errors
+            const serverMatch = await supabase
+                .from('attendances')
+                .select('id')
+                .eq('workerId', selectedWorker.id)
+                .eq('date', dateStr)
+                .eq('projectId', projId)
+                .maybeSingle();
 
-                if (exactMatch) {
-                    await update(KEYS.attendances, exactMatch.id, updateData);
-                } else {
-                    await create(KEYS.attendances, updateData);
-                }
+            if (serverMatch) {
+                await update(KEYS.attendances, serverMatch.id, updateData);
+            } else {
+                await create(KEYS.attendances, updateData);
             }
             // Silent refresh in background
             setRefreshKey((k) => k + 1);
@@ -483,7 +526,34 @@ export default function Attendance() {
     function prevMonth() { setCurrentDate(new Date(year, month - 1, 1)); }
     function nextMonth() { setCurrentDate(new Date(year, month + 1, 1)); }
 
-    const filteredWorkers = workers.filter((w) => w.fullName.toLowerCase().includes(search.toLowerCase()));
+    // Handle worker click - toggle selection
+    function handleSelectWorker(worker) {
+        if (selectedWorker?.id === worker.id) {
+            // Deselect if clicking same worker
+            setSelectedWorker(null);
+            setWorkerAssignments([]);
+            setAttendances([]);
+        } else {
+            setSelectedWorker(worker);
+            detectWorkerProjects(worker);
+        }
+    }
+
+    // Filter workers based on selected project for supervisors
+    const workersForSelectedProject = useMemo(() => {
+        if (!selectedProject || !isSupervisor) return workers;
+        
+        // For supervisors, only show workers assigned to the selected project
+        const workerIdsForProject = projectWorkers
+            .filter(pw => String(pw.projectId) === String(selectedProject))
+            .map(pw => pw.workerId);
+        
+        return workers.filter(w => workerIdsForProject.includes(w.id));
+    }, [workers, selectedProject, isSupervisor, projectWorkers]);
+
+    const filteredWorkers = workersForSelectedProject.filter((w) => 
+        (w.fullName || w.full_name || '').toLowerCase().includes(search.toLowerCase())
+    );
     const today = new Date();
     const presentDays = attendanceRecords.filter((a) => a.isPresent && !a.isHalfDay).length;
     const halfDays = attendanceRecords.filter((a) => a.isHalfDay).length;
@@ -518,9 +588,41 @@ export default function Attendance() {
 
                 <div className="attendance-layout">
                     <Card title={t('workers.title')}>
-                        <input placeholder={t('common.search') + "..."} value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 12 }} />
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                            <input 
+                                placeholder={t('common.search') + "..."} 
+                                value={search} 
+                                onChange={(e) => setSearch(e.target.value)} 
+                                style={{ flex: 1 }} 
+                            />
+                            {selectedWorker && (
+                                <button 
+                                    onClick={() => {
+                                        setSelectedWorker(null);
+                                        setWorkerAssignments([]);
+                                        setAttendances([]);
+                                    }}
+                                    style={{ 
+                                        padding: '8px 12px', 
+                                        background: '#fee2e2', 
+                                        color: '#dc2626',
+                                        border: 'none', 
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                         <div className="worker-search-list" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            {filteredWorkers.map((w) => {
+                            {filteredWorkers.length === 0 ? (
+                                <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>
+                                    No workers found
+                                </div>
+                            ) : filteredWorkers.map((w) => {
                                 // Quick check if this worker has any project assigned
                                 const wAtt = attendances.filter((a) => a.workerId === w.id);
                                 const latestProjectId = wAtt.length > 0

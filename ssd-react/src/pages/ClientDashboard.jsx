@@ -26,7 +26,9 @@ export default function ClientDashboard() {
 
     const timeAgo = (dateStr) => {
         if (!dateStr) return '';
-        const diff = Date.now() - new Date(dateStr).getTime();
+        // Handle date-only strings (YYYY-MM-DD) by appending time to avoid UTC issues
+        const dateValue = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
+        const diff = Date.now() - new Date(dateValue).getTime();
         const mins = Math.floor(diff / 60000);
         if (mins < 1) return t('dashboard.just_now');
         if (mins < 60) return `${mins}${t('dashboard.m_ago')}`;
@@ -37,29 +39,42 @@ export default function ClientDashboard() {
     };
 
     useEffect(() => {
+        console.log('[ClientDashboard] identity:', identity, 'profile:', profile);
         loadData();
-    }, [identity?.id]);
+    }, [identity?.id, profile?.target_id]);
 
     async function loadData() {
         if (!identity?.id) {
+            console.log('[ClientDashboard] No identity found - user may not be linked to a client record');
             setIsLoading(false);
             return;
         }
         setIsLoading(true);
         try {
-            // 1. Fetch client's projects
-            const { data: p } = await supabase
-                .from('projects')
-                .select('*')
-                .eq('client_id', identity.id);
-            setProjects(p || []);
+            // 1. Fetch client's projects using target_id (not identity.id)
+            let projectData = [];
+            if (profile?.target_id) {
+                const { data: p } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('id', profile.target_id);
+                projectData = p || [];
+            } else {
+                // Fallback: try client_id matching
+                const { data: p } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('client_id', identity.id);
+                projectData = p || [];
+            }
+            setProjects(projectData);
 
-            if (p && p.length > 0 && !selectedProjectId) {
-                setSelectedProjectId(p[0].id);
+            if (projectData.length > 0 && !selectedProjectId) {
+                setSelectedProjectId(projectData[0].id);
             }
 
-            if ((p || []).length > 0) {
-                const projectIds = p.map(x => x.id);
+            if (projectData.length > 0) {
+                const projectIds = projectData.map(x => x.id);
 
                 // 2. Fetch notifications/activities for these projects
                 const { data: recentPays } = await supabase
@@ -70,11 +85,11 @@ export default function ClientDashboard() {
                     .limit(10);
 
                 const feed = [];
-                (p || []).forEach(r =>
+                (projectData || []).forEach(r =>
                     feed.push({ text: `Project "${r.name}" started successfully`, time: r.createdAt || r.startDate, color: 'blue' })
                 );
                 (recentPays || []).forEach(r => {
-                    const proj = p.find(x => x.id === r.projectId);
+                    const proj = projectData.find(x => x.id === r.projectId);
                     feed.push({
                         text: `Update: ${r.category || 'Payment'} processed for ${proj?.name || 'project'}`,
                         time: r.createdAt || r.date, color: 'emerald'
@@ -172,7 +187,7 @@ export default function ClientDashboard() {
             </div>
 
             {selectedProjectId && (
-                <div className="mt-6">
+                <div className="dashboard-grid-full">
                     <Card>
                         {projects.length > 1 && (
                             <div className="mb-4">

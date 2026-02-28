@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, Plus, CheckCircle, Flame, Droplets, Activity } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ShieldAlert, AlertTriangle, Plus, CheckCircle, Flame, Droplets, Activity, RefreshCw } from 'lucide-react';
 import { getProjectIncidents, submitIncident } from '../../data/db-extensions';
 import BounceButton from '../BounceButton';
 import Modal from '../Modal';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
-const SafetyIncidentForm = ({ reporterId, projects }) => {
+const SafetyIncidentForm = ({ reporterId, projects, onSuccess, onError }) => {
     const [selectedProject, setSelectedProject] = useState('');
     const [incidents, setIncidents] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // Modal & Submission State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,6 +20,7 @@ const SafetyIncidentForm = ({ reporterId, projects }) => {
     const [incidentDate, setIncidentDate] = useState(new Date().toISOString().split('T')[0]);
     const [description, setDescription] = useState('');
     const [severity, setSeverity] = useState('Low');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         if (projects && projects.length > 0 && !selectedProject) {
@@ -30,34 +34,38 @@ const SafetyIncidentForm = ({ reporterId, projects }) => {
         }
     }, [selectedProject]);
 
-    const loadIncidents = async () => {
+    const loadIncidents = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const data = await getProjectIncidents(selectedProject);
             setIncidents(data || []);
-        } catch (error) {
-            console.error('Error loading incidents:', error);
+        } catch (err) {
+            console.error('Error loading incidents:', err);
+            setError('Failed to load incidents.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedProject]);
 
     const handleOpenModal = () => {
-        if (!selectedProject) {
-            alert('Please select a project first.');
-            return;
-        }
+        if (!selectedProject) return;
         setIncidentDate(new Date().toISOString().split('T')[0]);
         setDescription('');
         setSeverity('Low');
+        setFormErrors({});
         setIsModalOpen(true);
     };
 
+    const validateForm = () => {
+        const errors = {};
+        if (!description.trim()) errors.description = 'Description is required';
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async () => {
-        if (!description.trim()) {
-            alert('Please provide a description of the incident.');
-            return;
-        }
+        if (!validateForm()) return;
 
         setSubmitting(true);
         try {
@@ -72,9 +80,11 @@ const SafetyIncidentForm = ({ reporterId, projects }) => {
 
             setIsModalOpen(false);
             loadIncidents();
-        } catch (error) {
-            console.error('Submit error:', error);
-            alert('Failed to report incident. Please try again.');
+            if (onSuccess) onSuccess('Incident reported successfully!');
+        } catch (err) {
+            console.error('Submit error:', err);
+            setError('Failed to report incident.');
+            if (onError) onError('Failed to report incident');
         } finally {
             setSubmitting(false);
         }
@@ -98,61 +108,89 @@ const SafetyIncidentForm = ({ reporterId, projects }) => {
     if (!projects || projects.length === 0) return null;
 
     return (
-        <div className="bg-white border flex flex-col h-full border-slate-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="bg-white border-2 border-slate-100 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 flex flex-col h-full group/card">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/30">
                 <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-rose-100 text-rose-600 rounded-lg">
-                        <ShieldAlert size={18} />
+                    <div className="p-2.5 bg-rose-600 text-white rounded-xl shadow-lg shadow-rose-200">
+                        <ShieldAlert size={20} />
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-slate-800">Safety & Incidents</h3>
-                        <p className="text-[10px] text-slate-500 font-medium tracking-wide">SITE REPORTING</p>
+                        <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-wider leading-none">Safety & Incidents</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-1">Site Incident Reporting</p>
                     </div>
                 </div>
 
-                {projects.length > 1 && (
-                    <select
-                        value={selectedProject}
-                        onChange={(e) => setSelectedProject(e.target.value)}
-                        className="text-xs bg-white border border-slate-200 rounded-md p-1.5 text-slate-700 outline-none focus:border-rose-400"
+                <div className="flex items-center gap-2">
+                    <BounceButton
+                        onClick={loadIncidents}
+                        disabled={loading}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-100"
+                        title="Refresh Reports"
                     >
-                        {projects.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                )}
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </BounceButton>
+                    {projects.length > 1 && (
+                        <select
+                            value={selectedProject}
+                            onChange={(e) => setSelectedProject(e.target.value)}
+                            className="text-[11px] font-bold bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-slate-700 outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all cursor-pointer shadow-sm hover:border-slate-200"
+                        >
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
             </div>
 
-            <div className="p-4 flex-1 flex flex-col">
+            <div className="p-5 flex-1 flex flex-col">
                 <BounceButton
-                    className="w-full bg-slate-50 border border-slate-200 border-dashed rounded-lg p-3 flex items-center justify-center gap-2 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 text-slate-500 font-semibold text-sm transition-colors mb-4"
+                    className="w-full bg-rose-50/50 border-2 border-rose-100 border-dashed rounded-xl p-4 flex items-center justify-center gap-3 hover:bg-rose-600 hover:text-white hover:border-rose-600 hover:shadow-lg hover:shadow-rose-200 text-rose-700 font-black text-xs uppercase tracking-widest transition-all mb-6 group"
                     onClick={handleOpenModal}
                 >
-                    <Plus size={16} /> Report New Incident
+                    <div className="p-1 bg-white rounded-lg group-hover:bg-rose-400 transition-colors">
+                        <Plus size={18} />
+                    </div>
+                    Report New Incident
                 </BounceButton>
 
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Recent Reports</h4>
+                <div className="flex items-center justify-between mb-4 px-1">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Safety Logbook</h4>
+                    <div className="h-px bg-slate-100 flex-grow ml-4"></div>
+                </div>
 
                 {loading ? (
-                    <div className="text-center p-4 text-slate-400 animate-pulse text-sm">Loading reports...</div>
+                    <div className="flex items-center justify-center p-12">
+                        <LoadingSpinner text="Safety audit..." />
+                    </div>
+                ) : error ? (
+                    <EmptyState
+                        icon="alert"
+                        title="Unable to load reports"
+                        description={error}
+                        actionLabel="Try Again"
+                        onAction={loadIncidents}
+                    />
                 ) : incidents.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 opacity-70">
-                        <ShieldAlert size={24} className="text-slate-300 mb-2" />
-                        <span className="text-sm font-semibold text-slate-600">Zero Incidents</span>
-                        <span className="text-xs text-slate-400 max-w-[200px]">No safety reports or incidents logged for this site.</span>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-emerald-50/30 rounded-2xl border-2 border-dashed border-emerald-100 italic">
+                        <div className="p-3 bg-white rounded-2xl shadow-sm mb-3 text-emerald-500">
+                            <ShieldAlert size={28} />
+                        </div>
+                        <span className="text-sm font-bold text-emerald-600">Zero Incidents.</span>
+                        <span className="text-[10px] text-emerald-400 uppercase tracking-widest mt-1">Site is currently secure.</span>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-3 overflow-y-auto max-h-[220px] pr-1">
+                    <div className="flex flex-col gap-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
                         {incidents.map(incident => (
-                            <div key={incident.id} className="border border-slate-100 rounded-lg p-3 hover:border-rose-200 transition-colors bg-white shadow-sm flex flex-col">
-                                <div className="flex items-center justify-between mb-2">
+                            <div key={incident.id} className="group/item border-2 border-slate-50 rounded-2xl p-4 hover:border-rose-100 hover:bg-rose-50/30 hover:shadow-md transition-all bg-white relative">
+                                <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         {getSeverityBadge(incident.severity)}
-                                        <span className={`text-[10px] font-bold px-1.5 rounded-sm ${incident.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{incident.status}</span>
+                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase tracking-wider ${incident.status === 'Resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{incident.status}</span>
                                     </div>
-                                    <span className="text-xs font-semibold text-slate-500">{formatDate(incident.date)}</span>
+                                    <span className="text-xs font-black text-slate-400">{formatDate(incident.date)}</span>
                                 </div>
-                                <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed">
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed bg-white p-3 rounded-xl border border-slate-100 shadow-sm group-hover/item:border-rose-100 transition-colors">
                                     {incident.description}
                                 </p>
                             </div>

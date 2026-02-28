@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Truck, PackageSearch, PackageCheck, AlertCircle, Clock, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Truck, PackageSearch, PackageCheck, AlertCircle, Clock, ChevronRight, RefreshCw } from 'lucide-react';
 import { getSupplierOrders, updateOrderStatus } from '../../data/db-extensions';
 import BounceButton from '../BounceButton';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
-const SupplierOrdersView = ({ supplierId }) => {
+const SupplierOrdersView = ({ supplierId, onSuccess, onError }) => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [updatingId, setUpdatingId] = useState(null);
 
     useEffect(() => {
@@ -14,25 +17,30 @@ const SupplierOrdersView = ({ supplierId }) => {
         }
     }, [supplierId]);
 
-    const loadOrders = async () => {
+    const loadOrders = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const data = await getSupplierOrders(supplierId);
             setOrders(data || []);
-        } catch (error) {
-            console.error('Error loading supplier orders:', error);
+        } catch (err) {
+            console.error('Error loading supplier orders:', err);
+            setError('Failed to load orders.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [supplierId]);
 
     const handleStatusUpdate = async (orderId, newStatus) => {
         setUpdatingId(orderId);
         try {
             await updateOrderStatus(orderId, newStatus);
             loadOrders();
-        } catch (error) {
-            alert('Failed to update order status.');
+            if (onSuccess) onSuccess('Order status updated!');
+        } catch (err) {
+            console.error('Failed to update order status:', err);
+            setError('Failed to update order status.');
+            if (onError) onError('Failed to update order status');
         } finally {
             setUpdatingId(null);
         }
@@ -74,8 +82,19 @@ const SupplierOrdersView = ({ supplierId }) => {
                         <p className="text-[10px] text-slate-500 font-medium tracking-wide">MATERIAL DISPATCH QUEUE</p>
                     </div>
                 </div>
-                <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full">
-                    {orders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled').length} Active
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={loadOrders}
+                        disabled={loading}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Refresh orders"
+                    >
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                    <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full">
+                        {orders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled').length} Active
+                    </div>
                 </div>
             </div>
 

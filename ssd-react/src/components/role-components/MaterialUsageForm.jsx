@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Plus, CheckCircle, Search, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Package, Plus, CheckCircle, Search, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../../data/supabase';
 import { KEYS, getAll, create, update } from '../../data/db';
 import BounceButton from '../BounceButton';
 import Modal from '../Modal';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
-const MaterialUsageForm = ({ supervisorId, projects }) => {
+const MaterialUsageForm = ({ supervisorId, projects, onSuccess, onError }) => {
     const [selectedProject, setSelectedProject] = useState('');
     const [materials, setMaterials] = useState([]);
     const [recentUsage, setRecentUsage] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,6 +23,7 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
     const [usageQuantity, setUsageQuantity] = useState('');
     const [usageDate, setUsageDate] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         if (projects && projects.length > 0 && !selectedProject) {
@@ -33,8 +37,9 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
         }
     }, [selectedProject]);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             // Fetch global stock
             const allMats = await getAll(KEYS.materials);
@@ -49,38 +54,40 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
                 .limit(10);
 
             setRecentUsage(usageLogs || []);
-        } catch (error) {
-            console.error('Error loading materials:', error);
+        } catch (err) {
+            console.error('Error loading materials:', err);
+            setError('Failed to load materials.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedProject]);
 
     const handleOpenModal = () => {
-        if (!selectedProject) {
-            alert('Please select a project first.');
-            return;
-        }
+        if (!selectedProject) return;
         setUsageQuantity('');
         setSelectedMaterialId('');
         setUsageDate(new Date().toISOString().split('T')[0]);
         setSearchQuery('');
+        setFormErrors({});
         setIsModalOpen(true);
     };
 
-    const handleSubmit = async () => {
-        if (!selectedMaterialId) {
-            alert('Please select a material.');
-            return;
+    const validateForm = () => {
+        const errors = {};
+        if (!selectedMaterialId) errors.selectedMaterialId = 'Material is required';
+        if (!usageQuantity || isNaN(parseFloat(usageQuantity)) || parseFloat(usageQuantity) <= 0) {
+            errors.usageQuantity = 'Valid quantity is required';
         }
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleSubmit = async () => {
+        if (!validateForm()) return;
 
         const mat = materials.find(m => m.id === parseInt(selectedMaterialId));
         const qty = parseFloat(usageQuantity);
 
-        if (isNaN(qty) || qty <= 0) {
-            alert('Please enter a valid amount.');
-            return;
-        }
         if (qty > mat.quantity) {
             alert(`Insufficient stock! You requested ${qty} but only ${mat.quantity} ${mat.unit} are available.`);
             return;
@@ -104,9 +111,11 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
 
             setIsModalOpen(false);
             loadData(); // Reload stock and logs
+            if (onSuccess) onSuccess('Material usage logged successfully!');
         } catch (error) {
             console.error('Submit error:', error);
             alert('Failed to log material usage. Please try again.');
+            if (onError) onError('Failed to log material usage');
         } finally {
             setSubmitting(false);
         }
@@ -128,15 +137,15 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
     if (!projects || projects.length === 0) return null;
 
     return (
-        <div className="bg-white border flex flex-col h-full border-slate-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="bg-white border-2 border-slate-100 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 flex flex-col h-full group/card">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/30">
                 <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg">
-                        <Package size={18} />
+                    <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-200">
+                        <Package size={20} />
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-slate-800">Material Usage Log</h3>
-                        <p className="text-[10px] text-slate-500 font-medium tracking-wide">STOCK DEDUCTION</p>
+                        <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-wider leading-none">Material Usage</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-1">Stock Deduction Tracking</p>
                     </div>
                 </div>
 
@@ -144,7 +153,7 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
                     <select
                         value={selectedProject}
                         onChange={(e) => setSelectedProject(e.target.value)}
-                        className="text-xs bg-white border border-slate-200 rounded-md p-1.5 text-slate-700 outline-none focus:border-amber-400"
+                        className="text-[11px] font-bold bg-white border-2 border-slate-100 rounded-xl px-3 py-2 text-slate-700 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all cursor-pointer shadow-sm hover:border-slate-200"
                     >
                         {projects.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -153,34 +162,46 @@ const MaterialUsageForm = ({ supervisorId, projects }) => {
                 )}
             </div>
 
-            <div className="p-4 flex-1 flex flex-col">
+            <div className="p-5 flex-1 flex flex-col">
                 <BounceButton
-                    className="w-full bg-slate-50 border border-slate-200 border-dashed rounded-lg p-3 flex items-center justify-center gap-2 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600 text-slate-500 font-semibold text-sm transition-colors mb-4"
+                    className="w-full bg-amber-50/50 border-2 border-amber-100 border-dashed rounded-xl p-4 flex items-center justify-center gap-3 hover:bg-amber-500 hover:text-white hover:border-amber-500 hover:shadow-lg hover:shadow-amber-200 text-amber-700 font-black text-xs uppercase tracking-widest transition-all mb-6 group"
                     onClick={handleOpenModal}
                 >
-                    <Plus size={16} /> Log Consumed Material
+                    <div className="p-1 bg-white rounded-lg group-hover:bg-amber-400 transition-colors">
+                        <Plus size={18} />
+                    </div>
+                    Log Consumed Material
                 </BounceButton>
 
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Recent Consumptions</h4>
+                <div className="flex items-center justify-between mb-4 px-1">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Usage Records</h4>
+                    <div className="h-px bg-slate-100 flex-grow ml-4"></div>
+                </div>
 
                 {loading ? (
-                    <div className="text-center p-4 text-slate-400 animate-pulse text-sm">Loading logs...</div>
+                    <div className="flex items-center justify-center p-12 text-slate-400 animate-pulse text-xs font-bold uppercase tracking-widest">
+                        Inventory sync...
+                    </div>
                 ) : recentUsage.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 opacity-70">
-                        <Package size={24} className="text-slate-300 mb-2" />
-                        <span className="text-sm font-semibold text-slate-600">No recent usage.</span>
-                        <span className="text-xs text-slate-400 max-w-[200px]">Log materials deducted from inventory.</span>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-100 italic">
+                        <div className="p-3 bg-white rounded-2xl shadow-sm mb-3 text-slate-200">
+                            <Package size={28} />
+                        </div>
+                        <span className="text-sm font-bold text-slate-400">Inventory untouched.</span>
+                        <span className="text-[10px] text-slate-300 uppercase tracking-widest mt-1">Deduct used materials now.</span>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-2 overflow-y-auto max-h-[300px] pr-1">
+                    <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
                         {recentUsage.map(log => (
-                            <div key={log.id} className="border border-slate-100 rounded-lg p-3 hover:border-amber-200 transition-colors bg-white shadow-sm flex items-center justify-between">
+                            <div key={log.id} className="group/item border-2 border-slate-50 rounded-2xl p-4 hover:border-amber-100 hover:bg-amber-50/30 hover:shadow-md transition-all bg-white flex items-center justify-between">
                                 <div>
-                                    <div className="text-sm font-bold text-slate-800">{log.material?.name || 'Unknown Material'}</div>
-                                    <div className="text-xs text-slate-500 mt-0.5">{formatDate(log.date || log.createdAt)}</div>
+                                    <div className="text-sm font-black text-slate-800">{log.material?.name || 'Unknown Material'}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">{formatDate(log.date || log.createdAt)}</div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-bold text-amber-600">-{log.quantity} <span className="text-[10px] text-slate-400">{log.material?.unit}</span></div>
+                                <div className="text-right flex flex-col items-end">
+                                    <div className="text-sm font-black text-amber-600 bg-amber-100/50 px-3 py-1 rounded-xl border border-amber-200/50">
+                                        -{log.quantity} <span className="text-[9px] text-amber-400 uppercase tracking-tighter ml-1">{log.material?.unit}</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}

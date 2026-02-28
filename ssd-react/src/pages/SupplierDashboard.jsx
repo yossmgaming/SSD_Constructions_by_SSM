@@ -90,26 +90,26 @@ export default function SupplierDashboard() {
             )}
 
             <div className="dashboard-stats">
-                <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: '#fff7ed' }}>
-                        <Package size={22} color="#f97316" />
+                <Card className="stat-card amber">
+                    <div className="stat-icon amber">
+                        <Package size={22} />
                     </div>
                     <div className="card-label">Materials Supplied</div>
                     <div className="card-value"><CountUp to={materials.length} /></div>
                     <div className="stat-sub">Items in registry</div>
                 </Card>
 
-                <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: '#f0fdf4' }}>
-                        <DollarSign size={22} color="#10b981" />
+                <Card className="stat-card emerald">
+                    <div className="stat-icon emerald">
+                        <DollarSign size={22} />
                     </div>
                     <div className="card-label">Total Paid to You</div>
-                    <div className="card-value" style={{ fontSize: '1.1rem' }}>{fmt(totalPaid)}</div>
-                    <div className="stat-sub">Payments outgoing from SSD</div>
+                    <div className="card-value">{fmt(totalPaid)}</div>
+                    <div className="stat-sub">Payments from SSD</div>
                 </Card>
             </div>
 
-            <div className="mt-6 mb-6">
+            <div className="dashboard-grid-full">
                 <SupplierOrdersView supplierId={supplierId} />
             </div>
 

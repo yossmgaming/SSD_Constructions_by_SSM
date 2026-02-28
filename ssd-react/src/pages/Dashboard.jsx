@@ -15,11 +15,18 @@ import SupplierDashboard from './SupplierDashboard';
 import SubContractorDashboard from './SubContractorDashboard';
 import ProjectManagerDashboard from './ProjectManagerDashboard';
 import SupervisorDashboard from './SupervisorDashboard';
+import AIChatAssistant from '../components/AI/AIChatAssistant';
 import './Dashboard.css';
 
 export default function Dashboard() {
     const { t } = useTranslation();
     const { profile, identity, hasRole } = useAuth();
+
+    // Debug: Log role for troubleshooting
+    useEffect(() => {
+        console.log('[Dashboard] User role:', profile?.role);
+        console.log('[Dashboard] User profile:', profile);
+    }, [profile]);
 
     // Admin-Specific State
     const [projects, setProjects] = useState([]);
@@ -216,6 +223,8 @@ export default function Dashboard() {
                         PieTooltip={PieTooltip}
                     />
                 )}
+
+                {isAdminView && <AIChatAssistant />}
             </div>
         </GlobalLoadingOverlay>
     );

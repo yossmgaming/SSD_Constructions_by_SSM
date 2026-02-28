@@ -9,6 +9,10 @@ import './Dashboard.css';
 import DailyReportForm from '../components/role-components/DailyReportForm';
 import MaterialUsageForm from '../components/role-components/MaterialUsageForm';
 import SafetyIncidentForm from '../components/role-components/SafetyIncidentForm';
+import WorkerRequestSummary from '../components/role-components/WorkerRequestSummary';
+import MaterialRequestSummary from '../components/role-components/MaterialRequestSummary';
+import PaymentSummaryCard from '../components/role-components/PaymentSummaryCard';
+
 
 export default function SupervisorDashboard() {
     const { t } = useTranslation();
@@ -135,16 +139,23 @@ export default function SupervisorDashboard() {
                         <Clock size={22} />
                     </div>
                     <div className="card-label">Daily Status</div>
-                    <div className="card-value" style={{ fontSize: '1.2rem' }}>Live Tracking</div>
+                    <div className="card-value">Live Tracking</div>
                     <div className="stat-sub">Updated just now</div>
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 mb-6">
-                <DailyReportForm supervisorId={identity?.id} projects={projects} />
-                <MaterialUsageForm supervisorId={identity?.id} projects={projects} />
-                <SafetyIncidentForm reporterId={identity?.id} projects={projects} />
+            <div className="mt-8 mb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <DailyReportForm supervisorId={profile?.id} projects={projects} />
+                    <MaterialUsageForm supervisorId={profile?.id} projects={projects} />
+                    <SafetyIncidentForm reporterId={profile?.id} projects={projects} />
+                    <WorkerRequestSummary supervisorId={profile?.id} projects={projects} />
+                    <MaterialRequestSummary supervisorId={profile?.id} projects={projects} />
+                    <PaymentSummaryCard supervisorId={profile?.id} />
+                </div>
             </div>
+
+
 
             <div className="dashboard-grid">
                 <Card title="My Sites">

@@ -34,8 +34,9 @@ export default function Projects() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    const { profile, hasRole } = useAuth();
+    const { profile, identity, hasRole } = useAuth();
     const isClient = profile?.role === 'Client';
+    const isSupervisor = profile?.role === 'Site Supervisor';
     const isSuperAdminOrFinance = hasRole(['Super Admin', 'Finance']);
 
     // Dependencies for financials and delete checks
@@ -56,6 +57,24 @@ export default function Projects() {
                     console.warn("User is Client but has no target_id assigned.");
                     projs = [];
                 }
+            } else if (isSupervisor && identity?.id) {
+                // Supervisors can only see their assigned projects
+                const { data: assignments } = await supabase
+                    .from('projectWorkers')
+                    .select('projectId')
+                    .eq('workerId', identity.id);
+                
+                const projectIds = (assignments || []).map(a => a.projectId);
+                
+                if (projectIds.length > 0) {
+                    const { data: p } = await supabase
+                        .from('projects')
+                        .select('*')
+                        .in('id', projectIds)
+                        .order('createdAt', { ascending: false });
+                    projs = p || [];
+                }
+                console.log(`Supervisor RBAC: Loaded ${projs.length} assigned project(s)`);
             } else {
                 projs = await getAll(KEYS.projects);
                 console.log(`Admin/Staff: Loaded ${projs.length} projects`);
@@ -343,8 +362,10 @@ export default function Projects() {
         },
     ];
 
-    // Only allow Admins and PMs to edit
-    if (!isClient) {
+    // Only allow Admins and PMs to edit (not clients or supervisors)
+    const canEdit = !isClient && !isSupervisor && hasRole(['Super Admin', 'Finance', 'Project Manager']);
+    
+    if (!isClient && !isSupervisor) {
         columns.push({
             key: 'actions', label: '', render: (_, row) => (
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -359,16 +380,18 @@ export default function Projects() {
                     >
                         <Eye size={14} />
                     </BounceButton>
-                    <BounceButton
-                        className="icon-btn edit-btn"
-                        title="Edit Project"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            openDetails(row);
-                        }}
-                    >
-                        <Pencil size={14} />
-                    </BounceButton>
+                    {canEdit && (
+                        <BounceButton
+                            className="icon-btn edit-btn"
+                            title="Edit Project"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openDetails(row);
+                            }}
+                        >
+                            <Pencil size={14} />
+                        </BounceButton>
+                    )}
                 </div>
             )
         });
@@ -379,8 +402,8 @@ export default function Projects() {
             <div className="crud-page projects-page">
                 <div className="page-header">
                     <h1>{t('projects.title')}</h1>
-                    <div className="page-header-actions">
-                        {isSuperAdminOrFinance && (
+                <div className="page-header-actions">
+                        {canEdit && (
                             <BounceButton disabled={isLoading} className="btn btn-primary" onClick={() => { handleClear(); setIsModalOpen(true); }}><Plus size={18} /> {t('projects.new_project')}</BounceButton>
                         )}
                     </div>

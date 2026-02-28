@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { CalendarRange, Plus, Clock, CheckCircle, AlertCircle, PlayCircle, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CalendarRange, Plus, Clock, CheckCircle, AlertCircle, PlayCircle, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { getProjectTasks, createProjectTask, updateProjectTask } from '../../data/db-extensions';
 import BounceButton from '../BounceButton';
 import Modal from '../Modal';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
 const ProjectTimeline = ({ projects }) => {
     const [selectedProject, setSelectedProject] = useState('');
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,6 +20,7 @@ const ProjectTimeline = ({ projects }) => {
     const [title, setTitle] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         if (projects && projects.length > 0 && !selectedProject) {
@@ -30,21 +34,22 @@ const ProjectTimeline = ({ projects }) => {
         }
     }, [selectedProject]);
 
-    const loadTasks = async () => {
+    const loadTasks = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const data = await getProjectTasks(selectedProject);
             setTasks(data || []);
-        } catch (error) {
-            console.error('Error loading tasks:', error);
+        } catch (err) {
+            console.error('Error loading tasks:', err);
+            setError('Failed to load timeline. Please try again.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedProject]);
 
     const handleOpenModal = () => {
         if (!selectedProject) {
-            alert('Please select a project first.');
             return;
         }
         setTitle('');
@@ -54,19 +59,24 @@ const ProjectTimeline = ({ projects }) => {
         nextWeek.setDate(nextWeek.getDate() + 7);
         setEndDate(nextWeek.toISOString().split('T')[0]);
 
+        setFormErrors({});
         setIsModalOpen(true);
     };
 
-    const handleSubmit = async () => {
-        if (!title.trim() || !startDate || !endDate) {
-            alert('Please fill out all task details.');
-            return;
+    const validateForm = () => {
+        const errors = {};
+        if (!title.trim()) errors.title = 'Title is required';
+        if (!startDate) errors.startDate = 'Start date is required';
+        if (!endDate) errors.endDate = 'End date is required';
+        if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+            errors.endDate = 'End date cannot be before start date';
         }
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
-        if (new Date(startDate) > new Date(endDate)) {
-            alert('End date cannot be before start date.');
-            return;
-        }
+    const handleSubmit = async () => {
+        if (!validateForm()) return;
 
         setSubmitting(true);
         try {
@@ -81,9 +91,9 @@ const ProjectTimeline = ({ projects }) => {
 
             setIsModalOpen(false);
             loadTasks();
-        } catch (error) {
-            console.error('Submit error:', error);
-            alert('Failed to create task. Please try again.');
+        } catch (err) {
+            console.error('Submit error:', err);
+            setError('Failed to create task. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -93,8 +103,8 @@ const ProjectTimeline = ({ projects }) => {
         try {
             await updateProjectTask(taskId, { status: newStatus, progress: newProgress });
             loadTasks();
-        } catch (error) {
-            alert('Failed to update task.');
+        } catch (err) {
+            setError('Failed to update task.');
         }
     };
 
@@ -140,6 +150,14 @@ const ProjectTimeline = ({ projects }) => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={loadTasks}
+                        disabled={loading}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Refresh timeline"
+                    >
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
                     {projects.length > 1 && (
                         <select
                             value={selectedProject}
@@ -163,7 +181,19 @@ const ProjectTimeline = ({ projects }) => {
 
             <div className="p-4 flex-1 flex flex-col bg-slate-50/30">
                 {loading ? (
-                    <div className="flex-1 flex items-center justify-center text-slate-400 animate-pulse text-sm">Loading timeline...</div>
+                    <div className="flex-1 flex items-center justify-center">
+                        <LoadingSpinner text="Loading timeline..." />
+                    </div>
+                ) : error ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                        <EmptyState
+                            icon="alert"
+                            title="Unable to load timeline"
+                            description={error}
+                            actionLabel="Try Again"
+                            onAction={loadTasks}
+                        />
+                    </div>
                 ) : tasks.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-70">
                         <CalendarRange size={32} className="text-slate-300 mb-3" />
@@ -261,12 +291,13 @@ const ProjectTimeline = ({ projects }) => {
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1 block">Phase/Task Title <span className="text-blue-500">*</span></label>
                         <input
                             type="text"
-                            className="w-full text-sm p-3 border border-slate-200 rounded-md outline-none focus:border-blue-400"
+                            className={`w-full text-sm p-3 border rounded-md outline-none focus:border-blue-400 ${formErrors.title ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}
                             placeholder="e.g. Foundation Pouring, Site Survey..."
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={submitting}
                         />
+                        {formErrors.title && <span className="text-xs text-rose-500 mt-1">{formErrors.title}</span>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -274,22 +305,24 @@ const ProjectTimeline = ({ projects }) => {
                             <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1 block">Start Date</label>
                             <input
                                 type="date"
-                                className="w-full text-sm p-2 bg-white border border-slate-200 rounded-md outline-none focus:border-blue-400"
+                                className={`w-full text-sm p-2 bg-white border rounded-md outline-none focus:border-blue-400 ${formErrors.startDate ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                                 disabled={submitting}
                             />
+                            {formErrors.startDate && <span className="text-xs text-rose-500 mt-1">{formErrors.startDate}</span>}
                         </div>
                         <div className="form-group mb-0">
                             <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1 block">End Date</label>
                             <input
                                 type="date"
-                                className="w-full text-sm p-2 bg-white border border-slate-200 rounded-md outline-none focus:border-blue-400"
+                                className={`w-full text-sm p-2 bg-white border rounded-md outline-none focus:border-blue-400 ${formErrors.endDate ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}
                                 value={endDate}
                                 min={startDate || undefined}
                                 onChange={(e) => setEndDate(e.target.value)}
                                 disabled={submitting}
                             />
+                            {formErrors.endDate && <span className="text-xs text-rose-500 mt-1">{formErrors.endDate}</span>}
                         </div>
                     </div>
 
@@ -307,7 +340,7 @@ const ProjectTimeline = ({ projects }) => {
                             disabled={submitting}
                         >
                             {submitting ? (
-                                <span>Adding...</span>
+                                <><LoadingSpinner size="small" color="white" /> Creating...</>
                             ) : (
                                 <><CalendarRange size={16} /> Add to Timeline</>
                             )}

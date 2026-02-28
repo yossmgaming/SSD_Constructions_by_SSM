@@ -1,0 +1,330 @@
+.ai-alerts-container {
+    position: relative;
+}
+
+.ai-alerts-trigger {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ai-alerts-trigger:hover {
+    background: var(--bg-primary);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.ai-alerts-trigger.has-alerts {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.alert-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: #dc2626;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ai-alerts-panel {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 380px;
+    max-height: 500px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alerts-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.alerts-panel-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.ai-icon {
+    font-size: 16px;
+}
+
+.refresh-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.refresh-btn .spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.alerts-list {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.alerts-loading,
+.alerts-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.alerts-empty p {
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+.alert-item {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s ease;
+}
+
+.alert-item:hover {
+    background: var(--bg-primary);
+}
+
+.alert-item:last-child {
+    border-bottom: none;
+}
+
+.alert-icon-wrapper {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.alert-icon {
+    color: var(--text-muted);
+}
+
+.alert-icon.critical {
+    color: #dc2626;
+}
+
+.alert-icon.high {
+    color: #ea580c;
+}
+
+.alert-icon.medium {
+    color: #f59e0b;
+}
+
+.alert-icon.low {
+    color: #3b82f6;
+}
+
+.alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.alert-category {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.alert-severity {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.alert-severity.critical {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.alert-severity.high {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.alert-severity.medium {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.alert-severity.low {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.alert-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+}
+
+.alert-message {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+
+.alert-recommendation {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: #f0fdf4;
+    padding: 8px;
+    border-radius: 6px;
+    margin: 0 0 8px 0;
+    border-left: 3px solid #22c55e;
+}
+
+.alert-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.alert-time {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.resolve-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.resolve-btn:hover {
+    background: #059669;
+    color: white;
+}
+
+.alerts-panel-footer {
+    padding: 10px 16px;
+    background: #f8fafc;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.powered-by {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+}
+
+/* Scrollbar styling */
+.alerts-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.alerts-list::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+.alerts-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.alerts-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}

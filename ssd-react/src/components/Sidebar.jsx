@@ -7,6 +7,7 @@ import { SmileIcon } from './icons/SmileIcon';
 import { TruckIcon } from './icons/TruckIcon';
 import { DollarSignIcon } from './icons/DollarSignIcon';
 import { CalendarCheckIcon } from './icons/CalendarCheckIcon';
+import { CalendarClockIcon } from './icons/CalendarClockIcon';
 import { ChartSplineIcon } from './icons/ChartSplineIcon';
 import { BuildingIcon } from './icons/BuildingIcon';
 import { CalculatorIcon } from './icons/CalculatorIcon';
@@ -28,15 +29,24 @@ import './Sidebar.css';
 
 const navItems = [
     { to: '/', label: 'nav.dashboard', icon: LayoutPanelTopIcon },
-    { to: '/projects', label: 'nav.projects', icon: ConstructionIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/clients', label: 'nav.clients', icon: UsersIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/workers', label: 'nav.workers', icon: SmileIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/materials', label: 'nav.materials', icon: PackageIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/subcontractors', label: 'nav.subcontractors', icon: HardHat, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
-    { to: '/payments', label: 'nav.payments', icon: DollarSignIcon, roles: ['Super Admin', 'Finance'] },
-    { to: '/attendance', label: 'nav.attendance', icon: CalendarCheckIcon, roles: ['Super Admin', 'Finance', 'Project Manager', 'Site Supervisor'] },
+];
+
+const adminNavItems = [
+    { to: '/clients', label: 'nav.clients', icon: UsersIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/workers', label: 'nav.workers', icon: SmileIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/materials', label: 'nav.materials', icon: PackageIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/suppliers', label: 'nav.suppliers', icon: TruckIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/subcontractors', label: 'nav.subcontractors', icon: HardHat, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+];
+
+const supervisorNavItems = [
+    { to: '/projects', label: 'nav.projects', icon: ConstructionIcon, roles: ['Site Supervisor'] },
+    { to: '/supervisor-attendance', label: 'nav.attendance', icon: CalendarCheckIcon, roles: ['Site Supervisor'] },
+];
+
+const reportItems = [
     { to: '/reports', label: 'nav.reports', icon: ChartSplineIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
+    { to: '/holidays', label: 'nav.holidays', icon: CalendarClockIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
 ];
 
 const financeItems = [
@@ -49,7 +59,11 @@ const toolItems = [
     { to: '/agreements', label: 'nav.agreements', icon: FileTextIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
     { to: '/advances', label: 'nav.advances', icon: ClipboardIcon, roles: ['Super Admin', 'Finance'] },
     { to: '/rates', label: 'nav.rates', icon: HandCoinsIcon, roles: ['Super Admin', 'Finance'] },
-    { to: '/personnel-command', label: 'nav.personnel_command', icon: Shield, roles: ['Super Admin', 'Finance'] }
+    { to: '/personnel-command', label: 'nav.personnel_command', icon: Shield, roles: ['Super Admin', 'Finance'] },
+];
+
+const projectLogItems = [
+    { to: '/project-logs', label: 'nav.project_logs', icon: FileTextIcon, roles: ['Super Admin', 'Finance', 'Project Manager'] },
 ];
 
 const settingsItem = { to: '/settings', label: 'nav.settings', icon: CogIcon };
@@ -112,6 +126,30 @@ export default function Sidebar({ isOpen, onClose }) {
             <nav className="sidebar-nav">
                 {navItems.map(renderLink)}
 
+                {/* Admin/PM Navigation */}
+                {(hasRole(['Super Admin', 'Finance', 'Project Manager'])) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        {adminNavItems.map(renderLink)}
+                    </>
+                )}
+
+                {/* Supervisor Navigation */}
+                {(hasRole(['Site Supervisor'])) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        {supervisorNavItems.map(renderLink)}
+                    </>
+                )}
+
+                {/* Reports & Holidays - Admin/PM only */}
+                {(hasRole(['Super Admin', 'Finance', 'Project Manager'])) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        {reportItems.map(renderLink)}
+                    </>
+                )}
+
                 {hasRole(['Super Admin', 'Finance']) && (
                     <>
                         <div className="sidebar-divider" />
@@ -120,9 +158,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     </>
                 )}
 
-                <div className="sidebar-divider" />
-                <div className="sidebar-section-label">{t('nav.tools')}</div>
-                {toolItems.map(renderLink)}
+                {hasRole(['Super Admin', 'Finance', 'Project Manager']) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        <div className="sidebar-section-label">{t('nav.tools')}</div>
+                        {toolItems.map(renderLink)}
+                    </>
+                )}
+
+                {hasRole(['Super Admin', 'Finance', 'Project Manager']) && (
+                    <>
+                        <div className="sidebar-divider" />
+                        <div className="sidebar-section-label">{t('nav.project_log')}</div>
+                        {projectLogItems.map(renderLink)}
+                    </>
+                )}
                 <div className="sidebar-section-label">{t('nav.system')}</div>
                 {systemItems.map(renderLink)}
             </nav>

@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import CountUp from '../components/CountUp';
 import { useAuth } from '../context/AuthContext';
 
+
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#94a3b8'];
 
 export default function AdminDashboard({
@@ -133,6 +134,8 @@ export default function AdminDashboard({
                     </>
                 ) : <div className="chart-empty-sm">{t('dashboard.no_projects')}</div>}
             </Card>
+
+
 
             {/* ─── Activity + Projects ─────────────────── */}
             <div className="dashboard-grid">

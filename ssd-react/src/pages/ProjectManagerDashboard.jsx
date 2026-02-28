@@ -10,6 +10,7 @@ import ProjectTimeline from '../components/role-components/ProjectTimeline';
 import ResourceAllocationView from '../components/role-components/ResourceAllocationView';
 import ChangeOrderForm from '../components/role-components/ChangeOrderForm';
 
+
 export default function ProjectManagerDashboard() {
     const { t } = useTranslation();
     const { profile, identity } = useAuth();
@@ -141,19 +142,19 @@ export default function ProjectManagerDashboard() {
                         <TrendingUp size={22} />
                     </div>
                     <div className="card-label">Total Managed Value</div>
-                    <div className="card-value" style={{ fontSize: '1.2rem' }}>{fmt(stats.budget)}</div>
+                    <div className="card-value">{fmt(stats.budget)}</div>
                     <div className="stat-sub">Portfolio scale</div>
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 mb-6">
-                <div className="lg:col-span-2">
+            <div className="dashboard-grid-full">
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
                     <ProjectTimeline projects={projects} />
-                </div>
-                <div>
                     <ResourceAllocationView projects={projects} />
                 </div>
             </div>
+
+
 
             <div className="dashboard-grid">
                 <Card title="Project Summary">

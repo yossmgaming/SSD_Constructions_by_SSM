@@ -6,6 +6,8 @@ import Sidebar from './Sidebar';
 import Iridescence from './Iridescence';
 import BounceButton from './BounceButton';
 import GlobalLoadingOverlay from './GlobalLoadingOverlay';
+import NotificationBell from './NotificationBell';
+import AIAlerts from './AIAlerts';
 import './Layout.css';
 
 const IRIDESCENCE_COLOR = [0.9, 1, 1];
@@ -29,6 +31,10 @@ export default function Layout() {
                     <Menu size={24} />
                 </BounceButton>
                 <div className="mobile-header-title">SSD Constructions</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AIAlerts />
+                    <NotificationBell size="small" />
+                </div>
             </div>
 
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

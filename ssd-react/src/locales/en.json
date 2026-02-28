@@ -8,6 +8,7 @@
         "payments": "Payments",
         "attendance": "Attendance",
         "reports": "Reports",
+        "holidays": "Holidays",
         "project_overview": "Project Overview",
         "bank_accounts": "Bank Accounts",
         "boq_generator": "BOQ Generator",
@@ -22,7 +23,11 @@
         "invite_codes": "Invitation Gatekeeper",
         "personnel_command": "Personnel Command",
         "clients": "Clients",
-        "subcontractors": "Sub-Contractors"
+        "subcontractors": "Sub-Contractors",
+        "worker_requests": "Worker Requests",
+        "material_requests": "Material Requests",
+        "project_logs": "Project Log",
+        "project_log": "Project Log"
     },
     "common": {
         "add_new": "Add New",
@@ -328,5 +333,27 @@
         "thu": "Thu",
         "fri": "Fri",
         "sat": "Sat"
+    },
+    "holidays": {
+        "title": "Holidays & Leave Management",
+        "subtitle": "MANAGE COMPANY HOLIDAYS AND WORKER LEAVE REQUESTS",
+        "tab_company": "Company Holidays",
+        "tab_requests": "Leave Requests",
+        "tab_calendar": "Calendar View",
+        "company_subtitle": "Public holidays and company closures",
+        "requests_subtitle": "Review and manage worker leave applications",
+        "calendar_subtitle": "Company holidays and leave at a glance",
+        "add_holiday": "Add Holiday",
+        "edit_holiday": "Edit Holiday",
+        "holiday_name": "Holiday Name",
+        "is_recurring": "Recurring annually",
+        "recurring": "Recurring",
+        "one_time": "One-time",
+        "no_holidays": "No holidays configured",
+        "no_holidays_desc": "Add company holidays to help workers plan their leave.",
+        "this_month": "This Month",
+        "active_projects": "Active Projects",
+        "error_loading": "Error loading data",
+        "confirm_delete": "Are you sure you want to delete this holiday?"
     }
 }

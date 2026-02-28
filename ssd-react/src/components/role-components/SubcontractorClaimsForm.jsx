@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Target, PlusCircle, CheckCircle, Clock, XCircle, FileSpreadsheet, Percent, Wallet } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Target, PlusCircle, CheckCircle, Clock, XCircle, FileSpreadsheet, Percent, Wallet, RefreshCw } from 'lucide-react';
 import { getSubcontractorClaims, submitSubcontractorClaim } from '../../data/db-extensions';
 import BounceButton from '../BounceButton';
 import Modal from '../Modal';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
-const SubcontractorClaimsForm = ({ subId, assignments }) => {
+const SubcontractorClaimsForm = ({ subId, assignments, onSuccess, onError }) => {
     const [selectedAssignment, setSelectedAssignment] = useState('');
     const [claims, setClaims] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,6 +19,7 @@ const SubcontractorClaimsForm = ({ subId, assignments }) => {
     // Form fields
     const [title, setTitle] = useState('');
     const [percentage, setPercentage] = useState('');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         if (assignments && assignments.length > 0 && !selectedAssignment) {
@@ -27,45 +31,48 @@ const SubcontractorClaimsForm = ({ subId, assignments }) => {
         if (subId) {
             loadClaims();
         }
-    }, [subId, selectedAssignment]); // reloading when either changes is fine initially 
+    }, [subId, selectedAssignment]);
 
-    const loadClaims = async () => {
+    const loadClaims = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const data = await getSubcontractorClaims(subId);
             setClaims(data || []);
-        } catch (error) {
-            console.error('Error loading claims:', error);
+        } catch (err) {
+            console.error('Error loading claims:', err);
+            setError('Failed to load claims.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [subId]);
 
     const handleOpenModal = () => {
-        if (!selectedAssignment) {
-            alert('Please select a project assignment first.');
-            return;
-        }
+        if (!selectedAssignment) return;
         setTitle('');
         setPercentage('');
+        setFormErrors({});
         setIsModalOpen(true);
+    };
+
+    const validateForm = () => {
+        const errors = {};
+        if (!title.trim()) errors.title = 'Title is required';
+        const pct = parseInt(percentage);
+        if (!percentage || isNaN(pct) || pct <= 0 || pct > 100) {
+            errors.percentage = 'Percentage must be between 1 and 100';
+        }
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
     };
 
     const handleSubmit = async () => {
         const activeAssignment = assignments.find(a => a.id === selectedAssignment);
 
-        if (!activeAssignment) {
-            alert("Assignment not found.");
-            return;
-        }
+        if (!activeAssignment) return;
+        if (!validateForm()) return;
 
         const pct = parseInt(percentage);
-
-        if (!title.trim() || !percentage || isNaN(pct) || pct <= 0 || pct > 100) {
-            alert('Please provide a valid title and a percentage between 1 and 100.');
-            return;
-        }
-
         const contractVal = activeAssignment.contractAmount || 0;
         const claimAmount = (pct / 100) * contractVal;
 
@@ -83,9 +90,11 @@ const SubcontractorClaimsForm = ({ subId, assignments }) => {
 
             setIsModalOpen(false);
             loadClaims();
-        } catch (error) {
-            console.error('Submit error:', error);
-            alert('Failed to submit claim.');
+            if (onSuccess) onSuccess('Claim submitted successfully!');
+        } catch (err) {
+            console.error('Submit error:', err);
+            setError('Failed to submit claim.');
+            if (onError) onError('Failed to submit claim');
         } finally {
             setSubmitting(false);
         }

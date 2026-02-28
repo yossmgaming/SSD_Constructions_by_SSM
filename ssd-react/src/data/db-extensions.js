@@ -21,6 +21,20 @@ export async function getUserNotifications(userId) {
     return data;
 }
 
+export async function getWorkerNotifications(workerId) {
+    const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('target_user_id', workerId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+    if (error) {
+        console.error('Error fetching worker notifications:', error);
+        return [];
+    }
+    return data || [];
+}
+
 export async function markNotificationAsRead(notificationId) {
     const { error } = await supabase
         .from('notifications')
@@ -71,13 +85,33 @@ export async function uploadDocumentMeta(documentData) {
 // 3. DAILY REPORTS (Supervisor Dashboard)
 // ----------------------------------------------------------------------------
 export async function getDailyReports(projectId) {
+    // Fetch without FK join to avoid PGRST200 errors
     const { data, error } = await supabase
         .from('daily_reports')
-        .select('*, supervisor:supervisor_id(raw_user_meta_data)')
+        .select('*')
         .eq('project_id', projectId)
         .order('report_date', { ascending: false });
     if (error) throw error;
-    return data;
+    
+    // Manually enrich with supervisor data if supervisor_id exists
+    if (data && data.length > 0) {
+        const supervisorIds = [...new Set(data.map(r => r.supervisor_id).filter(Boolean))];
+        if (supervisorIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, raw_user_meta_data')
+                .in('id', supervisorIds);
+            
+            const profileMap = {};
+            (profiles || []).forEach(p => { profileMap[p.id] = p; });
+            
+            return data.map(r => ({
+                ...r,
+                supervisor: profileMap[r.supervisor_id] || null
+            }));
+        }
+    }
+    return data || [];
 }
 
 export async function submitDailyReport(reportData) {
@@ -114,6 +148,120 @@ export async function getWorkerLeaveRequests(workerId) {
         .order('created_at', { ascending: false });
     if (error) throw error;
     return data;
+}
+
+// ----------------------------------------------------------------------------
+// 4b. LEAVE REQUESTS - Management Functions
+// ----------------------------------------------------------------------------
+export async function getAllLeaveRequests(statusFilter = null) {
+    let query = supabase
+        .from('leave_requests')
+        .select(`
+            *,
+            worker:worker_id(
+                id,
+                fullName,
+                phone,
+                pid
+            )
+        `)
+        .order('created_at', { ascending: false });
+    
+    if (statusFilter && statusFilter !== 'All') {
+        query = query.eq('status', statusFilter);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+export async function updateLeaveRequestStatus(requestId, newStatus, reviewedByUserId) {
+    const { data, error } = await supabase
+        .from('leave_requests')
+        .update({ 
+            status: newStatus, 
+            reviewed_by: reviewedByUserId,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function getWorkerLeaveCountThisMonth(workerId) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+        .from('leave_requests')
+        .select('start_date, end_date, is_half_day')
+        .eq('worker_id', workerId)
+        .eq('status', 'Approved')
+        .gte('start_date', startDate)
+        .lte('start_date', endDate);
+    
+    if (error) {
+        console.error('Error getting leave count:', error);
+        return 0;
+    }
+    
+    let totalDays = 0;
+    (data || []).forEach(req => {
+        const startStr = req.start_date ? req.start_date.split(' ')[0] : null;
+        const endStr = req.end_date ? req.end_date.split(' ')[0] : null;
+        if (!startStr || !endStr) return;
+        
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const days = req.is_half_day ? diffDays * 0.5 : diffDays;
+        totalDays += days;
+    });
+    
+    return Math.round(totalDays * 10) / 10;
+}
+
+export async function getWorkerAssignedProjects(workerId) {
+    const { data, error } = await supabase
+        .from('projectWorkers')
+        .select(`
+            id,
+            assignedFrom,
+            assignedTo,
+            role,
+            project:projectId(
+                id,
+                name,
+                status,
+                location
+            )
+        `)
+        .eq('workerId', workerId);
+    
+    if (error) {
+        console.error('getWorkerAssignedProjects error:', error);
+        return [];
+    }
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    const activeAssignments = (data || []).filter(pw => {
+        const from = pw.assignedFrom || '1900-01-01';
+        const to = pw.assignedTo || '9999-12-31';
+        // Check if assignment is currently active (date-wise)
+        const isDateActive = from <= today && to >= today;
+        return isDateActive;
+    });
+    
+    return activeAssignments;
 }
 
 // ----------------------------------------------------------------------------
@@ -177,13 +325,33 @@ export async function submitIncident(incidentData) {
 }
 
 export async function getProjectIncidents(projectId) {
+    // Fetch without FK join to avoid PGRST200 errors
     const { data, error } = await supabase
         .from('incidents')
-        .select('*, reporter:reporter_id(raw_user_meta_data)')
+        .select('*')
         .eq('project_id', projectId)
         .order('date', { ascending: false });
     if (error) throw error;
-    return data;
+    
+    // Manually enrich with reporter data if reporter_id exists
+    if (data && data.length > 0) {
+        const reporterIds = [...new Set(data.map(r => r.reporter_id).filter(Boolean))];
+        if (reporterIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, raw_user_meta_data')
+                .in('id', reporterIds);
+            
+            const profileMap = {};
+            (profiles || []).forEach(p => { profileMap[p.id] = p; });
+            
+            return data.map(r => ({
+                ...r,
+                reporter: profileMap[r.reporter_id] || null
+            }));
+        }
+    }
+    return data || [];
 }
 
 // ----------------------------------------------------------------------------
@@ -273,6 +441,68 @@ export async function submitSubcontractorClaim(claimData) {
         .insert(claimData)
         .select()
         .single();
+    if (error) throw error;
+    return data;
+}
+
+// ----------------------------------------------------------------------------
+// 11. COMPANY HOLIDAYS
+// ----------------------------------------------------------------------------
+export async function getCompanyHolidays(year = null) {
+    const targetYear = year || new Date().getFullYear();
+    const { data, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .or(`date.eq.${targetYear}-01-01,date.gte.${targetYear}-01-01,date.lte.${targetYear}-12-31,is_recurring.eq.true`)
+        .order('date', { ascending: true });
+    if (error) throw error;
+    return data;
+}
+
+export async function addCompanyHoliday(holidayData) {
+    const { data, error } = await supabase
+        .from('holidays')
+        .insert(holidayData)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function updateCompanyHoliday(holidayId, updates) {
+    const { data, error } = await supabase
+        .from('holidays')
+        .update(updates)
+        .eq('id', holidayId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function deleteCompanyHoliday(holidayId) {
+    const { error } = await supabase
+        .from('holidays')
+        .delete()
+        .eq('id', holidayId);
+    if (error) throw error;
+}
+
+export async function checkHolidayOverlap(startDate, endDate) {
+    const { data, error } = await supabase
+        .from('holidays')
+        .select('name, date')
+        .or(`and(date.gte.${startDate},date.lte.${endDate}),and(date.eq.${startDate},is_recurring.eq.true),and(date.eq.${endDate},is_recurring.eq.true)`);
+    if (error) throw error;
+    return data;
+}
+
+export async function getHolidaysInRange(startDate, endDate) {
+    const { data, error } = await supabase
+        .from('holidays')
+        .select('name, date, is_recurring')
+        .or(`and(date.gte.${startDate},date.lte.${endDate}),is_recurring.eq.true`)
+        .order('date', { ascending: true });
     if (error) throw error;
     return data;
 }

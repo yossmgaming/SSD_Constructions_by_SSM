@@ -112,12 +112,12 @@ export default function SubContractorDashboard() {
                         <DollarSign size={22} />
                     </div>
                     <div className="card-label">Total Payments Received</div>
-                    <div className="card-value" style={{ fontSize: '1.1rem' }}>{fmt(totalPaid)}</div>
+                    <div className="card-value">{fmt(totalPaid)}</div>
                     <div className="stat-sub">From SSD accounts</div>
                 </Card>
             </div>
 
-            <div className="mt-6 mb-6">
+            <div className="dashboard-grid-full">
                 <SubcontractorClaimsForm subId={contractorId} assignments={projects.map(p => ({
                     id: p.id,
                     projectId: p.projectId,

@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { PencilRuler, Plus, CheckCircle, Clock, XCircle, FileText, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { PencilRuler, Plus, CheckCircle, Clock, XCircle, FileText, ChevronRight, RefreshCw } from 'lucide-react';
 import { getChangeOrders, createChangeOrder, updateChangeOrder } from '../../data/db-extensions';
 import BounceButton from '../BounceButton';
 import Modal from '../Modal';
+import EmptyState from '../EmptyState';
+import LoadingSpinner from '../LoadingSpinner';
 
-const ChangeOrderForm = ({ projects }) => {
+const ChangeOrderForm = ({ projects, onSuccess, onError }) => {
     const [selectedProject, setSelectedProject] = useState('');
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,6 +21,7 @@ const ChangeOrderForm = ({ projects }) => {
     const [description, setDescription] = useState('');
     const [costImpact, setCostImpact] = useState('');
     const [timeImpact, setTimeImpact] = useState('');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         if (projects && projects.length > 0 && !selectedProject) {
@@ -31,35 +35,40 @@ const ChangeOrderForm = ({ projects }) => {
         }
     }, [selectedProject]);
 
-    const loadOrders = async () => {
+    const loadOrders = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const data = await getChangeOrders(selectedProject);
             setOrders(data || []);
-        } catch (error) {
-            console.error('Error loading change orders:', error);
+        } catch (err) {
+            console.error('Error loading change orders:', err);
+            setError('Failed to load change orders.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedProject]);
 
     const handleOpenModal = () => {
-        if (!selectedProject) {
-            alert('Please select a project first.');
-            return;
-        }
+        if (!selectedProject) return;
         setTitle('');
         setDescription('');
         setCostImpact('');
         setTimeImpact('');
+        setFormErrors({});
         setIsModalOpen(true);
     };
 
+    const validateForm = () => {
+        const errors = {};
+        if (!title.trim()) errors.title = 'Title is required';
+        if (!description.trim()) errors.description = 'Description is required';
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async () => {
-        if (!title.trim() || !description.trim()) {
-            alert('Please provide a title and description.');
-            return;
-        }
+        if (!validateForm()) return;
 
         setSubmitting(true);
         try {
@@ -74,9 +83,11 @@ const ChangeOrderForm = ({ projects }) => {
 
             setIsModalOpen(false);
             loadOrders();
-        } catch (error) {
-            console.error('Submit error:', error);
-            alert('Failed to log change order.');
+            if (onSuccess) onSuccess('Change order logged successfully!');
+        } catch (err) {
+            console.error('Submit error:', err);
+            setError('Failed to log change order.');
+            if (onError) onError('Failed to log change order');
         } finally {
             setSubmitting(false);
         }
