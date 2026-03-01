@@ -14,7 +14,7 @@ namespace MainFunctions.Views
 {
     public partial class PaymentsView : UserControl
     {
-        private AppDbContext? _db;
+        private readonly AppDbContext _db = new AppDbContext();
         private ObligationHeader? _selectedHeader;
         private const int PageSize = 500;
 
@@ -77,26 +77,26 @@ namespace MainFunctions.Views
             SetManualControlsEnabled(enabled);
         }
 
+        // Make the Loaded handler async so we can await the DbPatcher tasks and avoid CS4014
         private async void PaymentsView_Loaded(object sender, RoutedEventArgs e)
         {
-            _db = await new DbContextFactory().CreateDbContextAsync();
             try { await DbPatcher.EnsureWorkerSchema(_db); } catch { }
             try { await DbPatcher.EnsureObligationSchema(_db); } catch { }
 
-            await LoadProjectsIntoSelector();
+            LoadProjectsIntoSelector();
 
             // Populate project picker for header creation
-            var projects = await _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToListAsync();
+            var projects = _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToList();
             PaymentProjectCombo.ItemsSource = projects;
             PaymentProjectCombo.DisplayMemberPath = "Name";
             PaymentProjectCombo.SelectedValuePath = "Id";
 
             // Default payment type to first item to load entities
             if (PaymentType.SelectedIndex < 0) PaymentType.SelectedIndex = 0;
-            await LoadEntitiesForPaymentType();
+            LoadEntitiesForPaymentType();
 
             MonthPicker.SelectedDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-            await LoadHeaders();
+            LoadHeaders();
 
             if (TypeFilter.Items.Count == 0)
             {
@@ -121,15 +121,15 @@ namespace MainFunctions.Views
             PaymentProjectCombo.IsEnabled = true;
         }
 
-        private async Task LoadProjectsIntoSelector()
+        private void LoadProjectsIntoSelector()
         {
-            var projects = await _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToListAsync();
+            var projects = _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToList();
             ProjectSelector.ItemsSource = projects;
             ProjectSelector.DisplayMemberPath = "Name";
             ProjectSelector.SelectedValuePath = "Id";
         }
 
-        private async Task LoadEntitiesForPaymentType()
+        private void LoadEntitiesForPaymentType()
         {
             var type = (PaymentType.SelectedItem as ComboBoxItem)?.Content as string;
             if (string.IsNullOrEmpty(type))
@@ -148,7 +148,7 @@ namespace MainFunctions.Views
             {
                 case "WorkerPayroll":
                 {
-                    var workers = await _db.Workers.AsNoTracking().OrderBy(w => w.FullName).Select(w => new { w.Id, w.FullName }).ToListAsync();
+                    var workers = _db.Workers.AsNoTracking().OrderBy(w => w.FullName).Select(w => new { w.Id, w.FullName }).ToList();
                     PaymentEntityCombo.ItemsSource = workers;
                     PaymentEntityCombo.DisplayMemberPath = "FullName";
                     PaymentEntityCombo.SelectedValuePath = "Id";
@@ -156,7 +156,7 @@ namespace MainFunctions.Views
                 }
                 case "MaterialPurchase":
                 {
-                    var materials = await _db.Materials.AsNoTracking().OrderBy(m => m.Name).Select(m => new { m.Id, m.Name }).ToListAsync();
+                    var materials = _db.Materials.AsNoTracking().OrderBy(m => m.Name).Select(m => new { m.Id, m.Name }).ToList();
                     PaymentEntityCombo.ItemsSource = materials;
                     PaymentEntityCombo.DisplayMemberPath = "Name";
                     PaymentEntityCombo.SelectedValuePath = "Id";
@@ -164,7 +164,7 @@ namespace MainFunctions.Views
                 }
                 case "ProjectExpense":
                 {
-                    var projects = await _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToListAsync();
+                    var projects = _db.Projects.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Id, p.Name }).ToList();
                     PaymentEntityCombo.ItemsSource = projects;
                     PaymentEntityCombo.DisplayMemberPath = "Name";
                     PaymentEntityCombo.SelectedValuePath = "Id";
@@ -175,7 +175,7 @@ namespace MainFunctions.Views
                     // For client invoices, the true entity is the project/client combo. Drive via project selection.
                     PaymentEntityCombo.ItemsSource = null;
                     PaymentEntityCombo.IsEnabled = false;
-                    await UpdateClientFromProject();
+                    UpdateClientFromProject();
                     break;
                 }
                 default:
@@ -193,26 +193,26 @@ namespace MainFunctions.Views
             return -1;
         }
 
-        private async void PaymentType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void PaymentType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // Clear any selected header (we're composing a new header)
             HeadersGrid.SelectedItem = null;
             _selectedHeader = null;
             PaymentEntityCombo.IsEnabled = true;
             PaymentProjectCombo.IsEnabled = true;
-            await LoadEntitiesForPaymentType();
-            await LoadHeaders();
+            LoadEntitiesForPaymentType();
+            LoadHeaders();
         }
 
-        private async void PaymentProjectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void PaymentProjectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (((PaymentType.SelectedItem as ComboBoxItem)?.Content as string) == "ClientInvoice")
             {
-                await UpdateClientFromProject();
+                UpdateClientFromProject();
             }
         }
 
-        private async Task UpdateClientFromProject()
+        private void UpdateClientFromProject()
         {
             var pid = PaymentProjectCombo.SelectedValue as int?;
             if (!pid.HasValue)
@@ -220,17 +220,17 @@ namespace MainFunctions.Views
                 PaymentEntityCombo.ItemsSource = null;
                 return;
             }
-            var proj = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid.Value);
+            var proj = _db.Projects.AsNoTracking().FirstOrDefault(p => p.Id == pid.Value);
             var name = proj?.Client ?? string.Empty;
             PaymentEntityCombo.ItemsSource = new[] { name };
         }
 
-        private async void Filters_Changed(object? sender, EventArgs e)
+        private void Filters_Changed(object? sender, EventArgs e)
         {
-            await LoadHeaders();
+            LoadHeaders();
         }
 
-        private async Task LoadHeaders()
+        private void LoadHeaders()
         {
             try
             {
@@ -240,7 +240,7 @@ namespace MainFunctions.Views
                 var typeFilter = (TypeFilter.SelectedItem as ComboBoxItem)?.Content as string;
                 var search = SearchBox.Text?.Trim();
 
-                var projected = await FinancialProjections.LoadObligations(_db, from, to, typeFilter, statusFilter, search, PageSize);
+                var projected = FinancialProjections.LoadObligations(_db, from, to, typeFilter, statusFilter, search, PageSize).GetAwaiter().GetResult();
 
                 HeadersGrid.ItemsSource = projected;
 
@@ -264,7 +264,7 @@ namespace MainFunctions.Views
             }
         }
 
-        private async void HeadersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void HeadersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selected = HeadersGrid.SelectedItem;
             if (selected == null)
@@ -279,7 +279,7 @@ namespace MainFunctions.Views
             var idProp = selected.GetType().GetProperty("Id");
             if (idProp == null)
             {
-                MessageBox.Show("Selected item does not contain an 'Id' property.", "Payments", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Diagnostics.Trace.WriteLine("Selected item does not contain an 'Id' property.");
                 _selectedHeader = null;
                 ClearDetailPanel();
                 HeaderSettlementsGrid.ItemsSource = null;
@@ -289,18 +289,18 @@ namespace MainFunctions.Views
             var idVal = idProp.GetValue(selected);
             if (idVal == null || !int.TryParse(idVal.ToString(), out var id))
             {
-                MessageBox.Show("Unable to determine selected obligation Id.", "Payments", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Diagnostics.Trace.WriteLine("Unable to determine selected obligation Id.");
                 _selectedHeader = null;
                 ClearDetailPanel();
                 HeaderSettlementsGrid.ItemsSource = null;
                 return;
             }
 
-            _selectedHeader = await _db.ObligationHeaders
+            _selectedHeader = _db.ObligationHeaders
                 .Include(h => h.Lines)
                 .Include(h => h.Settlements)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(h => h.Id == id);
+                .FirstOrDefault(h => h.Id == id);
 
             if (_selectedHeader == null) return;
 
@@ -309,11 +309,11 @@ namespace MainFunctions.Views
             if (typeIdx >= 0) PaymentType.SelectedIndex = typeIdx;
 
             // Load entity list for that type, then select the entity value; disable editing
-            await LoadEntitiesForPaymentType();
+            LoadEntitiesForPaymentType();
             PaymentProjectCombo.SelectedValue = _selectedHeader.ProjectId;
             if (_selectedHeader.Type == "ClientInvoice")
             {
-                await UpdateClientFromProject();
+                UpdateClientFromProject();
             }
             else
             {
@@ -326,14 +326,16 @@ namespace MainFunctions.Views
             PeriodEndPicker.SelectedDate = _selectedHeader.PeriodEnd;
 
             var total = _selectedHeader.Lines.Sum(l => l.Amount);
-            var applied = (await _db.CashSettlements.AsNoTracking()
+            var applied = _db.CashSettlements.AsNoTracking()
                             .Where(s => s.ObligationHeaderId == _selectedHeader.Id && !s.IsReversal)
                             .Select(s => s.Amount)
-                            .ToListAsync()).Sum()
-                        + (await _db.AdvanceApplications.AsNoTracking()
+                            .AsEnumerable()
+                            .Sum()
+                        + _db.AdvanceApplications.AsNoTracking()
                             .Where(a => a.ObligationHeaderId == _selectedHeader.Id)
                             .Select(a => a.AppliedAmount)
-                            .ToListAsync()).Sum();
+                            .AsEnumerable()
+                            .Sum();
             var balance = total - applied;
             PaymentTotal.Text = total.ToString("N2", CultureInfo.InvariantCulture);
             PaymentPaid.Text = applied.ToString("N2", CultureInfo.InvariantCulture);
@@ -355,10 +357,10 @@ namespace MainFunctions.Views
             SettlementMethod.IsEnabled = !isLocked;
 
             // Load settlements for header
-            var settlements = await _db.CashSettlements.AsNoTracking()
+            var settlements = _db.CashSettlements.AsNoTracking()
                 .Where(s => s.ObligationHeaderId == _selectedHeader.Id)
                 .OrderBy(s => s.Date)
-                .ToListAsync();
+                .ToList();
             HeaderSettlementsGrid.ItemsSource = settlements;
         }
 
@@ -385,12 +387,12 @@ namespace MainFunctions.Views
             HeaderSettlementsGrid.ItemsSource = null;
         }
 
-        private async void Refresh_Click(object sender, RoutedEventArgs e)
+        private void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            await LoadHeaders();
+            LoadHeaders();
         }
 
-        private async void GeneratePayrollButton_Click(object sender, RoutedEventArgs e)
+        private void GeneratePayrollButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -404,24 +406,24 @@ namespace MainFunctions.Views
                 var periodStart = new DateTime(anyDateInMonth.Year, anyDateInMonth.Month, 1);
                 var periodEnd = periodStart.AddMonths(1).AddDays(-1);
 
-                var assignedWorkers = await _db.ProjectWorkers.AsNoTracking()
+                var assignedWorkers = _db.ProjectWorkers.AsNoTracking()
                     .Where(pw => pw.ProjectId == projectId && (pw.AssignedFrom == null || pw.AssignedFrom <= periodEnd) && (pw.AssignedTo == null || pw.AssignedTo >= periodStart))
                     .Select(pw => pw.WorkerId)
                     .Distinct()
-                    .ToListAsync();
+                    .ToList();
 
                 foreach (var workerId in assignedWorkers)
                 {
-                    var exists = await _db.ObligationHeaders.AsNoTracking().AnyAsync(h => h.Type == "WorkerPayroll" && h.EntityId == workerId && h.ProjectId == projectId && h.PeriodStart == periodStart && h.PeriodEnd == periodEnd);
+                    var exists = _db.ObligationHeaders.AsNoTracking().Any(h => h.Type == "WorkerPayroll" && h.EntityId == workerId && h.ProjectId == projectId && h.PeriodStart == periodStart && h.PeriodEnd == periodEnd);
                     if (exists) continue;
 
-                    var worker = await _db.Workers.AsNoTracking().FirstAsync(w => w.Id == workerId);
+                    var worker = _db.Workers.AsNoTracking().First(w => w.Id == workerId);
                     var hourlyRate = PayrollCalculator.GetHourlyRate(worker.DailyRate);
 
-                    var attendances = await _db.Attendances.AsNoTracking()
+                    var attendances = _db.Attendances.AsNoTracking()
                         .Where(a => a.WorkerId == workerId && a.ProjectId == projectId && a.Date.Date >= periodStart && a.Date.Date <= periodEnd)
                         .OrderBy(a => a.Date)
-                        .ToListAsync();
+                        .ToList();
 
                     var header = new ObligationHeader
                     {
@@ -458,8 +460,8 @@ namespace MainFunctions.Views
                     _db.ObligationHeaders.Add(header);
                 }
 
-                await _db.SaveChangesAsync();
-                await LoadHeaders();
+                _db.SaveChanges();
+                LoadHeaders();
                 MessageBox.Show("Payroll generated.", "Payments", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -468,7 +470,7 @@ namespace MainFunctions.Views
             }
         }
 
-        private async void CreateHeaderButton_Click(object sender, RoutedEventArgs e)
+        private void CreateHeaderButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -514,13 +516,13 @@ namespace MainFunctions.Views
                 bool exists;
                 if (type == "ClientInvoice")
                 {
-                    exists = await _db.ObligationHeaders.AsNoTracking()
-                        .AnyAsync(h => h.Type == type && h.ProjectId == projectId && h.PeriodStart == periodStart.Date && h.PeriodEnd == periodEnd.Date);
+                    exists = _db.ObligationHeaders.AsNoTracking()
+                        .Any(h => h.Type == type && h.ProjectId == projectId && h.PeriodStart == periodStart.Date && h.PeriodEnd == periodEnd.Date);
                 }
                 else
                 {
-                    exists = await _db.ObligationHeaders.AsNoTracking()
-                        .AnyAsync(h => h.Type == type && h.EntityId == (entityId ?? null) && h.ProjectId == projectId && h.PeriodStart == periodStart.Date && h.PeriodEnd == periodEnd.Date);
+                    exists = _db.ObligationHeaders.AsNoTracking()
+                        .Any(h => h.Type == type && h.EntityId == (entityId ?? null) && h.ProjectId == projectId && h.PeriodStart == periodStart.Date && h.PeriodEnd == periodEnd.Date);
                 }
                 if (exists)
                 {
@@ -562,12 +564,12 @@ namespace MainFunctions.Views
                 header.IsLocked = header.Status == ObligationStatus.Paid;
 
                 _db.ObligationHeaders.Add(header);
-                await _db.SaveChangesAsync();
+                _db.SaveChanges();
 
                 PaymentEntityCombo.IsEnabled = false;
                 PaymentProjectCombo.IsEnabled = false;
 
-                await LoadHeaders();
+                LoadHeaders();
                 MessageBox.Show("Obligation created.", "Payments", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (DbUpdateException ex)
@@ -589,7 +591,7 @@ namespace MainFunctions.Views
             }
         }
 
-        private async void AddSettlementButton_Click(object sender, RoutedEventArgs e)
+        private void AddSettlementButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -600,14 +602,16 @@ namespace MainFunctions.Views
                 }
 
                 var total = _selectedHeader.Lines.Sum(l => l.Amount);
-                var applied = (await _db.CashSettlements.AsNoTracking()
+                var applied = _db.CashSettlements.AsNoTracking()
                                 .Where(s => s.ObligationHeaderId == _selectedHeader.Id && !s.IsReversal)
                                 .Select(s => s.Amount)
-                                .ToListAsync()).Sum()
-                            + (await _db.AdvanceApplications.AsNoTracking()
+                                .AsEnumerable()
+                                .Sum()
+                            + _db.AdvanceApplications.AsNoTracking()
                                 .Where(a => a.ObligationHeaderId == _selectedHeader.Id)
                                 .Select(a => a.AppliedAmount)
-                                .ToListAsync()).Sum();
+                                .AsEnumerable()
+                                .Sum();
                 var balance = total - applied;
 
                 if (_selectedHeader.Status == ObligationStatus.Paid || balance <= 0m)
@@ -624,7 +628,7 @@ namespace MainFunctions.Views
                 }
                 var method = (SettlementMethod.SelectedItem as ComboBoxItem)?.Content as string ?? "Cash";
 
-                await using var tx = await _db.Database.BeginTransactionAsync();
+                using var tx = _db.Database.BeginTransaction();
 
                 var toApply = amount <= balance ? amount : balance;
                 if (toApply > 0m)
@@ -660,27 +664,29 @@ namespace MainFunctions.Views
                     _db.CashSettlements.Add(advance);
                 }
 
-                await _db.SaveChangesAsync();
+                _db.SaveChanges();
 
                 // Recompute header status
-                var newApplied = (await _db.CashSettlements.AsNoTracking()
+                var newApplied = _db.CashSettlements.AsNoTracking()
                                    .Where(s => s.ObligationHeaderId == _selectedHeader.Id && !s.IsReversal)
                                    .Select(s => s.Amount)
-                                   .ToListAsync()).Sum()
-                               + (await _db.AdvanceApplications.AsNoTracking()
+                                   .AsEnumerable()
+                                   .Sum()
+                               + _db.AdvanceApplications.AsNoTracking()
                                    .Where(a => a.ObligationHeaderId == _selectedHeader.Id)
                                    .Select(a => a.AppliedAmount)
-                                   .ToListAsync()).Sum();
+                                   .AsEnumerable()
+                                   .Sum();
                 var newStatus = ObligationHeader.ComputeStatus(DateTime.Today, _selectedHeader.DueDate, total, newApplied);
-                var tracked = await _db.ObligationHeaders.FirstAsync(h => h.Id == _selectedHeader.Id);
+                var tracked = _db.ObligationHeaders.First(h => h.Id == _selectedHeader.Id);
                 tracked.Status = newStatus;
                 tracked.IsLocked = newStatus == ObligationStatus.Paid;
                 tracked.TotalAmountSnapshot = total;
-                await _db.SaveChangesAsync();
+                _db.SaveChanges();
 
-                await tx.CommitAsync();
+                tx.Commit();
 
-                await LoadHeaders();
+                LoadHeaders();
                 HeadersGrid.SelectedItem = null;
                 ClearDetailPanel();
             }
@@ -694,7 +700,7 @@ namespace MainFunctions.Views
             }
         }
 
-        private async void ReverseSettlementButton_Click(object sender, RoutedEventArgs e)
+        private void ReverseSettlementButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -715,14 +721,14 @@ namespace MainFunctions.Views
                     return;
                 }
                 // Guard against double reversal
-                var alreadyReversed = await _db.CashSettlements.AsNoTracking().AnyAsync(s => s.ReversesSettlementId == selected.Id);
+                var alreadyReversed = _db.CashSettlements.AsNoTracking().Any(s => s.ReversesSettlementId == selected.Id);
                 if (alreadyReversed)
                 {
                     MessageBox.Show("Settlement already reversed.");
                     return;
                 }
 
-                await using var tx = await _db.Database.BeginTransactionAsync();
+                using var tx = _db.Database.BeginTransaction();
 
                 var reversal = new CashSettlement
                 {
@@ -740,30 +746,31 @@ namespace MainFunctions.Views
                     ReversesSettlementId = selected.Id
                 };
                 _db.CashSettlements.Add(reversal);
-                await _db.SaveChangesAsync();
+                _db.SaveChanges();
 
                 // Recompute header status
                 var total = _selectedHeader.Lines.Sum(l => l.Amount);
-                var applied = (await _db.CashSettlements.AsNoTracking()
+                var applied = _db.CashSettlements.AsNoTracking()
                                 .Where(s => s.ObligationHeaderId == _selectedHeader.Id && !s.IsReversal)
                                 .Select(s => s.Amount)
-                                .ToListAsync()).Sum()
-                            + (await _db.AdvanceApplications.AsNoTracking()
+                                .AsEnumerable()
+                                .Sum()
+                            + _db.AdvanceApplications.AsNoTracking()
                                 .Where(a => a.ObligationHeaderId == _selectedHeader.Id)
                                 .Select(a => a.AppliedAmount)
-                                .ToListAsync()).Sum();
+                                .AsEnumerable()
+                                .Sum();
                 var newStatus = ObligationHeader.ComputeStatus(DateTime.Today, _selectedHeader.DueDate, total, applied);
-                var tracked = await _db.ObligationHeaders.FirstAsync(h => h.Id == _selectedHeader.Id);
+                var tracked = _db.ObligationHeaders.First(h => h.Id == _selectedHeader.Id);
                 tracked.Status = newStatus;
                 tracked.IsLocked = newStatus == ObligationStatus.Paid;
                 tracked.TotalAmountSnapshot = total;
-                await _db.SaveChangesAsync();
+                _db.SaveChanges();
 
-                await tx.CommitAsync();
+                tx.Commit();
 
                 // Refresh detail grid and headers
-                // HeadersGrid_SelectionChanged(null!, null!); // No longer needed, LoadHeaders() refreshes
-                await LoadHeaders();
+                LoadHeaders();
             }
             catch (Exception ex)
             {

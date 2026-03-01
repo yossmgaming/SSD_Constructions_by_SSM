@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace MainFunctions.Models
 {
@@ -20,5 +21,13 @@ namespace MainFunctions.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsReversal { get; set; }
         public int? ReversesSettlementId { get; set; }
+
+        // Audit
+        public int? ModifiedByUserId { get; set; }
+        public DateTime? ModifiedAt { get; set; }
+
+        // Concurrency token
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
     }
 }

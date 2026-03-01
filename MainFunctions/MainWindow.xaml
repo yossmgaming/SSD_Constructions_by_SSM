@@ -56,6 +56,7 @@
                                Foreground="#BBBBBB"
                                FontSize="12"
                                />
+                    <Button Content="View DB Logs" Margin="0,8,0,0" Click="ViewDbLogs_Click" Style="{StaticResource NavButton}" />
                 </StackPanel>
             </Grid>
         </Border>

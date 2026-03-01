@@ -597,3 +597,25 @@
 .risk-item:hover {
     transform: translateX(2px);
 }
+
+/* Language Badge */
+.language-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.language-badge.en {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.language-badge.sl {
+    background: #fff7ed;
+    color: #c2410c;
+}

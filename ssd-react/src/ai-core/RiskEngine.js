@@ -63,11 +63,9 @@ class RiskEngine {
       projectType: 'standard'
     };
 
-    const customThresholds = context?.projectType 
+    const activeThresholds = context?.projectType 
       ? this.projectTypeThresholds[context.projectType] 
-      : null;
-
-    const activeThresholds = customThresholds || this.thresholds;
+      : this.thresholds;
 
     // Fetch active alerts with age tracking
     const { data: alerts } = await supabase
@@ -143,12 +141,11 @@ class RiskEngine {
       (scores.attendanceGap * this.weights.attendanceGap);
 
     // Determine level using dynamic thresholds
-    const riskThresholds = context?.customThresholds || this.thresholds;
-    if (scores.totalScore >= riskThresholds.critical) {
+    if (scores.totalScore >= activeThresholds.critical) {
       scores.level = 'critical';
-    } else if (scores.totalScore >= riskThresholds.high) {
+    } else if (scores.totalScore >= activeThresholds.high) {
       scores.level = 'high';
-    } else if (scores.totalScore >= riskThresholds.medium) {
+    } else if (scores.totalScore >= activeThresholds.medium) {
       scores.level = 'medium';
     } else {
       scores.level = 'low';

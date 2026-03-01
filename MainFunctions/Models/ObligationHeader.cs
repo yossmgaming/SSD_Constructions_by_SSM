@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel.DataAnnotations;
 
 namespace MainFunctions.Models
 {
@@ -21,10 +22,18 @@ namespace MainFunctions.Models
         public string Notes { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // Audit
+        public int? ModifiedByUserId { get; set; }
+        public DateTime? ModifiedAt { get; set; }
+
         public List<ObligationLine> Lines { get; set; } = new();
 
         // Settlements directly linked to this obligation (does not include advances)
         public List<CashSettlement> Settlements { get; set; } = new();
+
+        // Concurrency token
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
 
         public decimal GetTotalLines() => Lines?.Sum(l => l.Amount) ?? 0m;
 

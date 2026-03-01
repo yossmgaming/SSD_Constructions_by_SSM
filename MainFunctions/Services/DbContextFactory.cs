@@ -1,6 +1,7 @@
 using MainFunctions.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using System;
 
 namespace MainFunctions.Services
 {
@@ -10,21 +11,30 @@ namespace MainFunctions.Services
         /// Creates a new AppDbContext, automatically selecting the online or offline database
         /// based on connectivity.
         /// </summary>
-        public async Task<AppDbContext> CreateDbContextAsync()
+        public virtual async Task<AppDbContext> CreateDbContextAsync()
         {
             var isOnline = await ConnectivityService.IsConnectedAsync();
-            
+
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
             if (isOnline)
             {
                 var connectionString = ConfigurationService.GetOnlineConnectionString();
-                optionsBuilder.UseNpgsql(connectionString);
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                    optionsBuilder.UseNpgsql(connectionString);
+                }
+                else
+                {
+                    // Online detected but no connection string configured - fallback to offline DB
+                    var offlineConn = ConfigurationService.GetOfflineConnectionString();
+                    optionsBuilder.UseSqlite(string.IsNullOrWhiteSpace(offlineConn) ? "Data Source=app.db" : offlineConn);
+                }
             }
             else
             {
                 var connectionString = ConfigurationService.GetOfflineConnectionString();
-                optionsBuilder.UseSqlite(connectionString);
+                optionsBuilder.UseSqlite(string.IsNullOrWhiteSpace(connectionString) ? "Data Source=app.db" : connectionString);
             }
 
             return new AppDbContext(optionsBuilder.Options);
@@ -34,11 +44,11 @@ namespace MainFunctions.Services
         /// Creates a new AppDbContext specifically for the OFFLINE database.
         /// This is used for startup migrations.
         /// </summary>
-        public AppDbContext CreateOfflineDbContext()
+        public virtual AppDbContext CreateOfflineDbContext()
         {
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             var connectionString = ConfigurationService.GetOfflineConnectionString();
-            optionsBuilder.UseSqlite(connectionString);
+            optionsBuilder.UseSqlite(string.IsNullOrWhiteSpace(connectionString) ? "Data Source=app.db" : connectionString);
             return new AppDbContext(optionsBuilder.Options);
         }
     }

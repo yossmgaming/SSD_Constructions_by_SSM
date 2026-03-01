@@ -7,12 +7,14 @@ using MainFunctions.Data;
 using MainFunctions.Models;
 using System.Collections.Generic;
 using MainFunctions.Services;
+using Microsoft.Extensions.Logging;
 
 namespace MainFunctions.Views
 {
     public partial class AdvancesView : UserControl
     {
         private AppDbContext? _db;
+        private IAdvanceApplicationService? _advanceService;
 
         public AdvancesView()
         {
@@ -25,6 +27,16 @@ namespace MainFunctions.Views
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
             _db = await new DbContextFactory().CreateDbContextAsync();
+
+            // Create a simple logger for the advance service using the app file logger provider
+            var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddProvider(new FileLoggerProvider("logs/app.log"));
+                builder.SetMinimumLevel(LogLevel.Information);
+            });
+
+            _advanceService = new AdvanceApplicationService(new DbContextFactory(), loggerFactory.CreateLogger<AdvanceApplicationService>());
+
             await LoadAdvances();
         }
 
@@ -94,7 +106,13 @@ namespace MainFunctions.Views
                 return;
             }
 
-            var dialog = new ApplyAdvanceDialog(_db, row.Id, row.Remaining);
+            if (_advanceService == null)
+            {
+                MessageBox.Show("Advance service not available.");
+                return;
+            }
+
+            var dialog = new ApplyAdvanceDialog(_db!, _advanceService, row.Id, row.Remaining);
             dialog.Owner = Window.GetWindow(this);
             if (dialog.ShowDialog() == true)
             {

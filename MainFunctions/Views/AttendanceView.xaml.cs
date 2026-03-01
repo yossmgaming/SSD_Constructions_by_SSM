@@ -152,6 +152,11 @@ namespace MainFunctions.Views
 
         private async Task LoadProjects()
         {
+            if (_db == null)
+            {
+                _db = await new DbContextFactory().CreateDbContextAsync();
+            }
+
             var list = await _db.Projects.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
             ProjectFilter.Items.Clear();
             ProjectFilter.Items.Add(new ComboBoxItem { Content = "All Projects", Tag = 0 });
@@ -164,6 +169,11 @@ namespace MainFunctions.Views
 
         private async Task LoadWorkers(string term)
         {
+            if (_db == null)
+            {
+                _db = await new DbContextFactory().CreateDbContextAsync();
+            }
+
             var q = _db.Workers.AsNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(term))
             {
@@ -414,6 +424,11 @@ namespace MainFunctions.Views
 
         private async Task LoadAttendanceForSelectedWorker()
         {
+            if (_db == null)
+            {
+                _db = await new DbContextFactory().CreateDbContextAsync();
+            }
+
             if (_selectedWorker == null)
             {
                 _currentMonthAttendance.Clear();

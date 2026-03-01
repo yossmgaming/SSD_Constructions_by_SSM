@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MainFunctions.Models;
+using MainFunctions.Services;
+using System.Data.Common;
+using System.Data;
 
 namespace MainFunctions.Data
 {
@@ -25,6 +28,13 @@ namespace MainFunctions.Data
         public DbSet<AdvanceApplication> AdvanceApplications { get; set; }
         public DbSet<Supplier> Suppliers { get; set; }
 
+        // Parameterless constructor for existing callers
+        public AppDbContext()
+            : this(new DbContextOptionsBuilder<AppDbContext>()
+                  .UseSqlite(ConfigurationService.GetOfflineConnectionString() ?? "Data Source=app.db")
+                  .Options)
+        {
+        }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
@@ -175,6 +185,131 @@ namespace MainFunctions.Data
 
             // Supplier mapping
             modelBuilder.Entity<Supplier>().Property(s => s.IsActive).HasConversion<int>();
+
+            // DB-level CHECK constraints
+            modelBuilder.Entity<AdvanceApplication>()
+                .HasCheckConstraint("CK_AdvanceApplication_AppliedAmount_Positive", "AppliedAmount > 0");
+
+            modelBuilder.Entity<CashSettlement>()
+                .HasCheckConstraint("CK_CashSettlement_Amount_NonNegative", "Amount >= 0");
+
+            // Map RowVersion concurrency tokens for entities that expose them explicitly
+            modelBuilder.Entity<ObligationHeader>()
+                .Property(h => h.RowVersion)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+
+            modelBuilder.Entity<CashSettlement>()
+                .Property(s => s.RowVersion)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+
+            modelBuilder.Entity<AdvanceApplication>()
+                .Property(a => a.RowVersion)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+
+            // Keep shadow concurrency tokens for other entities as a fallback
+            // Only configure shadow token if the column actually exists in the database to avoid runtime "no such column" errors.
+            bool HasColumn(string table, string column)
+            {
+                try
+                {
+                    var conn = Database.GetDbConnection();
+                    if (conn.State != ConnectionState.Open) conn.Open();
+                    using var cmd = conn.CreateCommand();
+                    // Fixed PRAGMA syntax: removed extra closing parenthesis
+                    cmd.CommandText = $"PRAGMA table_info('{table}')";
+                    using var rdr = cmd.ExecuteReader();
+                    while (rdr.Read())
+                    {
+                        var name = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+                        if (string.Equals(name, column, StringComparison.OrdinalIgnoreCase)) return true;
+                    }
+                }
+                catch
+                {
+                    // if we can't inspect DB, assume column may be missing and skip mapping
+                    return false;
+                }
+                finally
+                {
+                    try { Database.GetDbConnection().Close(); } catch { }
+                }
+
+                return false;
+            }
+
+            if (HasColumn("Projects", "_concurrencyToken"))
+                modelBuilder.Entity<Project>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Workers", "_concurrencyToken"))
+                modelBuilder.Entity<Worker>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Materials", "_concurrencyToken"))
+                modelBuilder.Entity<Material>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("ProjectWorkers", "_concurrencyToken"))
+                modelBuilder.Entity<ProjectWorker>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("ProjectMaterials", "_concurrencyToken"))
+                modelBuilder.Entity<ProjectMaterial>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Payments", "_concurrencyToken"))
+                modelBuilder.Entity<Payment>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("PaymentHeaders", "_concurrencyToken"))
+                modelBuilder.Entity<PaymentHeader>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("PaymentLines", "_concurrencyToken"))
+                modelBuilder.Entity<PaymentLine>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Settlements", "_concurrencyToken"))
+                modelBuilder.Entity<Settlement>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Boqs", "_concurrencyToken"))
+                modelBuilder.Entity<Boq>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("BoqItems", "_concurrencyToken"))
+                modelBuilder.Entity<BoqItem>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Attendances", "_concurrencyToken"))
+                modelBuilder.Entity<Attendance>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("ObligationLines", "_concurrencyToken"))
+                modelBuilder.Entity<ObligationLine>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
+            if (HasColumn("Suppliers", "_concurrencyToken"))
+                modelBuilder.Entity<Supplier>()
+                    .Property<byte[]>("_concurrencyToken")
+                    .IsRowVersion()
+                    .IsConcurrencyToken();
 
             base.OnModelCreating(modelBuilder);
         }

@@ -1,382 +1,497 @@
 using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using MainFunctions.Data;
+using Microsoft.Extensions.Logging;
+using Microsoft.Data.Sqlite;
+using System.Data.Common;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace MainFunctions.Services
 {
     public static class DbPatcher
     {
-        // Ensures new columns exist in SQLite when no EF migrations are present
-        public static async Task EnsureAttendanceSchema(DbContext db)
+        private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "logs");
+        private static readonly string LogFile = Path.Combine(LogPath, "dbpatcher.log");
+        private const long MaxLogSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+        // External logger can be set by the host app
+        public static ILogger? Logger { get; set; }
+
+        /// <summary>
+        /// Applies any pending EF Core migrations to the provided context.
+        /// By default this is a best-effort operation: exceptions are logged but not thrown.
+        /// Set <paramref name="throwOnError"/> to true to let exceptions propagate.
+        /// </summary>
+        public static async Task EnsureObligationSchema(AppDbContext? db, bool throwOnError = false)
         {
+            if (db == null) return;
             try
             {
-                var conn = db.Database.GetDbConnection();
-                if (conn.State != ConnectionState.Open)
-                    await conn.OpenAsync();
-
-                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                using (var cmd = conn.CreateCommand())
+                // Run diagnostics and attempt safe repair before migrations
+                try
                 {
-                    cmd.CommandText = "PRAGMA table_info(Attendances);";
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
+                    var diag = await DiagnoseSchemaAsync(db);
+                    Logger?.LogInformation("Schema diagnostic:\n{Diag}", diag.Report);
+                    if (diag.MissingColumns.Count > 0)
                     {
-                        var name = reader.GetString(1);
-                        columns.Add(name);
+                        Logger?.LogInformation("Attempting to repair {Count} missing columns", diag.MissingColumns.Count);
+                        await RepairMissingColumnsAsync(db, diag.MissingColumns);
+                    }
+                }
+                catch (Exception dex)
+                {
+                    Logger?.LogWarning(dex, "Schema diagnostic/repair failed (non-fatal)");
+                }
+
+                // Try to ensure shadow concurrency columns exist for existing tables before running migrations.
+                try { await EnsureShadowColumnsAsync(db); } catch (Exception se) { Logger?.LogDebug(se, "EnsureShadowColumnsAsync failed (non-fatal)"); }
+
+                await db.Database.MigrateAsync();
+                Logger?.LogInformation("EnsureObligationSchema: migrations applied for DB: {Db}", db.Database.GetDbConnection()?.Database);
+
+                // After migrations, ensure shadow columns again in case migrations created tables without the shadow column due to provider differences
+                try { await EnsureShadowColumnsAsync(db); } catch (Exception se) { Logger?.LogDebug(se, "EnsureShadowColumnsAsync post-migrate failed (non-fatal)"); }
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    // If this is a SQLite "already exists" or duplicate-column error, treat it as non-fatal.
+                    // This can happen if the DB schema was partially created outside of migrations or a runtime repair added a column.
+                    if (IsSqliteAlreadyExistsError(ex))
+                    {
+                        Logger?.LogWarning(ex, "EnsureObligationSchema: SQLite reported object already exists or duplicate column - attempting repair and ignoring migration error");
+                        try { await EnsureShadowColumnsAsync(db); } catch { }
+                        return;
+                    }
+
+                    LogError("EnsureObligationSchema", ex);
+                    Logger?.LogError(ex, "EnsureObligationSchema failure");
+                }
+                catch
+                {
+                    // Logging should never throw; swallow
+                }
+
+                if (throwOnError)
+                {
+                    throw;
+                }
+            }
+        }
+
+        private static async Task<(string Report, List<(string Table, string Column, string ClrType)> MissingColumns)> DiagnoseSchemaAsync(AppDbContext db)
+        {
+            var sb = new StringBuilder();
+            var missing = new List<(string Table, string Column, string ClrType)>();
+
+            var conn = db.Database.GetDbConnection();
+            try
+            {
+                if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+
+                // Load DB tables and columns
+                var dbTables = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                using (var tcmd = conn.CreateCommand())
+                {
+                    tcmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table'";
+                    using var tr = await tcmd.ExecuteReaderAsync();
+                    while (await tr.ReadAsync())
+                    {
+                        var tname = tr.IsDBNull(0) ? null : tr.GetString(0);
+                        if (tname == null) continue;
+                        dbTables[tname] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        using var ccmd = conn.CreateCommand();
+                        ccmd.CommandText = $"PRAGMA table_info('{tname}')";
+                        using var cr = await ccmd.ExecuteReaderAsync();
+                        while (await cr.ReadAsync())
+                        {
+                            var cname = cr.IsDBNull(1) ? null : cr.GetString(1);
+                            if (cname != null) dbTables[tname].Add(cname);
+                        }
                     }
                 }
 
-                if (!columns.Contains("HoursWorked"))
+                sb.AppendLine("Database tables:");
+                foreach (var t in dbTables.Keys) sb.AppendLine(" - " + t);
+
+                sb.AppendLine();
+
+                // Inspect EF model
+                sb.AppendLine("EF model tables and properties:");
+                foreach (var et in db.Model.GetEntityTypes())
                 {
-                    using var alter = conn.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Attendances ADD COLUMN HoursWorked NUMERIC NOT NULL DEFAULT 0;";
-                    await alter.ExecuteNonQueryAsync();
-                }
+                    // Skip owned types or query types without a table mapping
+                    var tableName = et.GetTableName();
+                    if (string.IsNullOrEmpty(tableName)) continue;
+                    sb.AppendLine("Entity: " + et.Name + " -> Table: " + tableName);
 
-                if (!columns.Contains("IsHalfDay"))
-                {
-                    using var alter2 = conn.CreateCommand();
-                    alter2.CommandText = "ALTER TABLE Attendances ADD COLUMN IsHalfDay INTEGER NOT NULL DEFAULT 0;";
-                    await alter2.ExecuteNonQueryAsync();
-                }
-            }
-            catch { }
-        }
-
-        public static async Task EnsurePaymentSchema(DbContext db)
-        {
-            try
-            {
-                var conn = db.Database.GetDbConnection();
-                if (conn.State != ConnectionState.Open)
-                    await conn.OpenAsync();
-
-                async Task<bool> TableExists(string table)
-                {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = $"PRAGMA table_info({table});";
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    return reader.HasRows;
-                }
-
-                if (!await TableExists("PaymentHeaders"))
-                {
-                    using var create = conn.CreateCommand();
-                    create.CommandText = @"CREATE TABLE IF NOT EXISTS PaymentHeaders (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Type TEXT NOT NULL,
-                        EntityId INTEGER NOT NULL,
-                        ProjectId INTEGER,
-                        PeriodStart TEXT NOT NULL,
-                        PeriodEnd TEXT NOT NULL,
-                        Source TEXT NOT NULL,
-                        Status TEXT NOT NULL,
-                        Notes TEXT NOT NULL,
-                        CreatedAt TEXT NOT NULL,
-                        DueDate TEXT
-                    );";
-                    await create.ExecuteNonQueryAsync();
-                }
-
-                if (!await TableExists("PaymentLines"))
-                {
-                    using var create = conn.CreateCommand();
-                    create.CommandText = @"CREATE TABLE IF NOT EXISTS PaymentLines (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        PaymentHeaderId INTEGER NOT NULL,
-                        Date TEXT NOT NULL,
-                        Description TEXT NOT NULL,
-                        Amount NUMERIC NOT NULL,
-                        FOREIGN KEY (PaymentHeaderId) REFERENCES PaymentHeaders(Id) ON DELETE CASCADE
-                    );";
-                    await create.ExecuteNonQueryAsync();
-                }
-
-                if (!await TableExists("Settlements"))
-                {
-                    using var create = conn.CreateCommand();
-                    create.CommandText = @"CREATE TABLE IF NOT EXISTS Settlements (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        PaymentHeaderId INTEGER NOT NULL,
-                        Date TEXT NOT NULL,
-                        Amount NUMERIC NOT NULL,
-                        Method TEXT NOT NULL,
-                        FOREIGN KEY (PaymentHeaderId) REFERENCES PaymentHeaders(Id) ON DELETE CASCADE
-                    );";
-                    await create.ExecuteNonQueryAsync();
-                }
-
-                using (var idx = conn.CreateCommand())
-                {
-                    idx.CommandText = @"CREATE UNIQUE INDEX IF NOT EXISTS IX_PaymentHeaders_UniquePayroll ON PaymentHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd);";
-                    await idx.ExecuteNonQueryAsync();
-                }
-            }
-            catch { }
-        }
-
-        // Ensure Workers table has Phone2 column to avoid materialization errors
-        public static async Task EnsureWorkerSchema(DbContext db)
-        {
-            try
-            {
-                var conn = db.Database.GetDbConnection();
-                if (conn.State != ConnectionState.Open)
-                    await conn.OpenAsync();
-
-                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "PRAGMA table_info(Workers);";
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
+                    // Collect column names expected
+                    foreach (var prop in et.GetProperties())
                     {
-                        var name = reader.GetString(1);
-                        columns.Add(name);
+                        string colName;
+                        try
+                        {
+                            var storeId = StoreObjectIdentifier.Table(tableName, null);
+                            colName = prop.GetColumnName(storeId);
+                        }
+                        catch
+                        {
+                            colName = prop.Name;
+                        }
+
+                        sb.AppendLine("   - " + prop.Name + " => " + colName + " (" + prop.ClrType.Name + ")");
+
+                        if (!dbTables.ContainsKey(tableName) || !dbTables[tableName].Contains(colName))
+                        {
+                            missing.Add((tableName, colName, prop.ClrType.Name));
+                        }
+                    }
+
+                    sb.AppendLine();
+                }
+
+                if (missing.Count > 0)
+                {
+                    sb.AppendLine("Missing columns detected:");
+                    foreach (var m in missing) sb.AppendLine($" - {m.Table}.{m.Column} ({m.ClrType})");
+                }
+                else
+                {
+                    sb.AppendLine("No missing columns detected.");
+                }
+
+                return (sb.ToString(), missing);
+            }
+            finally
+            {
+                try { await conn.CloseAsync(); } catch { }
+            }
+        }
+
+        private static async Task RepairMissingColumnsAsync(AppDbContext db, List<(string Table, string Column, string ClrType)> missing)
+        {
+            if (missing == null || missing.Count == 0) return;
+
+            // Backup DB file if possible
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                var dsn = conn.DataSource;
+                if (!string.IsNullOrEmpty(dsn) && File.Exists(dsn))
+                {
+                    var bak = Path.Combine(Path.GetDirectoryName(dsn) ?? ".", Path.GetFileNameWithoutExtension(dsn) + $"_backup_{DateTime.Now:yyyyMMddHHmmss}" + Path.GetExtension(dsn));
+                    File.Copy(dsn, bak, overwrite: false);
+                    Logger?.LogInformation("RepairMissingColumnsAsync: database backed up to {Bak}", bak);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning(ex, "RepairMissingColumnsAsync: failed to create DB backup (continuing)");
+            }
+
+            var conn2 = db.Database.GetDbConnection();
+            try
+            {
+                if (conn2.State != System.Data.ConnectionState.Open) await conn2.OpenAsync();
+                foreach (var m in missing)
+                {
+                    try
+                    {
+                        // Only perform safe additions: add nullable columns with a reasonable SQLite type
+                        var sqlType = MapClrTypeToSqlite(m.ClrType);
+                        if (sqlType == null)
+                        {
+                            Logger?.LogWarning("Skipping unknown column type for {Table}.{Column} ({ClrType})", m.Table, m.Column, m.ClrType);
+                            continue;
+                        }
+
+                        var cmd = conn2.CreateCommand();
+                        cmd.CommandText = $"ALTER TABLE \"{m.Table}\" ADD COLUMN \"{m.Column}\" {sqlType}";
+                        try
+                        {
+                            await cmd.ExecuteNonQueryAsync();
+                            Logger?.LogInformation("RepairMissingColumnsAsync: added column {Table}.{Column} as {Type}", m.Table, m.Column, sqlType);
+                        }
+                        catch (SqliteException sqe)
+                        {
+                            // Ignore duplicate/exists errors
+                            if (IsSqliteAlreadyExistsError(sqe))
+                            {
+                                Logger?.LogWarning(sqe, "RepairMissingColumnsAsync: column add conflict for {Table}.{Column}", m.Table, m.Column);
+                                continue;
+                            }
+                            throw;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogWarning(ex, "RepairMissingColumnsAsync: failed to add column {Table}.{Column}", m.Table, m.Column);
+                    }
+                }
+            }
+            finally
+            {
+                try { await conn2.CloseAsync(); } catch { }
+            }
+        }
+
+        private static string? MapClrTypeToSqlite(string clrTypeName)
+        {
+            // Simple mapping based on CLR type name reported from EF metadata
+            // Return a type suitable for ALTER TABLE (nullable by default in SQLite)
+            switch (clrTypeName)
+            {
+                case "String":
+                    return "TEXT";
+                case "Decimal":
+                    return "NUMERIC";
+                case "Int32":
+                case "Int64":
+                case "Boolean":
+                    return "INTEGER";
+                case "DateTime":
+                    return "TEXT";
+                case "Byte[]":
+                case "Byte[]?":
+                    return "BLOB";
+                default:
+                    return null;
+            }
+        }
+
+        private static async Task EnsureShadowColumnsAsync(AppDbContext db)
+        {
+            // Candidate tables that use shadow _concurrencyToken in model configuration/migrations
+            var candidates = new[]
+            {
+                "Projects",
+                "Workers",
+                "Materials",
+                "ProjectWorkers",
+                "ProjectMaterials",
+                "Payments",
+                "PaymentHeaders",
+                "PaymentLines",
+                "Settlements",
+                "Boqs",
+                "BoqItems",
+                "Attendances",
+                "ObligationLines",
+                "Suppliers"
+            };
+
+            var conn = db.Database.GetDbConnection();
+            try
+            {
+                if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+                using var checkCmd = conn.CreateCommand();
+
+                foreach (var table in candidates)
+                {
+                    try
+                    {
+                        // Check if table exists
+                        checkCmd.CommandText = $"SELECT name FROM sqlite_master WHERE type='table' AND name=@t";
+                        var param = checkCmd.CreateParameter(); param.ParameterName = "@t"; param.Value = table; checkCmd.Parameters.Clear(); checkCmd.Parameters.Add(param);
+                        var exists = false;
+                        using (var r = await checkCmd.ExecuteReaderAsync())
+                        {
+                            exists = await r.ReadAsync();
+                        }
+
+                        if (!exists) continue;
+
+                        // Check if column exists
+                        using var colCmd = conn.CreateCommand();
+                        colCmd.CommandText = $"PRAGMA table_info('{table}')";
+                        var has = false;
+                        using (var rdr = await colCmd.ExecuteReaderAsync())
+                        {
+                            while (await rdr.ReadAsync())
+                            {
+                                var name = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+                                if (string.Equals(name, "_concurrencyToken", StringComparison.OrdinalIgnoreCase)) { has = true; break; }
+                            }
+                        }
+
+                        if (has) continue;
+
+                        // Add the nullable BLOB column
+                        using var addCmd = conn.CreateCommand();
+                        addCmd.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"_concurrencyToken\" BLOB";
+                        try
+                        {
+                            await addCmd.ExecuteNonQueryAsync();
+                            Logger?.LogInformation("EnsureShadowColumnsAsync: added _concurrencyToken to {Table}", table);
+                        }
+                        catch (SqliteException sqe)
+                        {
+                            // If another process added it concurrently, ignore
+                            if (sqe.SqliteErrorCode == 1 && (sqe.Message?.IndexOf("duplicate column", StringComparison.OrdinalIgnoreCase) >= 0 || sqe.Message?.IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                Logger?.LogWarning(sqe, "EnsureShadowColumnsAsync: concurrent add of _concurrencyToken for {Table}", table);
+                                continue;
+                            }
+                            throw;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogWarning(ex, "EnsureShadowColumnsAsync: failed to ensure column for table {Table}", table);
+                    }
+                }
+            }
+            finally
+            {
+                try { await conn.CloseAsync(); } catch { }
+            }
+        }
+
+        private static bool IsSqliteAlreadyExistsError(Exception ex)
+        {
+            // Walk the exception chain and look for a SqliteException or message indicating an existing table/column
+            var current = ex;
+            while (current != null)
+            {
+                if (current is SqliteException sqlEx)
+                {
+                    if (sqlEx.SqliteErrorCode == 1)
+                    {
+                        var msg = sqlEx.Message ?? string.Empty;
+                        if (msg.IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                        if (msg.IndexOf("duplicate column", StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                        if (msg.IndexOf("duplicate column name", StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
                     }
                 }
 
-                if (!columns.Contains("Phone2"))
-                {
-                    using var alter = conn.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Workers ADD COLUMN Phone2 TEXT NOT NULL DEFAULT '';";
-                    await alter.ExecuteNonQueryAsync();
-                }
+                var text = current.Message ?? string.Empty;
+                if (text.IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+                if (text.IndexOf("duplicate column", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+                if (text.IndexOf("duplicate column name", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+
+                current = current.InnerException;
             }
-            catch { }
+
+            return false;
         }
 
-        // New obligation & cash ledger schema
-        public static async Task EnsureObligationSchema(DbContext db)
+        /// <summary>
+        /// Alias for EnsureObligationSchema kept for backward compatibility.
+        /// </summary>
+        public static Task EnsureWorkerSchema(AppDbContext? db, bool throwOnError = false) => EnsureObligationSchema(db, throwOnError);
+
+        /// <summary>
+        /// Compatibility alias used by older callers that expect attendance schema to be ensured.
+        /// </summary>
+        public static Task EnsureAttendanceSchema(AppDbContext? db, bool throwOnError = false) => EnsureObligationSchema(db, throwOnError);
+
+        /// <summary>
+        /// Compatibility alias used by older callers that expect payment schema to be ensured.
+        /// </summary>
+        public static Task EnsurePaymentSchema(AppDbContext? db, bool throwOnError = false) => EnsureObligationSchema(db, throwOnError);
+
+        /// <summary>
+        /// Returns the path to the active dbpatcher log file.
+        /// </summary>
+        public static string GetLogFilePath() => LogFile;
+
+        /// <summary>
+        /// Returns the last <paramref name="lineCount"/> lines from the log file.
+        /// </summary>
+        public static string[] GetLastLogLines(int lineCount)
         {
             try
             {
-                var conn = db.Database.GetDbConnection();
-                if (conn.State != ConnectionState.Open)
-                    await conn.OpenAsync();
+                if (!File.Exists(LogFile)) return Array.Empty<string>();
+                var allLines = File.ReadAllLines(LogFile);
+                if (lineCount <= 0) return Array.Empty<string>();
+                if (allLines.Length <= lineCount) return allLines;
+                var result = new string[lineCount];
+                Array.Copy(allLines, allLines.Length - lineCount, result, 0, lineCount);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning(ex, "GetLastLogLines failed");
+                return Array.Empty<string>();
+            }
+        }
 
-                async Task<bool> TableExists(string table)
+        private static void LogError(string operation, Exception ex)
+        {
+            try
+            {
+                if (!Directory.Exists(LogPath)) Directory.CreateDirectory(LogPath);
+
+                RotateIfNeeded();
+
+                var sb = new StringBuilder();
+                sb.AppendLine("================ DbPatcher Error =================");
+                sb.AppendLine(DateTime.Now.ToString("o"));
+                sb.AppendLine($"Operation: {operation}");
+                sb.AppendLine("Message: " + ex.Message);
+                sb.AppendLine("Type: " + ex.GetType());
+                sb.AppendLine("StackTrace:");
+                sb.AppendLine(ex.StackTrace ?? string.Empty);
+
+                var inner = ex.InnerException;
+                while (inner != null)
                 {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = $"PRAGMA table_info({table});";
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    return reader.HasRows;
+                    sb.AppendLine("--- Inner Exception ---");
+                    sb.AppendLine("Message: " + inner.Message);
+                    sb.AppendLine("Type: " + inner.GetType());
+                    sb.AppendLine(inner.StackTrace ?? string.Empty);
+                    inner = inner.InnerException;
                 }
 
-                async Task Exec(string sql)
+                sb.AppendLine();
+                File.AppendAllText(LogFile, sb.ToString());
+
+                // Also write structured log if logger available
+                Logger?.LogError(ex, "{Operation} failed: {Message}", operation, ex.Message);
+            }
+            catch
+            {
+                // Swallow any logging errors.
+            }
+        }
+
+        private static void RotateIfNeeded()
+        {
+            try
+            {
+                if (!File.Exists(LogFile)) return;
+                var fi = new FileInfo(LogFile);
+                if (fi.Length <= MaxLogSizeBytes) return;
+                var archived = Path.Combine(LogPath, $"dbpatcher_{DateTime.Now:yyyyMMddHHmmss}.log");
+                File.Move(LogFile, archived);
+
+                // Simple retention: keep only last 5 archives
+                var files = new DirectoryInfo(LogPath).GetFiles("dbpatcher_*.log");
+                if (files.Length > 5)
                 {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = sql;
-                    await cmd.ExecuteNonQueryAsync();
-                }
-
-                if (!await TableExists("Suppliers"))
-                {
-                    await Exec(@"CREATE TABLE IF NOT EXISTS Suppliers (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Name TEXT NOT NULL,
-                        Contact TEXT NOT NULL,
-                        Notes TEXT NOT NULL,
-                        IsActive INTEGER NOT NULL,
-                        CreatedAt TEXT NOT NULL
-                    );");
-                }
-
-                if (!await TableExists("ObligationHeaders"))
-                {
-                    await Exec(@"CREATE TABLE IF NOT EXISTS ObligationHeaders (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Type TEXT NOT NULL,
-                        Direction TEXT NOT NULL,
-                        ProjectId INTEGER,
-                        EntityType TEXT NOT NULL,
-                        EntityId INTEGER,
-                        PeriodStart TEXT NOT NULL,
-                        PeriodEnd TEXT NOT NULL,
-                        DueDate TEXT,
-                        TotalAmountSnapshot NUMERIC NOT NULL DEFAULT 0,
-                        Status TEXT NOT NULL,
-                        IsLocked INTEGER NOT NULL DEFAULT 0,
-                        Notes TEXT NOT NULL,
-                        CreatedAt TEXT NOT NULL
-                    );");
-
-                    // Legacy generic uniqueness (kept for backward compatibility, doesn't enforce ClientInvoice uniqueness for NULL EntityId)
-                    await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_Unique ON ObligationHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd);");
-                }
-
-                if (!await TableExists("ObligationLines"))
-                {
-                    await Exec(@"CREATE TABLE IF NOT EXISTS ObligationLines (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        ObligationHeaderId INTEGER NOT NULL,
-                        Description TEXT NOT NULL,
-                        Quantity NUMERIC NOT NULL,
-                        UnitRate NUMERIC NOT NULL,
-                        Amount NUMERIC NOT NULL,
-                        CreatedAt TEXT NOT NULL,
-                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
-                    );");
-                }
-
-                if (!await TableExists("CashSettlements"))
-                {
-                    await Exec(@"CREATE TABLE IF NOT EXISTS CashSettlements (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        ObligationHeaderId INTEGER,
-                        Date TEXT NOT NULL,
-                        Amount NUMERIC NOT NULL,
-                        Direction TEXT NOT NULL,
-                        Method TEXT NOT NULL,
-                        FromEntityType TEXT NOT NULL,
-                        FromEntityId INTEGER,
-                        ToEntityType TEXT NOT NULL,
-                        ToEntityId INTEGER,
-                        ReferenceNo TEXT NOT NULL,
-                        Notes TEXT NOT NULL,
-                        EnteredByUserId INTEGER,
-                        CreatedAt TEXT NOT NULL,
-                        IsReversal INTEGER NOT NULL DEFAULT 0,
-                        ReversesSettlementId INTEGER,
-                        RemainingAmount NUMERIC NOT NULL DEFAULT 0,
-                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
-                    );");
-
-                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_CashSettlements_Header ON CashSettlements(ObligationHeaderId);");
-                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_CashSettlements_Reverses ON CashSettlements(ReversesSettlementId);");
-                }
-
-                if (!await TableExists("AdvanceApplications"))
-                {
-                    await Exec(@"CREATE TABLE IF NOT EXISTS AdvanceApplications (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        AdvanceSettlementId INTEGER NOT NULL,
-                        ObligationHeaderId INTEGER NOT NULL,
-                        AppliedAmount NUMERIC NOT NULL,
-                        CreatedAt TEXT NOT NULL,
-                        FOREIGN KEY(AdvanceSettlementId) REFERENCES CashSettlements(Id),
-                        FOREIGN KEY(ObligationHeaderId) REFERENCES ObligationHeaders(Id)
-                    );");
-
-                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_AdvanceApplications_Advance ON AdvanceApplications(AdvanceSettlementId);");
-                    await Exec(@"CREATE INDEX IF NOT EXISTS IX_AdvanceApplications_Header ON AdvanceApplications(ObligationHeaderId);");
-                }
-
-                // Drop any existing triggers on these tables and recreate the allowed set
-                foreach (var tbl in new[] { "ObligationHeaders", "ObligationLines", "CashSettlements", "AdvanceApplications" })
-                {
-                    using var q = conn.CreateCommand();
-                    q.CommandText = "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=@t";
-                    var p = q.CreateParameter();
-                    p.ParameterName = "@t";
-                    p.Value = tbl;
-                    q.Parameters.Add(p);
-                    using var r = await q.ExecuteReaderAsync();
-                    var toDrop = new List<string>();
-                    while (await r.ReadAsync()) toDrop.Add(r.GetString(0));
-                    foreach (var trig in toDrop)
+                    Array.Sort(files, (a, b) => a.CreationTimeUtc.CompareTo(b.CreationTimeUtc));
+                    for (int i = 0; i < files.Length - 5; i++)
                     {
-                        await Exec($"DROP TRIGGER IF EXISTS {trig};");
+                        try { files[i].Delete(); } catch { }
                     }
                 }
-
-                // Append-only triggers: block DELETE for all tables
-                async Task EnsureNoDelete(string table)
-                {
-                    await Exec($@"CREATE TRIGGER IF NOT EXISTS TR_{table}_NoDelete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;");
-                }
-
-                // Headers: allow only Status, IsLocked, TotalAmountSnapshot to change
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_ObligationHeaders_BlockImmutableUpdate
-                      BEFORE UPDATE ON ObligationHeaders
-                      FOR EACH ROW
-                      WHEN COALESCE(NEW.Type,'') <> COALESCE(OLD.Type,'')
-                        OR COALESCE(NEW.Direction,'') <> COALESCE(OLD.Direction,'')
-                        OR COALESCE(NEW.ProjectId,-1) <> COALESCE(OLD.ProjectId,-1)
-                        OR COALESCE(NEW.EntityType,'') <> COALESCE(OLD.EntityType,'')
-                        OR COALESCE(NEW.EntityId,-1) <> COALESCE(OLD.EntityId,-1)
-                        OR COALESCE(NEW.PeriodStart,'') <> COALESCE(OLD.PeriodStart,'')
-                        OR COALESCE(NEW.PeriodEnd,'') <> COALESCE(OLD.PeriodEnd,'')
-                        OR COALESCE(NEW.DueDate,'') <> COALESCE(OLD.DueDate,'')
-                        OR COALESCE(NEW.Notes,'') <> COALESCE(OLD.Notes,'')
-                        OR COALESCE(NEW.CreatedAt,'') <> COALESCE(OLD.CreatedAt,'')
-                      BEGIN
-                        SELECT RAISE(ABORT, 'Obligation header is append-only');
-                      END;");
-
-                await EnsureNoDelete("ObligationHeaders");
-
-                // Lines, settlements, applications: block any UPDATE/DELETE
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_ObligationLines_NoUpdate BEFORE UPDATE ON ObligationLines BEGIN SELECT RAISE(ABORT, 'Obligation lines are append-only'); END;");
-                await EnsureNoDelete("ObligationLines");
-
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_NoUpdate BEFORE UPDATE ON CashSettlements BEGIN SELECT RAISE(ABORT, 'Cash settlements are append-only'); END;");
-                await EnsureNoDelete("CashSettlements");
-
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_NoUpdate BEFORE UPDATE ON AdvanceApplications BEGIN SELECT RAISE(ABORT, 'Advance applications are append-only'); END;");
-                await EnsureNoDelete("AdvanceApplications");
-
-                // Enforce correct uniqueness using partial indices in SQLite
-                // 1) ClientInvoice: one per project and period (EntityId may be NULL)
-                await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_ClientInvoice_PerProjectPeriod
-                      ON ObligationHeaders(Type, ProjectId, PeriodStart, PeriodEnd)
-                      WHERE Type = 'ClientInvoice';");
-
-                // 2) Entity-scoped: for types with EntityId present
-                await Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ObligationHeaders_EntityScoped
-                      ON ObligationHeaders(Type, EntityId, ProjectId, PeriodStart, PeriodEnd)
-                      WHERE EntityId IS NOT NULL;");
-
-                // NEW: Trigger to maintain RemainingAmount on CashSettlements for advances
-                // This computes RemainingAmount = Amount - (sum of AdvanceApplications.AppliedAmount)
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_UpdateRemaining AFTER INSERT ON AdvanceApplications
-                      BEGIN
-                        UPDATE CashSettlements
-                        SET RemainingAmount = Amount - IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = NEW.AdvanceSettlementId), 0)
-                        WHERE Id = NEW.AdvanceSettlementId;
-                      END;");
-
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_UpdateRemaining_OnDelete AFTER DELETE ON AdvanceApplications
-                      BEGIN
-                        UPDATE CashSettlements
-                        SET RemainingAmount = Amount - IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = OLD.AdvanceSettlementId), 0)
-                        WHERE Id = OLD.AdvanceSettlementId;
-                      END;");
-
-                // Also update remaining when an advance row is inserted
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_CashSettlements_InitRemaining AFTER INSERT ON CashSettlements
-                      BEGIN
-                        UPDATE CashSettlements SET RemainingAmount = Amount WHERE Id = NEW.Id;
-                      END;");
-
-                // Prevent applying advances such that sum(AppliedAmount) > CashSettlements.Amount
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOverApply
-                      BEFORE INSERT ON AdvanceApplications
-                      BEGIN
-                        SELECT CASE WHEN (NEW.AppliedAmount + IFNULL((SELECT SUM(AppliedAmount) FROM AdvanceApplications WHERE AdvanceSettlementId = NEW.AdvanceSettlementId), 0)) > (SELECT Amount FROM CashSettlements WHERE Id = NEW.AdvanceSettlementId)
-                          THEN RAISE(ABORT, 'Advance over-applied') END;
-                      END;");
-
-                // Prevent applying against reversed advances
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOnReversedAdvance
-                      BEFORE INSERT ON AdvanceApplications
-                      BEGIN
-                        SELECT CASE WHEN (SELECT IsReversal FROM CashSettlements WHERE Id = NEW.AdvanceSettlementId) = 1
-                          THEN RAISE(ABORT, 'Cannot apply a reversed advance') END;
-                      END;");
-
-                // Prevent applying to reversed obligations
-                await Exec(@"CREATE TRIGGER IF NOT EXISTS TR_AdvanceApplications_PreventOnReversedObligation
-                      BEFORE INSERT ON AdvanceApplications
-                      BEGIN
-                        SELECT CASE WHEN (SELECT IsReversal FROM CashSettlements WHERE ObligationHeaderId = NEW.ObligationHeaderId LIMIT 1) = 1
-                          THEN RAISE(ABORT, 'Cannot apply to a reversed obligation') END;
-                      END;");
             }
-            catch { }
+            catch
+            {
+                // ignore rotation failures
+            }
         }
     }
 }

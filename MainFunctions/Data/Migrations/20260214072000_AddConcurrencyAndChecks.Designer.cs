@@ -3,6 +3,7 @@ using System;
 using MainFunctions.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MainFunctions.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260214072000_AddConcurrencyAndChecks")]
+    partial class AddConcurrencyAndChecks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.10");
@@ -43,16 +46,18 @@ namespace MainFunctions.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("BLOB");
 
+                    b.Property<byte[]>("_concurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("BLOB");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AdvanceSettlementId");
 
                     b.HasIndex("ObligationHeaderId");
 
-                    b.ToTable("AdvanceApplications", t =>
-                        {
-                            t.HasCheckConstraint("CK_AdvanceApplication_AppliedAmount_Positive", "AppliedAmount > 0");
-                        });
+                    b.ToTable("AdvanceApplications");
                 });
 
             modelBuilder.Entity("MainFunctions.Models.Attendance", b =>
@@ -246,14 +251,16 @@ namespace MainFunctions.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<byte[]>("_concurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("BLOB");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ObligationHeaderId");
 
-                    b.ToTable("CashSettlements", t =>
-                        {
-                            t.HasCheckConstraint("CK_CashSettlement_Amount_NonNegative", "Amount >= 0");
-                        });
+                    b.ToTable("CashSettlements");
                 });
 
             modelBuilder.Entity("MainFunctions.Models.Material", b =>
@@ -353,6 +360,11 @@ namespace MainFunctions.Data.Migrations
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("_concurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("BLOB");
 
                     b.HasKey("Id");
 

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Configuration;
-using System.IO;
+using System;
 
 namespace MainFunctions.Services
 {
@@ -9,10 +9,20 @@ namespace MainFunctions.Services
 
         static ConfigurationService()
         {
-            Configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
+            try
+            {
+                // Use application base directory rather than current working directory.
+                // Make the file optional to avoid exceptions if it's not present in the working directory.
+                Configuration = new ConfigurationBuilder()
+                    .SetBasePath(AppContext.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .Build();
+            }
+            catch
+            {
+                // Fallback to an empty configuration to avoid throwing during static construction.
+                Configuration = new ConfigurationBuilder().Build();
+            }
         }
 
         public static string? GetOnlineConnectionString()

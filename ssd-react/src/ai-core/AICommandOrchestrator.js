@@ -1,6 +1,6 @@
 // ============================================
 // AI COMMAND ORCHESTRATOR
-// Master pipeline: Intent → Sim → Validate → Topics → Risk → Priority → Response → Tone → Confidence → Log
+// Master pipeline: EntityResolve → PreFlight → Intent → Sim → Validate → Risk → Priority → Response → Tone → Confidence → Log
 // ============================================
 
 import { supabase } from '../data/supabase';
@@ -9,6 +9,8 @@ import { riskEngine } from './RiskEngine';
 import { priorityEngine } from './PriorityEngine';
 import { confidenceEngine } from './ConfidenceEngine';
 import { structuredResponseBuilder } from './StructuredResponseBuilder';
+import { entityResolverEngine } from './EntityResolverEngine';
+import { preFlightDataEngine } from './PreFlightDataEngine';
 
 class AICommandOrchestrator {
   constructor() {
@@ -31,40 +33,56 @@ class AICommandOrchestrator {
     };
 
     try {
-      // Stage 0: Pre-flight Conflict Detection (parallel)
+      // Stage 0: Entity Resolution (break query into atomic entities)
+      pipeline.stages.entityResolution = entityResolverEngine.resolveEntities(userInput);
+      
+      // Stage 0b: Pre-flight Data Fetch (get ALL live data before response)
+      pipeline.stages.preFlightData = await preFlightDataEngine.fetchAllLiveData(
+        pipeline.stages.entityResolution
+      );
+      
+      // Stage 0c: Answer Entity Queries (if specific queries detected)
+      if (pipeline.stages.entityResolution.entities.length > 0) {
+        pipeline.stages.entityAnswers = preFlightDataEngine.answerEntityQuery(
+          pipeline.stages.entityResolution,
+          pipeline.stages.preFlightData
+        );
+      }
+      
+      // Stage 1: Pre-flight Conflict Detection (parallel)
       pipeline.stages.conflictDetection = await this.detectConflicts(userInput, pipeline.normalizedInput);
       
-      // Stage 1: Intent Classification
+      // Stage 2: Intent Classification
       pipeline.stages.intent = this.classifyIntent(userInput);
       
-      // Stage 2: Derived Metrics Detection
+      // Stage 3: Derived Metrics Detection
       pipeline.stages.derivedMetrics = this.extractDerivedMetrics(userInput, pipeline.normalizedInput);
       
-      // Stage 3: Simulation Detection
+      // Stage 4: Simulation Detection
       pipeline.stages.simulation = await simulationEngine.execute(userInput);
       
-      // Stage 4: Context Building
-      pipeline.stages.context = await this.buildContext(pipeline.stages.intent, userRole);
+      // Stage 5: Context Building (now uses pre-flight data)
+      pipeline.stages.context = await this.buildContext(pipeline.stages.intent, userRole, pipeline.stages.preFlightData);
       
-      // Stage 5: Cross-validation (if conflicts detected)
+      // Stage 6: Cross-validation (if conflicts detected)
       if (pipeline.stages.conflictDetection?.conflicts?.length > 0) {
         pipeline.stages.crossCheck = this.performCrossValidation(pipeline.stages.context);
       }
       
-      // Stage 6: Reality Validation (skip for simulations)
+      // Stage 7: Reality Validation (skip for simulations)
       if (!pipeline.stages.simulation.isSimulation) {
         pipeline.stages.validation = await this.runValidation(userInput, pipeline.stages.context);
       } else {
         pipeline.stages.validation = { validated: true, claims: [], score: 1 };
       }
       
-      // Stage 7: Risk Assessment
+      // Stage 8: Risk Assessment
       pipeline.stages.risk = await riskEngine.calculateRiskScore(
         pipeline.stages.context?.activeProjectId,
         { forceLevel: pipeline.stages.context?.forcedRiskLevel }
       );
       
-      // Stage 8: Priority Sorting
+      // Stage 9: Priority Sorting
       const recommendations = pipeline.stages.context?.recommendations || [];
       pipeline.stages.priority = priorityEngine.enrichWithFinancialImpact(
         recommendations,
@@ -72,11 +90,15 @@ class AICommandOrchestrator {
       );
       pipeline.stages.priority = priorityEngine.sortRecommendations(pipeline.stages.priority);
       
-      // Stage 9: Confidence Scoring
+      // Stage 10: Confidence Scoring
       const dataAge = this.getDataAge(pipeline.stages.context);
+      const dataAvailability = pipeline.stages.preFlightData?.availability || {};
+      const availableFields = Object.values(dataAvailability).filter(d => d.available)?.length || 0;
+      const totalFields = Object.keys(dataAvailability).length;
+      
       pipeline.stages.confidence = confidenceEngine.calculateConfidence(null, {
         dataAge,
-        completeness: pipeline.stages.context?.completeness || 0.5,
+        completeness: totalFields > 0 ? availableFields / totalFields : 0.5,
         validationScore: pipeline.stages.validation?.score || 0.5,
         matchingPatterns: pipeline.stages.validation?.claims?.length || 0,
         crossCheck: pipeline.stages.crossCheck || {},
@@ -90,23 +112,25 @@ class AICommandOrchestrator {
         isCompound
       );
       
-      // Stage 10: Response Building
+      // Stage 11: Response Building
       pipeline.stages.response = this.buildResponse(
         pipeline.stages.intent,
         pipeline.stages.simulation,
         pipeline.stages.context,
         pipeline.stages.risk,
         pipeline.stages.priority,
-        pipeline.stages.confidence
+        pipeline.stages.confidence,
+        pipeline.stages.entityAnswers,
+        pipeline.stages.preFlightData.availability
       );
       
-      // Stage 11: Tone Adjustment
+      // Stage 12: Tone Adjustment
       pipeline.stages.response = structuredResponseBuilder.addTone(
         pipeline.stages.response,
         this.determineTone(pipeline.stages.risk, pipeline.stages.intent)
       );
       
-      // Stage 12: Audit Logging
+      // Stage 13: Audit Logging
       await this.logInteraction(pipeline);
       
       pipeline.success = true;
@@ -268,7 +292,7 @@ class AICommandOrchestrator {
     return { intent, confidence: Math.min(confidence + 0.5, 1) };
   }
 
-  async buildContext(intent, userRole) {
+  async buildContext(intent, userRole, preFlightData = null) {
     const context = {
       userRole,
       recommendations: [],
@@ -276,33 +300,47 @@ class AICommandOrchestrator {
       completeness: 0.5
     };
 
-    // Fetch role-appropriate data
-    const fetches = [
-      this.fetchProjects(),
-      this.fetchFinance(),
-      this.fetchWorkers()
-    ];
+    // Use pre-flight data if available (preferred)
+    if (preFlightData) {
+      context.projects = preFlightData.projects || [];
+      context.finance = preFlightData.finance || null;
+      context.workers = preFlightData.workers || [];
+      context.alerts = preFlightData.alerts || [];
+      context.system = preFlightData.system || null;
+      
+      // Calculate data completeness from availability
+      const availableFields = Object.values(preFlightData.availability || {})
+        .filter(d => d.available).length;
+      const totalFields = Object.keys(preFlightData.availability || {}).length;
+      context.completeness = totalFields > 0 ? availableFields / totalFields : 0.5;
+    } else {
+      // Fallback: fetch directly
+      const fetches = [
+        this.fetchProjects(),
+        this.fetchFinance(),
+        this.fetchWorkers()
+      ];
 
-    const [projects, finance, workers] = await Promise.all(fetches);
-    
-    context.projects = projects;
-    context.finance = finance;
-    context.workers = workers;
+      const [projects, finance, workers] = await Promise.all(fetches);
+      
+      context.projects = projects;
+      context.finance = finance;
+      context.workers = workers;
+      
+      const fields = [projects, finance, workers].filter(Boolean).length;
+      context.completeness = fields / 3;
+    }
 
     // Generate recommendations based on data
     context.recommendations = this.generateRecommendations(
-      projects,
-      finance,
-      workers,
+      context.projects,
+      context.finance,
+      context.workers,
       userRole
     );
 
-    // Calculate data completeness
-    const fields = [projects, finance, workers].filter(Boolean).length;
-    context.completeness = fields / 3;
-
     // Identify active project
-    const activeProject = projects?.find(p => p.status === 'Ongoing');
+    const activeProject = context.projects?.find(p => p.status === 'Ongoing');
     context.activeProjectId = activeProject?.id;
 
     return context;
@@ -381,7 +419,7 @@ class AICommandOrchestrator {
     return recommendations;
   }
 
-  async runValidation(input, context) {
+  async runValidation(input) {
     // Simple validation: check for specific claims
     const claims = [];
     const validated = { validated: true, claims: [], score: 1 };
@@ -412,13 +450,16 @@ class AICommandOrchestrator {
     return age / (1000 * 60 * 60);
   }
 
-  buildResponse(intent, simulation, context, risk, priority, confidence) {
+  buildResponse(intent, simulation, context, risk, priority, confidence, entityAnswers = [], dataAvailability = {}) {
     const metrics = this.extractMetrics(context);
     const delta = this.calculateDelta(context);
     const risks = context?.recommendations?.slice(0, 3) || [];
     
     // Extract multi-topic breakdown
     const multiTopic = this.extractMultiTopic(metrics, context);
+
+    // Add data availability notes
+    const availabilityNotes = this.generateAvailabilityNotes(dataAvailability);
 
     // Build battlefield response
     const battlefieldData = {
@@ -428,7 +469,9 @@ class AICommandOrchestrator {
       recommendations: priority.slice(0, 5),
       simulation: simulation.isSimulation ? simulation : null,
       confidence,
-      multiTopic
+      multiTopic,
+      entityAnswers,
+      availabilityNotes
     };
 
     const battlefieldResponse = structuredResponseBuilder.buildBattlefieldResponse(battlefieldData, {
@@ -452,6 +495,21 @@ class AICommandOrchestrator {
         simulation: simulation.isSimulation
       })
     };
+  }
+
+  generateAvailabilityNotes(availability) {
+    const notes = [];
+    
+    for (const [key, data] of Object.entries(availability)) {
+      if (!data.available) {
+        notes.push({
+          entity: key,
+          note: data.reason || 'Data not available'
+        });
+      }
+    }
+    
+    return notes;
   }
 
   calculateDelta(context) {
@@ -516,16 +574,41 @@ class AICommandOrchestrator {
 
   extractMetrics(context) {
     const metrics = {};
+    
+    // Try finance data first, fallback to system snapshot
     if (context?.finance) {
       metrics.cashBalance = context.finance.cash_balance || 0;
-      metrics.totalExpenses = context.finance.total_expenses || 0;
+      metrics.totalExpenses = context.finance.total_expenses || context.finance.total_money_out || 0;
+      metrics.totalIncome = context.finance.total_income || context.finance.total_money_in || 0;
+    } else if (context?.system) {
+      // Fallback to system snapshot
+      metrics.cashBalance = context.system.cash_balance || 0;
+      metrics.totalExpenses = context.system.total_money_out || 0;
+      metrics.totalIncome = context.system.total_money_in || 0;
     }
+    
     if (context?.projects) {
       metrics.activeProjects = context.projects.filter(p => p.status === 'Ongoing').length;
+      metrics.totalProjects = context.projects.length;
+    } else if (context?.system) {
+      metrics.activeProjects = context.system.active_projects || 0;
+      metrics.totalProjects = context.system.total_projects || 0;
     }
+    
     if (context?.workers) {
       metrics.totalWorkers = context.workers.length;
+      metrics.presentToday = context.system?.present_today || 0;
+    } else if (context?.system) {
+      metrics.totalWorkers = context.system.total_workers || 0;
+      metrics.presentToday = context.system.present_today || 0;
     }
+    
+    if (context?.alerts) {
+      metrics.criticalAlerts = context.alerts.filter(a => a.severity === 'critical').length;
+    } else if (context?.system) {
+      metrics.criticalAlerts = context.system.critical_alerts || 0;
+    }
+    
     return metrics;
   }
 

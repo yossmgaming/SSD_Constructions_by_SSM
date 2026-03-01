@@ -198,7 +198,7 @@ class StructuredResponseBuilder {
   // ============================================
 
   buildBattlefieldResponse(data, context) {
-    const { metrics, risks, recommendations, simulation, confidence, delta, multiTopic } = data;
+    const { metrics, risks, recommendations, simulation, confidence, delta, multiTopic, entityAnswers, availabilityNotes } = data;
     const timestamp = new Date().toLocaleString('en-US', { 
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
     });
@@ -210,6 +210,8 @@ class StructuredResponseBuilder {
     const formattedRecommendations = this.formatBattlefieldRecommendations(recommendations);
     const formattedSimulation = this.formatBattlefieldSimulation(simulation);
     const formattedMultiTopic = this.formatBattlefieldMultiTopic(multiTopic);
+    const formattedEntityAnswers = this.formatEntityAnswers(entityAnswers);
+    const formattedAvailability = this.formatAvailabilityNotes(availabilityNotes);
     const metadata = this.buildMetadata(context, confidence);
 
     return {
@@ -219,11 +221,35 @@ class StructuredResponseBuilder {
       recommendations: formattedRecommendations,
       simulationMode: formattedSimulation,
       multiTopicBreakdown: formattedMultiTopic,
+      entityAnswers: formattedEntityAnswers,
+      dataAvailability: formattedAvailability,
       metadata,
       cta: formattedRecommendations[0]?.action 
         ? `📌 Recommended Next Steps: ${formattedRecommendations[0].action}`
         : null
     };
+  }
+
+  formatEntityAnswers(entityAnswers) {
+    if (!entityAnswers || entityAnswers.length === 0) return [];
+    
+    return entityAnswers.map(answer => ({
+      type: answer.type,
+      available: answer.available !== false,
+      data: answer.data || answer,
+      count: answer.count,
+      note: answer.note || null
+    }));
+  }
+
+  formatAvailabilityNotes(notes) {
+    if (!notes || notes.length === 0) return [];
+    
+    return notes.map(n => ({
+      entity: n.entity,
+      note: n.note,
+      severity: 'info'
+    }));
   }
 
   formatBattlefieldMetrics(metrics, delta) {

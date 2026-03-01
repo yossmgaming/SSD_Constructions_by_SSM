@@ -11,6 +11,9 @@ using Microsoft.EntityFrameworkCore;
 using MainFunctions.Data;
 using MainFunctions.Models;
 using MainFunctions.Services;
+using Microsoft.Data.Sqlite;
+using System.Data.Common;
+using System.Threading.Tasks;
 
 namespace MainFunctions.Views
 {
@@ -85,6 +88,50 @@ namespace MainFunctions.Views
 
                 AssignProjectBox.SelectedIndex = 0; // default to None
             }
+            catch (SqliteException se) when (se.Message?.IndexOf("no such column", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Missing shadow column in Projects (e.g., p._concurrencyToken). Attempt to create it then retry once.
+                try
+                {
+                    var created = false;
+                    try
+                    {
+                        created = await EnsureShadowColumnExistsAsync("Projects", "_concurrencyToken");
+                    }
+                    catch { created = false; }
+
+                    if (!created)
+                    {
+                        // fallback to running migrations which may add the column
+                        try
+                        {
+                            await DbPatcher.EnsureObligationSchema(_db, throwOnError: false);
+                        }
+                        catch { }
+                    }
+
+                    if (_db == null) return;
+                    var list = await _db.Projects.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+
+                    AssignProjectBox.Items.Clear();
+                    var noneItem = new ComboBoxItem { Content = "None", Tag = NoneProjectId };
+                    AssignProjectBox.Items.Add(noneItem);
+
+                    foreach (var p in list)
+                    {
+                        var item = new ComboBoxItem { Content = p.Name, Tag = p.Id };
+                        AssignProjectBox.Items.Add(item);
+                    }
+
+                    AssignProjectBox.SelectedIndex = 0;
+                    return;
+                }
+                catch (Exception rex)
+                {
+                    MessageBox.Show($"Failed to repair DB and load projects: {rex.Message}", "Workers", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to load projects: {ex.Message}", "Workers", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -127,8 +174,83 @@ namespace MainFunctions.Views
                 }
             }
 
-            WorkersGrid.ItemsSource = await q.OrderBy(w => w.FullName).ThenBy(w => w.NIC).ToListAsync();
+            try
+            {
+                WorkersGrid.ItemsSource = await q.OrderBy(w => w.FullName).ThenBy(w => w.NIC).ToListAsync();
+            }
+            catch (SqliteException se) when (se.Message?.IndexOf("no such column", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Likely schema is missing added shadow column(s). Try to create the shadow column for Workers as a quick recovery,
+                // then attempt migrations and retry the query.
+                var col = "_concurrencyToken";
+                var created = false;
+                try
+                {
+                    created = await EnsureShadowColumnExistsAsync("Workers", col);
+                }
+                catch { created = false; }
+
+                if (!created)
+                {
+                    // fallback to running migrations which may add the column
+                    try
+                    {
+                        await DbPatcher.EnsureObligationSchema(_db, throwOnError: false);
+                    }
+                    catch { }
+                }
+
+                try
+                {
+                    WorkersGrid.ItemsSource = await q.OrderBy(w => w.FullName).ThenBy(w => w.NIC).ToListAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to load workers after attempting DB repair/migration: {ex.Message}", "Workers", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to load workers: {ex.Message}", "Workers", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
+        private async Task<bool> EnsureShadowColumnExistsAsync(string tableName, string columnName)
+        {
+            if (_db == null) return false;
+            var conn = _db.Database.GetDbConnection();
+            try
+            {
+                if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+                using var cmd = conn.CreateCommand();
+                // PRAGMA table_info returns columns: cid, name, type, notnull, dflt_value, pk
+                cmd.CommandText = $"PRAGMA table_info('{tableName}')";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var name = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    if (string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true; // already exists
+                    }
+                }
+
+                // Add the column as BLOB nullable. SQLite allows adding columns.
+                using var addCmd = conn.CreateCommand();
+                addCmd.CommandText = $"ALTER TABLE \"{tableName}\" ADD COLUMN \"{columnName}\" BLOB";
+                await addCmd.ExecuteNonQueryAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                try { await conn.CloseAsync(); } catch { }
+            }
+        }
+
         private async void WorkersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_db == null) return;

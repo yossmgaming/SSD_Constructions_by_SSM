@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using MainFunctions.Services;
 
 namespace MainFunctions
 {
@@ -84,6 +85,32 @@ namespace MainFunctions
         private void Advances_Click(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new Views.AdvancesView();
+        }
+
+        private void ViewDbLogs_Click(object sender, RoutedEventArgs e)
+        {
+            var lines = DbPatcher.GetLastLogLines(200);
+            var dlg = new Window
+            {
+                Title = "DB Patcher Logs",
+                Width = 800,
+                Height = 600,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new ScrollViewer
+                {
+                    Content = new TextBox
+                    {
+                        Text = string.Join(System.Environment.NewLine, lines),
+                        IsReadOnly = true,
+                        TextWrapping = TextWrapping.NoWrap,
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        FontFamily = new FontFamily("Consolas")
+                    }
+                }
+            };
+            dlg.ShowDialog();
         }
     }
 }
